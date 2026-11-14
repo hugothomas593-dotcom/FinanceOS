@@ -94,4 +94,31 @@ describe('Avenor financial intelligence', () => {
     expect(result.totalOutflows).toBe(40_000);
     expect(result.topSpendingCategories[0].category).toBe('payroll');
   });
+
+  it('calculates unit economics only when the relevant monthly inputs are available', async () => {
+    const { calculateUnitEconomics } = await import('../src/lib/finance-intelligence');
+    const result = calculateUnitEconomics({
+      mrr: 120_000,
+      activeCustomers: 100,
+      newCustomers: 10,
+      churnedCustomers: 5,
+      marketingSpend: 12_000,
+      salesSpend: 8_000,
+    }, 80);
+    expect(result.arpa).toBe(1_200);
+    expect(result.cac).toBe(2_000);
+    expect(result.monthlyLogoChurnPct).toBeCloseTo(5.2631579);
+    expect(result.cacPaybackMonths).toBeCloseTo(2.0833333);
+    expect(result.ltv).toBeCloseTo(18_240);
+    expect(result.ltvToCac).toBeCloseTo(9.12);
+  });
+
+  it('does not invent CAC or LTV when required metrics are missing', async () => {
+    const { calculateUnitEconomics } = await import('../src/lib/finance-intelligence');
+    const result = calculateUnitEconomics({ mrr: 20_000 }, 70);
+    expect(result.cac).toBeNull();
+    expect(result.ltv).toBeNull();
+    expect(result.missingData.length).toBeGreaterThan(0);
+  });
+
 });
