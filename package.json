@@ -1,5 +1,5 @@
 {
-  "name": "financeos-saas-starter",
+  "name": "avenor",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -11,7 +11,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@supabase/ssr": "^0.6.1",
+    "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.49.0",
     "next": "^15.2.0",
     "react": "^19.0.0",
