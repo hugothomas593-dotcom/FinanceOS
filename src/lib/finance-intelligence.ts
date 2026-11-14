@@ -320,6 +320,103 @@ export function calculateWorkingCapitalImpact(
   };
 }
 
+
+export type CompanyKpis = {
+  mrr?: number;
+  activeCustomers?: number;
+  newCustomers?: number;
+  churnedCustomers?: number;
+  marketingSpend?: number;
+  salesSpend?: number;
+  grossMarginPct?: number;
+};
+
+export function calculateUnitEconomics(
+  kpis: CompanyKpis,
+  fallbackGrossMarginPct?: number,
+) {
+  const grossMarginPct = kpis.grossMarginPct ?? fallbackGrossMarginPct ?? null;
+  const activeCustomers = kpis.activeCustomers ?? null;
+  const newCustomers = kpis.newCustomers ?? null;
+  const churnedCustomers = kpis.churnedCustomers ?? null;
+  const mrr = kpis.mrr ?? null;
+  const marketingSpend = kpis.marketingSpend ?? null;
+  const salesSpend = kpis.salesSpend ?? null;
+
+  const arpa = mrr !== null && activeCustomers !== null && activeCustomers > 0
+    ? mrr / activeCustomers
+    : null;
+  const openingCustomers =
+    activeCustomers !== null && newCustomers !== null && churnedCustomers !== null
+      ? activeCustomers + churnedCustomers - newCustomers
+      : null;
+  const monthlyLogoChurnPct =
+    openingCustomers !== null && openingCustomers > 0 && churnedCustomers !== null
+      ? (churnedCustomers / openingCustomers) * 100
+      : null;
+  const totalAcquisitionSpend =
+    marketingSpend !== null && salesSpend !== null
+      ? marketingSpend + salesSpend
+      : null;
+  const cac =
+    totalAcquisitionSpend !== null && newCustomers !== null && newCustomers > 0
+      ? totalAcquisitionSpend / newCustomers
+      : null;
+  const monthlyGrossProfitPerCustomer =
+    arpa !== null && grossMarginPct !== null
+      ? arpa * (grossMarginPct / 100)
+      : null;
+  const cacPaybackMonths =
+    cac !== null && monthlyGrossProfitPerCustomer !== null && monthlyGrossProfitPerCustomer > 0
+      ? cac / monthlyGrossProfitPerCustomer
+      : null;
+  const ltv =
+    monthlyGrossProfitPerCustomer !== null && monthlyLogoChurnPct !== null && monthlyLogoChurnPct > 0
+      ? monthlyGrossProfitPerCustomer / (monthlyLogoChurnPct / 100)
+      : null;
+  const ltvToCac = ltv !== null && cac !== null && cac > 0 ? ltv / cac : null;
+
+  const missingData: string[] = [];
+  if (mrr === null || activeCustomers === null) missingData.push('MRR and active customer count are required to calculate ARPA.');
+  if (marketingSpend === null || salesSpend === null || newCustomers === null) missingData.push('Marketing spend, sales spend and new customers are required to calculate blended CAC.');
+  if (churnedCustomers === null || activeCustomers === null || newCustomers === null) missingData.push('Opening customers, new customers and churned customers are required to calculate monthly logo churn.');
+  if (grossMarginPct === null) missingData.push('Gross margin is required to calculate gross-profit-based LTV and CAC payback.');
+  if (monthlyLogoChurnPct === 0) missingData.push('Observed churn is zero; LTV is not estimated from an arbitrary floor.');
+  if (monthlyLogoChurnPct !== null && monthlyLogoChurnPct < 0) missingData.push('The supplied customer movements imply negative opening customers; reconcile customer counts.');
+
+  return {
+    mrr,
+    arr: mrr !== null ? mrr * 12 : null,
+    activeCustomers,
+    newCustomers,
+    churnedCustomers,
+    openingCustomers,
+    arpa,
+    grossMarginPct,
+    totalAcquisitionSpend,
+    cac,
+    monthlyLogoChurnPct,
+    monthlyGrossProfitPerCustomer,
+    cacPaybackMonths,
+    ltv,
+    ltvToCac,
+    methodology: {
+      arpa: 'MRR divided by active customers for the same reporting period.',
+      cac: 'Marketing plus sales spend divided by new customers for the same reporting period.',
+      monthlyLogoChurn: 'Churned customers divided by estimated opening customers (ending active + churned − new).',
+      ltv: 'Monthly gross profit per customer divided by monthly logo churn rate.',
+      ltvToCac: 'Estimated gross-profit LTV divided by blended CAC.',
+    },
+    caveats: [
+      'All inputs are manually supplied monthly business metrics unless otherwise labeled.',
+      'CAC is a blended one-period estimate; it is not cohort-attributed and may not match fully loaded acquisition cost.',
+      'LTV assumes constant ARPA, gross margin and churn; it is a simple steady-state estimate, not a cohort-based lifetime model.',
+      'Monthly active customers, new customers and churned customers must use a consistent customer definition and period.',
+    ],
+    missingData,
+  };
+}
+
 export function buildCompanySnapshot(
   inputs: ModelInputs | null,
   actuals: ActualRecord[],
