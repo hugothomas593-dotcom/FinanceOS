@@ -510,3 +510,29 @@ td:first-child { color: #425a68; font-weight: 550; }
   .decision-row { align-items: flex-start; }
   .assumption-actions { align-items: flex-start; flex-direction: column; }
 }
+
+/* Inputs and status controls */
+.sync-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 5px 8px;
+  border: 1px solid #e7edef;
+  border-radius: 5px;
+  background: #fafbfc;
+}
+.login-card select {
+  width: 100%;
+  border: 1px solid #dfe6e9;
+  border-radius: 6px;
+  padding: 11px;
+  background: #fff;
+  color: #2f4654;
+  font-size: 11px;
+}
+.login-card a { color: #426b58; font-size: 10px; text-decoration: none; }
+.login-card a:hover { text-decoration: underline; }
+.empty-state.large-empty { max-width: 760px; margin: 24px auto; padding: 36px; border-radius: 8px; }
+.empty-state.large-empty .button-primary { margin-top: 8px; }
+.number-field input::placeholder { color: #aab4ba; }
+textarea:focus, input:focus, select:focus { outline-color: rgba(49,93,120,.18); }
