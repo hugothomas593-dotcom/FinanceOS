@@ -391,7 +391,7 @@ export async function POST(request: Request) {
     };
 
     const agent = new ToolLoopAgent({
-      model: 'anthropic/claude-sonnet-4.6',
+      model: process.env.AI_GATEWAY_MODEL || 'anthropic/claude-sonnet-4.6',
       instructions: formatInstructions(organizationName, currency, snapshot),
       tools,
       stopWhen: stepCountIs(6),

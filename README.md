@@ -8,7 +8,7 @@ Avenor is an early SaaS codebase for European Seed-stage startups. It combines a
 - Next.js 15 App Router, React 19, TypeScript
 - Supabase Auth + Postgres + Row Level Security
 - Deterministic TypeScript financial engine
-- OpenAI Responses API for explanation only (optional; server-side key)
+- Vercel AI Gateway + AI SDK 7 ToolLoopAgent for the financial Copilot; Vercel deployments authenticate with OIDC, local development uses an optional server-side Gateway key
 - Stripe Checkout + signed webhook scaffold
 
 ## Local setup
@@ -20,14 +20,14 @@ Avenor is an early SaaS codebase for European Seed-stage startups. It combines a
 6. Open `/login`, create an account, confirm the email, and create a company at `/onboarding`.
 
 ## Implemented in this codebase
-- Dashboard and editable illustrative financial assumptions.
-- 18-month deterministic forecast and hiring scenario calculation.
+- Dashboard and persisted company financial assumptions.
+- 18-month deterministic financial forecast and multi-decision scenario calculations (hiring, pricing, general recurring and one-off decisions, break-even, affordable investment, fundraising/dilution and working capital).
 - Scenario comparison and local demo Decision Ledger.
 - Supabase server/browser client helpers and auth refresh middleware.
 - Login/sign-up page and auth callback.
 - Organization onboarding RPC with owner membership.
 - Authenticated APIs for organization creation, model versions, scenarios, CSV actuals import, and Copilot.
-- Copilot reads the latest approved model, calculates with the deterministic engine, then optionally uses the LLM to explain supplied outputs. The LLM does not calculate authoritative numbers.
+- Avenor Intelligence uses a side-panel chat with persistent, creator-private conversation history. It reads the latest approved model (or latest draft with an explicit warning) and imported actuals, uses deterministic financial tools for scenarios and metrics, and uses the LLM to interpret and explain the outputs. The LLM does not calculate authoritative numbers.
 - Stripe Checkout API with server-controlled return URLs and webhook signature verification/idempotency scaffold.
 - Health/configuration endpoint.
 
@@ -46,7 +46,7 @@ Avenor is an early SaaS codebase for European Seed-stage startups. It combines a
 Minimum columns: `Date,Amount`. Optional columns: `Description,Category`. Positive amounts are treated as inflows; negative amounts as outflows. Use ISO dates (`YYYY-MM-DD`). Dot-decimal and common European decimal-comma amounts are supported. Maximum 10,000 rows / 2 MB per import.
 
 ## Required environment variables
-See `.env.example`. `SUPABASE_SERVICE_ROLE_KEY` is only used by the Stripe webhook and must never be exposed to the browser. `OPENAI_API_KEY`, `OPENAI_MODEL`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_PRICE_ID` are server-only.
+See `.env.example`. `SUPABASE_SERVICE_ROLE_KEY`, `AI_GATEWAY_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_PRICE_ID` are server-only. Vercel deployments use the platform-provided OIDC token for AI Gateway; a private `AI_GATEWAY_API_KEY` is only needed for local development outside a linked Vercel environment. `AI_GATEWAY_MODEL` defaults to `anthropic/claude-sonnet-4.6`.
 
 ## Before a commercial launch — mandatory
 - Configure production Supabase, email confirmation, allowed redirect URLs, backups, and database access policies.
@@ -69,3 +69,13 @@ The current deterministic forecast is a simplified operating cash model. Runway 
 
 ## Deployment distinction
 Supabase is for database/authentication; it does not host the Next.js website. Apply the SQL in `supabase/FINANCEOS_SETUP_ALL.sql` to Supabase, then deploy the application separately (for example with Vercel). See `SUPABASE_SETUP.md`. This build is not production-certified; see `BUILD_STATUS.md` before using customer data or payments.
+
+
+## Avenor Intelligence — Copilot scope and limitations
+- The persistent side panel is available across the authenticated dashboard. Conversations are private to the user who created them within their workspace.
+- The agent can inspect the saved financial model and up to 5,000 imported actual records; it can analyze historical inflows/outflows, recent trends and expense categories.
+- Deterministic tools cover a general 18-month operating-cash scenario, hiring cost, break-even revenue, affordable one-off investment under a target-runway constraint, pricing/volume sensitivity, simple fundraising dilution, and working-capital payment-day sensitivity.
+- Tool results and model evidence are saved with assistant messages; a modeled scenario can be saved to the Decision Ledger.
+- AI explanations are routed through Vercel AI Gateway. The default model is Claude Sonnet 4.6; inference requests are pinned to the EU. Vercel-hosted Preview/Production uses OIDC. Local development outside Vercel needs a private `AI_GATEWAY_API_KEY`.
+- The agent cannot execute payments, alter accounting records, approve spending, run payroll, or replace the accountable founder, accountant, lawyer or payroll specialist.
+- Current engine exclusions include tax/VAT schedules, working-capital detail beyond a user-supplied DSO/DPO/DIO sensitivity, debt schedules, FX, capex timing/depreciation, deferred revenue, and customer-level CAC/LTV/churn/cohort metrics. Missing data is disclosed rather than inferred.
