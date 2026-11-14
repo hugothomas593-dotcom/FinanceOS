@@ -83,4 +83,4 @@ A detailed source audit is maintained in `docs/AVENOR_AUDIT_2026-11-14.md`. Verc
 - Replaced the dark decorative sidebar and heavy AI-style treatments with a white workspace navigation, restrained navy/green palette, Inter typography, fine borders and lighter hierarchy.
 - Simplified the Avenor chat language and made it a non-blocking desktop side panel; mobile uses a full-screen layout.
 - The app title and description now present Avenor as a financial workspace, not an AI demonstration.
-- No Production deployment. Latest CI is running on the current branch head.
+- No Production deployment. Final CI on commit `4c7e6db6668c282ee7e4cf4fdce9c30745b9ab54` passed 25 unit tests, Next.js production build and TypeScript.
