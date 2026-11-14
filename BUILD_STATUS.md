@@ -77,3 +77,10 @@ A detailed source audit is maintained in `docs/AVENOR_AUDIT_2026-11-14.md`. Verc
 - Local Vercel CLI fallback was unavailable in the connected runtime (no Vercel CLI token).
 - No live authenticated Copilot/AI Gateway request has been verified yet; UI/API/tool implementation is code/build validated only.
 - Supabase Auth advisor warns leaked-password protection is disabled; enable this before public registrations. Stripe webhook no-client-policy notice is intentional.
+
+## Professional interface refinement — 15 November 2026
+- Reworked the dashboard, navigation, metric cards, data tables, input forms, login and onboarding screens with a consistent neutral finance-software design.
+- Replaced the dark decorative sidebar and heavy AI-style treatments with a white workspace navigation, restrained navy/green palette, Inter typography, fine borders and lighter hierarchy.
+- Simplified the Avenor chat language and made it a non-blocking desktop side panel; mobile uses a full-screen layout.
+- The app title and description now present Avenor as a financial workspace, not an AI demonstration.
+- No Production deployment. Latest CI is running on the current branch head.
