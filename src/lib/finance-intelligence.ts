@@ -309,6 +309,84 @@ export function calculateFundraisingImpact(
   };
 }
 
+
+export function simulateMarketingInvestment(
+  inputs: ModelInputs,
+  assumptions: {
+    campaignBudget: number;
+    monthlyMarketingSpendIncrease: number;
+    expectedRevenueUpliftPct: number;
+    expectedNewCustomers: number;
+    horizonMonths?: number;
+  },
+) {
+  const horizon = assumptions.horizonMonths ?? 18;
+  if (assumptions.campaignBudget < 0 || assumptions.monthlyMarketingSpendIncrease < 0) {
+    throw new Error('Marketing spend cannot be negative.');
+  }
+  if (assumptions.expectedRevenueUpliftPct < -100 || assumptions.expectedRevenueUpliftPct > 500) {
+    throw new Error('Expected revenue uplift must be between -100% and +500%.');
+  }
+  if (!Number.isInteger(assumptions.expectedNewCustomers) || assumptions.expectedNewCustomers < 0) {
+    throw new Error('Expected new customers must be a non-negative whole number.');
+  }
+  if (!Number.isInteger(horizon) || horizon < 1 || horizon > 36) {
+    throw new Error('Marketing horizon must be between 1 and 36 months.');
+  }
+
+  const scenario = simulateFinancialDecision(inputs, {
+    name: 'Marketing investment',
+    revenueChangePct: assumptions.expectedRevenueUpliftPct,
+    monthlyOpexChange: assumptions.monthlyMarketingSpendIncrease,
+    oneTimeCashImpact: -assumptions.campaignBudget,
+    oneTimeMonth: 1,
+    horizonMonths: horizon,
+  });
+
+  const uplift = assumptions.expectedRevenueUpliftPct / 100;
+  const monthlyGrossMargin = 1 - inputs.cogsRatio;
+  let baselineRevenue = inputs.monthlyRevenue;
+  let totalIncrementalRevenue = 0;
+  for (let month = 0; month < horizon; month += 1) {
+    totalIncrementalRevenue += baselineRevenue * uplift;
+    baselineRevenue *= 1 + inputs.monthlyRevenueGrowth;
+  }
+
+  const totalMarketingSpend =
+    assumptions.campaignBudget + assumptions.monthlyMarketingSpendIncrease * horizon;
+  const incrementalGrossProfit = totalIncrementalRevenue * monthlyGrossMargin;
+  const modeledContribution = incrementalGrossProfit - totalMarketingSpend;
+  const blendedCampaignCac = assumptions.expectedNewCustomers > 0
+    ? totalMarketingSpend / assumptions.expectedNewCustomers
+    : null;
+  const monthlyIncrementalGrossProfit = inputs.monthlyRevenue * uplift * monthlyGrossMargin;
+  const monthlyNetContributionAfterRunRateSpend =
+    monthlyIncrementalGrossProfit - assumptions.monthlyMarketingSpendIncrease;
+  const campaignPaybackMonths = monthlyNetContributionAfterRunRateSpend > 0
+    ? assumptions.campaignBudget / monthlyNetContributionAfterRunRateSpend
+    : null;
+
+  return {
+    assumptions,
+    totalMarketingSpend,
+    totalIncrementalRevenue,
+    incrementalGrossProfit,
+    modeledContribution,
+    modeledRoiPct: totalMarketingSpend > 0
+      ? (modeledContribution / totalMarketingSpend) * 100
+      : null,
+    blendedCampaignCac,
+    campaignPaybackMonths,
+    scenario,
+    caveats: [
+      'Expected revenue uplift and new customers are user-provided assumptions, not observed campaign outcomes.',
+      'CAC is a blended campaign estimate using the supplied campaign budget plus recurring marketing spend and supplied new-customer count.',
+      'Payback assumes the current monthly gross-profit uplift persists; it is not a cohort-based payback curve.',
+      'Excludes sales commission, agency fees, attribution lag, discounting, retention, refunds and channel mix unless included in supplied spend.',
+    ],
+  };
+}
+
 export function calculateWorkingCapitalImpact(
   inputs: ModelInputs,
   changeInDsoDays: number,
