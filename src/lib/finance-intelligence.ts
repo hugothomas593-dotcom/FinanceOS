@@ -203,15 +203,28 @@ export function simulateHiringDecision(inputs: ModelInputs, hire: HireInput, hor
   };
 }
 
-export function calculateBreakEven(inputs: ModelInputs) {
+export type BreakEvenResult =
+  | { possible: false; reason: string }
+  | {
+      possible: true;
+      grossMarginPct: number;
+      monthlyFixedCosts: number;
+      requiredMonthlyRevenue: number;
+      currentMonthlyRevenue: number;
+      monthlyRevenueGap: number;
+      requiredRevenueGrowthPct: number | null;
+      caveat: string;
+    };
+
+export function calculateBreakEven(inputs: ModelInputs): BreakEvenResult {
   const grossMargin = 1 - inputs.cogsRatio;
   const monthlyFixedCosts = inputs.monthlyOpexExPayroll + inputs.existingMonthlyPayroll;
   if (grossMargin <= 0) {
-    return { possible: false, reason: 'Gross margin is zero or negative; no finite break-even revenue can be calculated.' };
+    return { possible: false as const, reason: 'Gross margin is zero or negative; no finite break-even revenue can be calculated.' };
   }
   const requiredRevenue = monthlyFixedCosts / grossMargin;
   return {
-    possible: true,
+    possible: true as const,
     grossMarginPct: grossMargin * 100,
     monthlyFixedCosts,
     requiredMonthlyRevenue: requiredRevenue,
