@@ -21,8 +21,12 @@ type CopilotEvidence = {
     actuals?: {
       records?: number;
       monthsCovered?: number;
-      revenueTrendPct?: number | null;
+      inflowTrendPct?: number | null;
       outflowTrendPct?: number | null;
+    };
+    businessMetrics?: {
+      period?: string | null;
+      unitEconomics?: Record<string, number | string | null | unknown>;
     };
     missingData?: string[];
   };
@@ -153,6 +157,8 @@ export function AvenorCopilot({
     'How much monthly revenue do we need to break even?',
     'Model a 10% price increase with a 5% volume decline.',
     'What working-capital risk do slower customer payments create?',
+    'What are our CAC, LTV and CAC payback from this month’s metrics?',
+    'Are we losing customers faster than we are acquiring them?',
   ], []);
 
   async function loadThread(id: string) {
@@ -364,6 +370,39 @@ export function AvenorCopilot({
                                       <strong>{suffix === '%' ? `${Number(value).toFixed(1)}%` : formatMoney(Number(value), evidence.currency || currency)}</strong>
                                     </div>
                                   ))}
+                                </div>
+                              )}
+                              {evidence.snapshot?.businessMetrics?.unitEconomics && (
+                                <div className={styles.unitEconomics}>
+                                  <div className={styles.unitHeading}>
+                                    <strong>SaaS unit economics</strong>
+                                    <span>{evidence.snapshot.businessMetrics.period || 'Latest supplied month'}</span>
+                                  </div>
+                                  <div className={styles.metricEvidence}>
+                                    {[
+                                      ['MRR', evidence.snapshot.businessMetrics.unitEconomics.mrr, 'money'],
+                                      ['ARR', evidence.snapshot.businessMetrics.unitEconomics.arr, 'money'],
+                                      ['ARPA', evidence.snapshot.businessMetrics.unitEconomics.arpa, 'money'],
+                                      ['CAC', evidence.snapshot.businessMetrics.unitEconomics.cac, 'money'],
+                                      ['LTV', evidence.snapshot.businessMetrics.unitEconomics.ltv, 'money'],
+                                      ['CAC payback', evidence.snapshot.businessMetrics.unitEconomics.cacPaybackMonths, 'months'],
+                                      ['Monthly churn', evidence.snapshot.businessMetrics.unitEconomics.monthlyLogoChurnPct, 'percent'],
+                                      ['LTV / CAC', evidence.snapshot.businessMetrics.unitEconomics.ltvToCac, 'ratio'],
+                                    ].filter((item) => typeof item[1] === 'number').map(([label, value, format]) => (
+                                      <div key={String(label)}>
+                                        <span>{String(label)}</span>
+                                        <strong>
+                                          {format === 'money'
+                                            ? formatMoney(Number(value), evidence.currency || currency)
+                                            : format === 'percent'
+                                              ? `${Number(value).toFixed(1)}%`
+                                              : format === 'months'
+                                                ? `${Number(value).toFixed(1)} months`
+                                                : `${Number(value).toFixed(2)}x`}
+                                        </strong>
+                                      </div>
+                                    ))}
+                                  </div>
                                 </div>
                               )}
                               {evidence.calculations?.length ? (
