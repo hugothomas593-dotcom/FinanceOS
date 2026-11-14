@@ -407,6 +407,11 @@ export async function POST(request: Request) {
         messages: history,
         abortSignal: request.signal,
         timeout: 50_000,
+        providerOptions: {
+          gateway: {
+            inferenceRegion: { scope: 'zone', geoRegion: 'eu' },
+          },
+        },
       });
       answer = generated.text.trim();
       if (!answer) throw new Error('The AI model returned an empty response');
