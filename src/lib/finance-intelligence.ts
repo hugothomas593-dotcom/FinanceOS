@@ -64,10 +64,10 @@ export function analyzeHistoricalActuals(actuals: ActualRecord[]) {
   const previous = monthly.slice(-6, -3);
   const totalInflows = monthly.reduce((sum, row) => sum + row.inflows, 0);
   const totalOutflows = monthly.reduce((sum, row) => sum + row.outflows, 0);
-  const averageMonthlyRevenue = monthly.length ? totalInflows / monthly.length : 0;
+  const averageMonthlyInflows = monthly.length ? totalInflows / monthly.length : 0;
   const averageMonthlyOutflows = monthly.length ? totalOutflows / monthly.length : 0;
-  const latestRevenue = latest.reduce((sum, row) => sum + row.inflows, 0);
-  const previousRevenue = previous.reduce((sum, row) => sum + row.inflows, 0);
+  const latestInflows = latest.reduce((sum, row) => sum + row.inflows, 0);
+  const previousInflows = previous.reduce((sum, row) => sum + row.inflows, 0);
   const latestOutflows = latest.reduce((sum, row) => sum + row.outflows, 0);
   const previousOutflows = previous.reduce((sum, row) => sum + row.outflows, 0);
   const topSpendingCategories = [...spendByCategory.entries()]
@@ -82,11 +82,11 @@ export function analyzeHistoricalActuals(actuals: ActualRecord[]) {
     totalInflows,
     totalOutflows,
     netCashMovement: totalInflows - totalOutflows,
-    averageMonthlyRevenue,
+    averageMonthlyInflows,
     averageMonthlyOutflows,
-    latestThreeMonthRevenue: latestRevenue,
-    previousThreeMonthRevenue: previousRevenue,
-    revenueTrendPct: previousRevenue > 0 ? ((latestRevenue - previousRevenue) / previousRevenue) * 100 : null,
+    latestThreeMonthInflows: latestInflows,
+    previousThreeMonthInflows: previousInflows,
+    inflowTrendPct: previousInflows > 0 ? ((latestInflows - previousInflows) / previousInflows) * 100 : null,
     outflowTrendPct: previousOutflows > 0 ? ((latestOutflows - previousOutflows) / previousOutflows) * 100 : null,
     topSpendingCategories,
     monthly,
