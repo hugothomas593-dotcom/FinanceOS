@@ -422,15 +422,24 @@ export function buildCompanySnapshot(
   actuals: ActualRecord[],
   currency: string,
   modelStatus: string | null,
+  companyKpis: CompanyKpis = {},
 ) {
   const historical = analyzeHistoricalActuals(actuals);
+  const unitEconomics = calculateUnitEconomics(
+    companyKpis,
+    inputs ? (1 - inputs.cogsRatio) * 100 : undefined,
+  );
   if (!inputs) {
     return {
       modelAvailable: false,
       modelStatus,
       currency,
       historical,
-      missingData: ['No saved financial model is available. Enter opening cash, revenue, payroll, operating expenses and COGS before company-specific forecasting.'],
+      unitEconomics,
+      missingData: [
+        'No saved financial model is available. Enter opening cash, revenue, payroll, operating expenses and COGS before company-specific forecasting.',
+        ...unitEconomics.missingData,
+      ],
     };
   }
 
@@ -442,7 +451,7 @@ export function buildCompanySnapshot(
     ...(historical.monthsCovered < 6 ? ['At least six months of categorized actuals are needed for reliable historical trend analysis.'] : []),
     'No verified tax/VAT payment calendar is loaded.',
     'No receivables, payables, debt, deferred revenue or capex schedule is loaded.',
-    'No customer-level acquisition, retention or cohort data is loaded; CAC, LTV and churn cannot yet be calculated.',
+    ...unitEconomics.missingData,
   ];
   return {
     modelAvailable: true,
@@ -460,6 +469,8 @@ export function buildCompanySnapshot(
     },
     forecast: summary,
     historical,
+    unitEconomics,
+    businessKpis: companyKpis,
     missingData,
   };
 }
