@@ -1,18 +1,17 @@
-
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { getSupabasePublicConfig } from '@/lib/supabase/config';
 
 export async function createSupabaseServerClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const config = getSupabasePublicConfig();
 
-  if (!url || !anonKey) {
+  if (!config) {
     throw new Error('Supabase is not configured');
   }
 
   const cookieStore = await cookies();
 
-  return createServerClient(url, anonKey, {
+  return createServerClient(config.url, config.key, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -22,7 +21,8 @@ export async function createSupabaseServerClient() {
           name: string;
           value: string;
           options: any;
-        }>
+        }>,
+        _headers
       ) {
         try {
           cookiesToSet.forEach(({ name, value, options }) => {
@@ -30,7 +30,7 @@ export async function createSupabaseServerClient() {
           });
         } catch {
           // Server Components cannot always mutate cookies.
-          // Middleware refreshes sessions.
+          // The Next.js middleware refreshes sessions and writes response cookies.
         }
       },
     },
@@ -51,4 +51,3 @@ export async function requireUser() {
 
   return { supabase, user };
 }
-
