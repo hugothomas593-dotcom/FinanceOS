@@ -121,4 +121,22 @@ describe('Avenor financial intelligence', () => {
     expect(result.missingData.length).toBeGreaterThan(0);
   });
 
+
+  it('models marketing spend, estimated customer acquisition and campaign contribution', async () => {
+    const { simulateMarketingInvestment } = await import('../src/lib/finance-intelligence');
+    const result = simulateMarketingInvestment(inputs, {
+      campaignBudget: 10_000,
+      monthlyMarketingSpendIncrease: 2_000,
+      expectedRevenueUpliftPct: 10,
+      expectedNewCustomers: 20,
+      horizonMonths: 12,
+    });
+    expect(result.totalMarketingSpend).toBe(34_000);
+    expect(result.totalIncrementalRevenue).toBe(120_000);
+    expect(result.incrementalGrossProfit).toBe(96_000);
+    expect(result.modeledContribution).toBe(62_000);
+    expect(result.blendedCampaignCac).toBe(1_700);
+    expect(result.scenario.impact.endingCash).toBe(62_000);
+  });
+
 });
