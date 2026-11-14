@@ -434,7 +434,7 @@ export async function POST(request: Request) {
         actuals: {
           records: historical.records,
           monthsCovered: historical.monthsCovered,
-          revenueTrendPct: historical.revenueTrendPct,
+          inflowTrendPct: historical.inflowTrendPct,
           outflowTrendPct: historical.outflowTrendPct,
           topSpendingCategories: historical.topSpendingCategories,
         },
