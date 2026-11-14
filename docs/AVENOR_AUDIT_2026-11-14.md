@@ -2,95 +2,90 @@
 
 **Audit date:** 14 November 2026  
 **Repository:** `hugothomas593-dotcom/FinanceOS`  
-**Scope:** GitHub source tree, application routes, financial engine, Supabase migrations, Vercel projects and deployment metadata.  
+**Scope:** GitHub source, application routes, finance engine, Supabase schema and Vercel deployment configuration.  
 **Release verdict:** NOT PRODUCTION READY.
 
 ## Executive findings
 
-The repository is a functional prototype foundation, not a commercial MVP. It contains a Next.js App Router application, authenticated API routes, a deterministic TypeScript forecasting engine, CSV parsing, Stripe scaffolding, SQL migrations and unit tests. The dashboard remains predominantly a local demonstration and is not yet a persisted company finance workspace.
+The repository is a prototype foundation, not yet a commercial MVP. It contains a Next.js App Router application, authenticated API routes, a deterministic TypeScript forecasting engine, CSV parsing, Stripe scaffolding, SQL migrations and unit tests. The dashboard still relies primarily on local demonstration assumptions rather than a complete persisted company finance workspace.
 
-## Confirmed application gaps
+## Application gaps confirmed
 
-1. The main dashboard initializes financial assumptions directly in the client. It does not load an approved model or actuals from the authenticated workspace.
-2. The Decision Simulator calculates locally. Its Decision Ledger is React component state and is lost on reload; saved scenarios do not use the scenarios API.
+1. The main dashboard initializes financial assumptions in client state; it does not load an approved model or actuals from the authenticated workspace.
+2. The Decision Simulator calculates locally. Its Decision Ledger is React component state and is lost on reload; saved scenarios are not yet connected to the scenarios API.
 3. The visible Copilot preview is rule-based and does not call the server Copilot API.
-4. CSV actuals are written through an authenticated API but are not reconciled into dashboard forecasts. The import route now creates stable row references to avoid duplicate records when the same CSV is imported again.
-5. The fundraising and investor-reporting views are simplified calculators and must not be presented as validated financial reporting.
-6. Password reset was absent from the sign-in flow. The callback previously ignored the result of exchanging the authorization code; both flows have been improved in this branch.
-7. Branding was inconsistent across metadata, onboarding and the dashboard.
+4. CSV actuals can be written through an authenticated API. The import path now uses stable row references and workspace currency, but imported actuals are not yet reconciled into dashboard forecasts.
+5. Fundraising and investor-reporting views are simplified calculators, not validated financial reporting.
+6. Password reset screens and a hardened auth callback have been added in the hardening branch; these flows still require end-to-end verification.
+7. Branding has been aligned to Avenor in the screens touched by this branch.
 
-## Confirmed infrastructure and release gaps
+## Supabase — confirmed production project and schema
 
-### Supabase
+- The user confirmed that Supabase project `qeitvqzujytiiupmkmyp` (workspace label `cleardesk.pro@gmail.com's Project`, region `eu-west-1`) is the intended Avenor project.
+- The project's original application schema was empty after a prior cleanup. A controlled recovery script was added at `supabase/recovery/2026-11-14_restore_avenor_after_manual_rollback.sql` and applied to the confirmed project.
+- The restored schema contains 10 public application tables: organizations, organization_members, financial_actuals, model_versions, scenarios, copilot_threads, copilot_messages, audit_events, subscriptions and stripe_webhook_events.
+- RLS is enabled on all 10 tables. A database check confirmed 21 policies assigned to authenticated users; the public onboarding wrapper is SECURITY INVOKER, anonymous users cannot execute it, and authenticated users can.
+- All ten tables currently contain zero business rows. No customer financial data was present or deleted.
+- The Supabase security advisor reports one informational finding: `stripe_webhook_events` has RLS enabled with no client-facing policies. This table is deliberately server-only; privileges are revoked from public/anon/authenticated and granted to service_role. No warning-level security finding was returned.
+- Performance advisor "unused index" notices are expected at this stage because this is a newly initialized database with no application activity.
 
-- The Supabase URL configured in the Vercel Production environment is `https://qeitvqzujytiiupmkmyb.supabase.co`, matching the project reference in the original brief.
-- The connected Supabase account does **not** have permission to inspect that production project. Its project list exposes a different project, `qeitvqzujytiiupmkmyp`, in the EU region.
-- Migrations `001` through `006` were temporarily applied to the accessible but different project while checking whether it was the intended environment. After confirming the mismatch, all ten tables and the helper functions created by this work were dropped. A rollback migration was recorded. The tables were verified to contain zero rows before rollback; no user data was deleted.
-- The accessible project now has no public application tables. **No migrations have been applied to the production Supabase project `qeitvqzujytiiupmkmyb`.** Its schema and RLS policies remain unverified until access is granted to that exact project.
-- Supabase production credentials were not copied into preview environments. Previews must not share the production database by default.
+## Vercel — project and environment state
 
-### Vercel
+- Three Vercel projects had been linked to the same Git repository: `financeos`, `financeoss` and `financeosss`.
+- The user-facing domain `financeosss.vercel.app` belongs to `financeosss` and remains verified and attached.
+- The duplicate projects `financeos` and `financeoss` had previews disabled. The canonical project's automatic previews are also paused to prevent them from using Production credentials before an isolated staging environment exists.
+- All three projects were aligned to Next.js, automatic output-directory detection and Node 22.x. The former `financeos` project had been forcing a static `public` output directory, causing `STATIC_BUILD_NO_OUT_DIR` notifications.
+- The failed preview build for commit `09a82dc` was caused by a nullable Supabase `getClaims()` type access in middleware. This was corrected in the hardening branch; subsequent GitHub CI builds pass.
+- Vercel Production environment variables were verified against the user-confirmed Supabase project:
+  - `NEXT_PUBLIC_SUPABASE_URL` matches `https://qeitvqzujytiiupmkmyp.supabase.co`.
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` matches that project's legacy anon key.
+  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is set to that project's publishable key.
+- Environment variable changes apply to the next deployment/build. The currently active Production deployment remains on the old `main` commit; no Production redeployment has been triggered.
+- Preview deployments remain paused until a separate staging Supabase project/credentials can be provided. Do not point preview builds to Production data.
 
-- Three projects (`financeos`, `financeoss`, and `financeosss`) were linked to the same Git repository, so one commit generated multiple preview deployments.
-- The `financeos` project had no framework selected and required a static `public` output directory. This caused the `STATIC_BUILD_NO_OUT_DIR` failures on later commits. Its preview deployments are now disabled; its framework, output and Node settings were also aligned to Next.js.
-- The exact failure in preview deployment for commit `09a82dc` was a TypeScript error in middleware while destructuring the nullable Supabase `getClaims()` result. That code was corrected in a later commit and the current GitHub Actions build/typecheck passes.
-- `financeoss` was a duplicate Next.js project. Its previews are disabled and its framework/output/Node settings are aligned.
-- `financeosss` is the intended project because it owns the configured domain `financeosss.vercel.app`. That domain remains attached and verified. Its framework is Next.js, Node is set to 22.x and the output directory is auto-detected.
-- Automatic preview deployments are currently disabled on all three projects while the correct Supabase access and isolated preview environment are unresolved. Existing Production domains and the Production deployment were not changed. No production deployment was triggered during this work.
-- The current Production deployment still points to the pre-hardening `main` commit. The code changes in this PR have not been merged or deployed to Production.
+## CI and repository
 
-### CI and repository
+- Added `.gitignore`, `.env.example`, shared Supabase public-key config, auth callback hardening, forgot/reset password pages, stable CSV import references, regression tests, technical audit and GitHub Actions CI.
+- The latest CI run before the most recent documentation/recovery-script commits passed 15/15 Vitest tests, Next.js production build and TypeScript. A new run is triggered by the latest commit.
+- The original repository had no `package-lock.json`; dependency resolution should be made reproducible before release.
+- CI does not replace browser end-to-end testing, multi-tenant RLS tests, a Stripe test-mode acceptance test or Production smoke testing.
 
-- The original repository had no `package-lock.json`; dependency resolution is not yet fully reproducible.
-- A GitHub Actions workflow now runs dependency installation, 15 Vitest tests, a Next.js production build and a TypeScript check. All passed on the latest validated hardening commit before this documentation refresh.
-- CI does not replace browser end-to-end tests, two-organization RLS tests, Stripe test-mode acceptance or a production smoke test.
+## Work completed in this hardening pass
 
-## Reusable components
-
-- Next.js 15 App Router and TypeScript structure.
-- Supabase SSR client and cookie-based session middleware.
-- Organization membership model and API membership checks.
-- SQL migrations for organizations, model versions, actuals, scenarios, audit events and Stripe event receipts.
-- Deterministic forecast engine and CSV parser with unit tests.
-- Stripe Checkout and signed webhook scaffolding.
-
-## Work completed in the hardening branch
-
-- Added a repository `.gitignore` and safe `.env.example`.
-- Upgraded Supabase SSR support to the 0.12 line, added a shared public-key configuration helper, and aligned middleware with Supabase's `getClaims()` guidance and cache headers.
+- Added repository hygiene files and environment-variable guidance.
+- Upgraded `@supabase/ssr` to 0.12.7, centralized the public Supabase key, and updated middleware to use `getClaims()` and preserve refreshed cookies/cache headers.
 - Hardened the auth callback and added password reset request/update screens.
-- Made CSV imports idempotent at the transaction-row level and use the workspace's configured base currency.
-- Added unit tests for deterministic import references.
-- Aligned visible product naming to Avenor.
-- Added a CI workflow for type checking, unit tests and production build validation.
-- Audited and corrected Vercel project build settings; paused duplicate and automatic preview deployments to stop repetitive failed-preview emails.
-- Rolled back the temporary schema creation on the wrong, accessible Supabase project after identifying that Vercel Production points to a different project. No production Supabase schema changes were made.
+- Made CSV imports idempotent at the transaction-row level and use workspace currency.
+- Added deterministic import-reference tests.
+- Aligned visible app branding and metadata to Avenor.
+- Added CI for unit tests, production build and type checking.
+- Restored the confirmed Supabase schema and verified RLS/privileges.
+- Corrected Vercel Production Supabase URL and keys, and disabled duplicate/automatic previews while staging remains unavailable.
 
 ## Prioritized remaining work
 
 ### P0 — before customer financial data
-1. Grant the connected Supabase integration access to the exact production project `qeitvqzujytiiupmkmyb`, then inspect its tables, migrations, RLS policies and advisors.
-2. Confirm and apply versioned migrations to the intended database only.
-3. Test RLS with at least two users across at least two organizations, including read, insert, update and delete attempts.
-4. Verify sign-up, email confirmation, sign-in, password reset, session refresh, sign-out and workspace onboarding end-to-end.
-5. Connect the dashboard and assumptions editor to persisted approved model versions; remove illustrative assumptions from real workspaces.
-6. Reconcile imported actuals into the model with transaction preview, error reporting, duplicate feedback and currency handling.
-7. Persist scenarios and Decision Ledger entries in Supabase, with snapshots of assumptions, model version and calculated outputs.
-8. Create an isolated preview/staging Supabase environment, add preview-only credentials, and re-enable a single Vercel preview project.
+1. Add a separate staging Supabase project and preview-only credentials; re-enable one Vercel preview project only after isolation is verified.
+2. Test RLS with at least two users across at least two organizations, including read/insert/update/delete attempts.
+3. Verify sign-up, email confirmation, sign-in, password reset, session refresh, sign-out and workspace onboarding end-to-end.
+4. Connect dashboard and assumptions editor to persisted approved model versions; remove demo assumptions from real workspaces.
+5. Complete CSV preview, validation, error reporting, duplicate feedback and actuals-to-forecast reconciliation.
+6. Persist scenarios and Decision Ledger entries in Supabase, including model-version and output snapshots.
+7. Only then merge and redeploy to Production; run authenticated smoke tests on the canonical domain.
 
 ### P1 — before charging customers
-1. Connect the Copilot UI to the authenticated Copilot endpoint and persist conversation threads; constrain AI explanations to deterministic outputs and evidence.
-2. Complete Stripe entitlements, billing portal, cancellation, failed payment, invoices, VAT and webhook replay/reconciliation.
-3. Add rate limiting, origin/CSRF protections, structured observability, error tracking, backup/restore tests and incident procedures.
-4. Complete GDPR notices, terms, DPA, deletion/export workflows, retention rules and subprocessor review.
-5. Validate payroll, tax, VAT, working capital, debt, foreign exchange and other model assumptions with qualified specialists.
+1. Connect the Copilot UI to the authenticated Copilot API and persist threads; constrain AI to explain deterministic outputs and evidence.
+2. Complete Stripe entitlements, customer portal, cancellation, failed payments, invoices, tax and webhook reconciliation.
+3. Add rate limiting, origin/CSRF protections, observability, error tracking, backup/restore tests and incident procedures.
+4. Complete GDPR notices, terms, DPA, data deletion/export, retention and subprocessor review.
+5. Validate payroll, tax, VAT, working capital, debt, FX and other modelling assumptions with qualified specialists.
 
 ### P2 — product differentiation
-1. Build the signature "What Can I Afford?" constrained optimization workflow.
-2. Add downside, base and upside scenario comparison, decision thresholds and critical-cash alerts.
-3. Expand European hiring-cost data only with dated, source-backed and reviewable assumptions.
-4. Validate willingness to pay with French Pre-Seed and Seed founders before broad integrations.
+1. Build "What Can I Afford?" as a constrained decision engine.
+2. Add downside/base/upside comparisons, decision thresholds and cash alerts.
+3. Expand European hiring assumptions only with dated, source-backed and reviewable data.
+4. Validate willingness to pay with French Pre-Seed and Seed founders.
 
-## Important limitations
+## Limitations
 
-This audit is based on source code and provider metadata available during this session. It is not an independent penetration test, a financial-model validation, a legal review or proof of production health. Production Supabase access is still missing; no production database migration or production deployment was performed.
+This is a source/configuration audit, not an independent penetration test, financial-model validation, legal review or proof that the application is ready for public launch. The production database schema is now initialized, but the current app deployment has not been updated and end-to-end acceptance remains incomplete.
