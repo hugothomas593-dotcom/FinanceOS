@@ -265,7 +265,7 @@ export function AvenorCopilot({
         aria-label={open ? 'Close Avenor Intelligence' : 'Open Avenor Intelligence'}
         aria-expanded={open}
       >
-        <span className={styles.launcherIcon}>✳</span>
+        <span className={styles.launcherIcon}>A</span>
         <span className={styles.launcherLabel}>Ask Avenor</span>
         <span className={styles.launcherDot} />
       </button>
@@ -276,10 +276,10 @@ export function AvenorCopilot({
           <aside className={styles.panel} aria-label="Avenor financial companion">
             <header className={styles.header}>
               <div className={styles.headerBrand}>
-                <div className={styles.brandMark}>✳</div>
+                <div className={styles.brandMark}>A</div>
                 <div>
-                  <strong>Avenor Intelligence</strong>
-                  <span>Your financial decision companion</span>
+                  <strong>Avenor</strong>
+                  <span>Financial decision support</span>
                 </div>
               </div>
               <div className={styles.headerActions}>
@@ -293,7 +293,7 @@ export function AvenorCopilot({
               <span className={styles.statusDot} />
               <span>{organizationName || 'Your workspace'}</span>
               <span className={styles.currency}>{currency}</span>
-              <span className={styles.connected}>Workspace connected</span>
+              <span className={styles.connected}>Workspace linked</span>
             </div>
 
             {historyOpen ? (
@@ -322,15 +322,14 @@ export function AvenorCopilot({
                 <div className={styles.messages}>
                   {messages.length === 0 ? (
                     <div className={styles.welcome}>
-                      <div className={styles.welcomeIcon}>✳</div>
-                      <span className={styles.eyebrow}>YOUR FINANCE TEAMMATE</span>
+                      <div className={styles.welcomeIcon}>A</div>
+                      <span className={styles.eyebrow}>FINANCIAL DECISION SUPPORT</span>
                       <h2>What decision are you working through?</h2>
                       <p>
-                        Ask about cash, revenue, margins, costs, hiring, pricing, investment, fundraising or any
-                        business decision with a financial impact. Avenor will analyze your workspace data and
-                        show its assumptions.
+                        Ask about your cash position, costs, revenue or a business decision. Avenor uses the information in
+                        this workspace and shows the assumptions behind its analysis.
                       </p>
-                      <div className={styles.suggestionHeading}>START WITH A QUESTION</div>
+                      <div className={styles.suggestionHeading}>COMMON QUESTIONS</div>
                       <div className={styles.suggestions}>
                         {suggestions.map((suggestion) => (
                           <button key={suggestion} type="button" onClick={() => void sendMessage(suggestion)}>
@@ -347,7 +346,7 @@ export function AvenorCopilot({
                     const saved = savedMessages.includes(message.id);
                     return (
                       <article key={message.id} className={message.role === 'user' ? styles.userMessage : styles.assistantMessage}>
-                        {message.role === 'assistant' && <div className={styles.messageAvatar}>✳</div>}
+                        {message.role === 'assistant' && <div className={styles.messageAvatar}>A</div>}
                         <div className={styles.messageBody}>
                           <div className={styles.messageMeta}>
                             <strong>{message.role === 'user' ? 'You' : 'Avenor'}</strong>
@@ -443,8 +442,8 @@ export function AvenorCopilot({
                   })}
                   {busy && (
                     <div className={styles.thinking}>
-                      <span className={styles.messageAvatar}>✳</span>
-                      <div><strong>Avenor is analyzing your workspace</strong><span>Reviewing assumptions, testing scenarios and checking the numbers…</span></div>
+                      <span className={styles.messageAvatar}>A</span>
+                      <div><strong>Reviewing the numbers</strong><span>Reviewing assumptions, testing scenarios and checking the numbers…</span></div>
                     </div>
                   )}
                   <div ref={messageEndRef} />
@@ -468,7 +467,7 @@ export function AvenorCopilot({
                         void sendMessage();
                       }
                     }}
-                    placeholder="Ask Avenor anything about your company's finances…"
+                    placeholder="Ask about your company's finances or a decision…"
                     rows={2}
                     maxLength={4_000}
                     disabled={busy || !organizationId}
@@ -481,8 +480,8 @@ export function AvenorCopilot({
                   </div>
                 </form>
                 <div className={styles.disclaimer}>
-                  Avenor uses deterministic calculations and your workspace assumptions. Verify tax, legal and
-                  regulated advice with a qualified professional.
+                  Calculations use the data and assumptions available in your workspace. Confirm tax, legal and
+                  regulated matters with a qualified professional.
                 </div>
               </>
             )}
