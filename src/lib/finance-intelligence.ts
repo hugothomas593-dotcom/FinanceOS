@@ -153,7 +153,7 @@ export function simulateFinancialDecision(inputs: ModelInputs, change: DecisionC
       grossMarginChangePp: change.grossMarginChangePp ?? 0,
       monthlyOtherCashFlowChange: change.monthlyOtherCashFlowChange ?? 0,
       oneTimeCashImpact: change.oneTimeCashImpact ?? 0,
-      oneTimeMonth,
+      oneTimeMonth: oneOffMonth,
       horizonMonths: horizon,
     },
     base,
