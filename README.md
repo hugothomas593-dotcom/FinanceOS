@@ -79,3 +79,10 @@ Supabase is for database/authentication; it does not host the Next.js website. A
 - AI explanations are routed through Vercel AI Gateway. The default model is Claude Sonnet 4.6; inference requests are pinned to the EU. Vercel-hosted Preview/Production uses OIDC. Local development outside Vercel needs a private `AI_GATEWAY_API_KEY`.
 - The agent cannot execute payments, alter accounting records, approve spending, run payroll, or replace the accountable founder, accountant, lawyer or payroll specialist.
 - The unit-economics estimates require manually entered monthly MRR, active/new/churned customer counts, marketing/sales spend and gross margin. They are blended, period-based estimates, not cohort-attributed CAC/LTV. The engine still excludes verified tax/VAT schedules, full AR/AP ageing, debt schedules, FX, capex timing/depreciation, deferred revenue and cohort-based retention. Missing data is disclosed rather than inferred.
+
+
+## Interface design
+- The workspace uses a restrained finance-software visual system: neutral canvas, white work surfaces, deep blue-grey typography and a muted green accent.
+- Navigation, forecast tables, forms, status indicators and authentication screens share the same visual language.
+- Avenor chat is a quiet right-side utility panel. On desktop it does not dim or block the underlying workspace; on mobile it becomes a full-screen panel.
+- Product copy focuses on the financial tasks and decisions rather than describing AI as the product.
