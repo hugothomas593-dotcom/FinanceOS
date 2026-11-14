@@ -51,3 +51,11 @@ A detailed source audit is maintained in `docs/AVENOR_AUDIT_2026-11-14.md`. Verc
 - Empty workspaces no longer display fabricated starting financial values as if they were company data.
 - Imported actuals are counted and labelled as not yet reconciled into the forecast. Copilot remains a rule-based preview, not connected to the authenticated AI endpoint.
 - CI passed after the workspace/dashboard integration: 15 Vitest tests, Next.js build and TypeScript check. Browser E2E, multi-tenant RLS and import-to-forecast reconciliation remain unverified.
+
+## Staging and Preview — 14 November 2026
+- Created Supabase project `avenor-staging` (`fozwtnfzzancgdwjxopy`) in the same EU organization. Project creation cost quote: $0/month.
+- Initialized 10 public application tables; all 10 have RLS, with 21 authenticated policies. All staging tables are empty.
+- Added and read back Preview-only Vercel URL and publishable key; both match staging. Production variables remain mapped to the production Supabase project.
+- Enabled automatic Preview deployments only on `financeosss`; duplicate projects `financeos` and `financeoss` remain paused.
+- Vercel Preview deployment `dpl_EsRCMudbosD3vE1GSphkXMzgB9MV` for commit `b826a2b1b2c6cb88679dee0dc0c9eecaccd89454` reached `READY`. The first 30-minute runtime error-log window returned no entries; browser/authenticated smoke testing remains necessary.
+- Production domain and active Production deployment were not changed.
