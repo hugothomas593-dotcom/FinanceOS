@@ -13,11 +13,12 @@ The repository is a prototype foundation, not yet a commercial MVP. It contains 
 
 1. The main dashboard now loads a workspace's latest model version from the authenticated models API and supports saving draft/approved model versions. The simulator still calculates locally and requires a saved base model.
 2. Saved Decision Ledger scenarios now load from and persist to Supabase, including a model-version reference and deterministic output snapshot. This workflow has passed build/typecheck but still needs browser end-to-end and tenant-isolation testing.
-3. The visible Copilot preview is rule-based and does not call the server Copilot API.
-4. CSV actuals can be written through an authenticated API. The import path uses stable row references and workspace currency; the dashboard displays imported row counts but imported actuals are not yet reconciled into forecast assumptions.
-5. Fundraising and investor-reporting views are simplified calculators, not validated financial reporting.
-6. Password reset screens and a hardened auth callback have been added in the hardening branch; these flows still require end-to-end verification.
-7. Branding has been aligned to Avenor in the screens touched by this branch.
+3. A Gmail-style persistent Avenor Intelligence side panel now calls a server-side ToolLoopAgent using Vercel AI Gateway. It has creator-private thread history, deterministic financial tools, evidence and limitations, and the ability to save a modeled analysis to the Decision Ledger. The code builds and types, but a live authenticated browser request to AI Gateway has not yet been verified.
+4. CSV actuals can be written through an authenticated API. The import path uses stable row references and workspace currency; actuals are still not reconciled into forecast assumptions. Transaction cash inflows are not assumed to be operating revenue.
+5. A monthly Business Metrics screen now stores MRR, customer counts, marketing/sales spend and gross margin in the existing financial_actuals table under separate KPI metric keys. The Copilot calculates ARPA, blended CAC, monthly logo churn, payback, simplified gross-profit LTV and LTV/CAC only when inputs are present. These are manually supplied, period-based estimates, not cohort analysis.
+6. Fundraising and investor-reporting views are simplified calculators, not validated financial reporting.
+7. Password reset screens and a hardened auth callback have been added in the hardening branch; these flows still require end-to-end verification.
+8. Branding has been aligned to Avenor in the screens touched by this branch.
 
 ## Supabase — confirmed production project and schema
 
@@ -75,11 +76,12 @@ The repository is a prototype foundation, not yet a commercial MVP. It contains 
 7. Only then merge and redeploy to Production; run authenticated smoke tests on the canonical domain.
 
 ### P1 — before charging customers
-1. Connect the Copilot UI to the authenticated Copilot API and persist threads; constrain AI to explain deterministic outputs and evidence.
-2. Complete Stripe entitlements, customer portal, cancellation, failed payments, invoices, tax and webhook reconciliation.
-3. Add rate limiting, origin/CSRF protections, observability, error tracking, backup/restore tests and incident procedures.
-4. Complete GDPR notices, terms, DPA, data deletion/export, retention and subprocessor review.
-5. Validate payroll, tax, VAT, working capital, debt, FX and other modelling assumptions with qualified specialists.
+1. Perform authenticated browser acceptance of the Copilot: sign in, ask a cash question, ask a mixed strategic decision, verify the deterministic tool evidence, reopen history, and save a scenario.
+2. Confirm Vercel AI Gateway OIDC works in the deployed runtime and inspect the first request's model/provider, EU region, usage and cost. No live AI request has yet been verified.
+3. Complete Stripe entitlements, customer portal, cancellation, failed payments, invoices, tax and webhook reconciliation.
+4. Add rate limiting, origin/CSRF protections, observability, error tracking, backup/restore tests and incident procedures.
+5. Complete GDPR notices, terms, DPA, data deletion/export, retention and subprocessor review.
+6. Validate payroll, tax, VAT, working capital, debt, FX and other modelling assumptions with qualified specialists.
 
 ### P2 — product differentiation
 1. Build "What Can I Afford?" as a constrained decision engine.
