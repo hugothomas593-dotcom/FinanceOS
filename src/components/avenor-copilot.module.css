@@ -102,3 +102,8 @@
   .messages { padding: 14px 12px 10px; }
   .suggestions button { padding: 9px; }
 }
+
+.unitEconomics { margin-top: 10px; padding: 10px; border: 1px solid #e6eee7; border-radius: 10px; background: #fbfdfb; }
+.unitHeading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.unitHeading strong { color: #3d6447; font-size: 9px; }
+.unitHeading span { color: #9aa69c; font-size: 8px; }
