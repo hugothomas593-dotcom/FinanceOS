@@ -262,7 +262,7 @@ export function AvenorCopilot({
         type="button"
         className={styles.launcher}
         onClick={() => setOpen((value) => !value)}
-        aria-label={open ? 'Close Avenor Intelligence' : 'Open Avenor Intelligence'}
+        aria-label={open ? 'Close Avenor chat' : 'Open Avenor chat'}
         aria-expanded={open}
       >
         <span className={styles.launcherIcon}>A</span>
