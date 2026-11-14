@@ -33,7 +33,7 @@ The repository is a prototype foundation, not yet a commercial MVP. It contains 
 
 - Three Vercel projects had been linked to the same Git repository: `financeos`, `financeoss` and `financeosss`.
 - The user-facing domain `financeosss.vercel.app` belongs to `financeosss` and remains verified and attached.
-- The duplicate projects `financeos` and `financeoss` had previews disabled. The canonical project's automatic previews are also paused to prevent them from using Production credentials before an isolated staging environment exists.
+- The duplicate projects `financeos` and `financeoss` have previews disabled. The canonical `financeosss` project has previews enabled and its Preview environment targets only the isolated `avenor-staging` project.
 - All three projects were aligned to Next.js, automatic output-directory detection and Node 22.x. The former `financeos` project had been forcing a static `public` output directory, causing `STATIC_BUILD_NO_OUT_DIR` notifications.
 - The failed preview build for commit `09a82dc` was caused by a nullable Supabase `getClaims()` type access in middleware. This was corrected in the hardening branch; subsequent GitHub CI builds pass.
 - Vercel Production environment variables were verified against the user-confirmed Supabase project:
@@ -41,12 +41,12 @@ The repository is a prototype foundation, not yet a commercial MVP. It contains 
   - `NEXT_PUBLIC_SUPABASE_ANON_KEY` matches that project's legacy anon key.
   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is set to that project's publishable key.
 - Environment variable changes apply to the next deployment/build. The currently active Production deployment remains on the old `main` commit; no Production redeployment has been triggered.
-- Preview deployments remain paused until a separate staging Supabase project/credentials can be provided. Do not point preview builds to Production data.
+- Preview deployments are enabled only on `financeosss` and use Preview-only variables for `avenor-staging`; neither duplicate project can start previews. Production variables remain separately mapped to the production Supabase project.
 
 ## CI and repository
 
 - Added `.gitignore`, `.env.example`, shared Supabase public-key config, auth callback hardening, forgot/reset password pages, stable CSV import references, regression tests, technical audit and GitHub Actions CI.
-- The latest CI run before the most recent documentation/recovery-script commits passed 15/15 Vitest tests, Next.js production build and TypeScript. A new run is triggered by the latest commit.
+- The latest CI run on commit `b826a2b1b2c6cb88679dee0dc0c9eecaccd89454` passed 15/15 Vitest tests, Next.js production build and TypeScript.
 - The original repository had no `package-lock.json`; dependency resolution should be made reproducible before release.
 - CI does not replace browser end-to-end testing, multi-tenant RLS tests, a Stripe test-mode acceptance test or Production smoke testing.
 
@@ -61,12 +61,12 @@ The repository is a prototype foundation, not yet a commercial MVP. It contains 
 - Aligned visible app branding and metadata to Avenor.
 - Added CI for unit tests, production build and type checking.
 - Restored the confirmed Supabase schema and verified RLS/privileges.
-- Corrected Vercel Production Supabase URL and keys, and disabled duplicate/automatic previews while staging remains unavailable.
+- Corrected Vercel Production Supabase URL and keys, created isolated `avenor-staging`, added Preview-only Vercel credentials and enabled previews only on the canonical project.
 
 ## Prioritized remaining work
 
 ### P0 — before customer financial data
-1. Add a separate staging Supabase project and preview-only credentials; re-enable one Vercel preview project only after isolation is verified.
+1. Run authenticated browser smoke tests against the first staging Preview and create a dedicated staging test user/workspace.
 2. Test RLS with at least two users across at least two organizations, including read/insert/update/delete attempts.
 3. Verify sign-up, email confirmation, sign-in, password reset, session refresh, sign-out and workspace onboarding end-to-end.
 4. Finish the model workflow: model editing/version selection, review controls, and clear draft-versus-approved semantics across all screens.
