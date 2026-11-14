@@ -92,3 +92,14 @@ The repository is a prototype foundation, not yet a commercial MVP. It contains 
 ## Limitations
 
 This is a source/configuration audit, not an independent penetration test, financial-model validation, legal review or proof that the application is ready for public launch. The production database schema is now initialized, but the current app deployment has not been updated and end-to-end acceptance remains incomplete.
+
+
+## Additional security note
+Supabase Auth advisor warns that leaked-password protection is disabled. Enable compromised-password checks before public registration. This setting was not changed from the integration.
+
+
+## Copilot acceptance state — 14 November 2026
+- The latest source commit `343fecba6823af3d61e2ea3aa6d6a6008d90a896` passed GitHub Actions: 25 tests, Next.js production build and TypeScript.
+- Vercel did not create a fresh Preview for the Copilot source due to HTTP 402 `api-deployments-free-per-day`; the existing READY Preview belongs to a prior commit and must not be used to validate the new Copilot.
+- No authenticated browser request to the Copilot or AI Gateway has been completed. OIDC/model configuration is code/build-validated only. Do not claim the assistant is live until the first authenticated test succeeds.
+- The Copilot is an analytical assistant, not an autonomous employee: it cannot perform accounting entries, transfer funds, execute payroll, approve expenditure, or provide accountable legal/tax decisions.
