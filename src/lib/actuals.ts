@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import type { ImportedActual } from '@/lib/csv';
+import type { ImportedActual } from './csv';
 
 /**
  * Creates deterministic per-row references so re-importing the same transaction
