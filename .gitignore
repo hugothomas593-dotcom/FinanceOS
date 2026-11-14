@@ -1,0 +1,36 @@
+# Dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# Next.js
+/.next/
+/out/
+/build
+
+# Tests and coverage
+/coverage
+/test-results
+/playwright-report
+
+# Environment files — keep only the safe template
+.env
+.env.*
+!.env.example
+
+# Vercel
+.vercel
+
+# Logs and debug output
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+*.log
+
+# Local files and operating system metadata
+.DS_Store
+*.pem
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
