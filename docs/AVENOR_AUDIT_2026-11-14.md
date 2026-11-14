@@ -7,14 +7,14 @@
 
 ## Executive findings
 
-The repository is a prototype foundation, not yet a commercial MVP. It contains a Next.js App Router application, authenticated API routes, a deterministic TypeScript forecasting engine, CSV parsing, Stripe scaffolding, SQL migrations and unit tests. The dashboard still relies primarily on local demonstration assumptions rather than a complete persisted company finance workspace.
+The repository is a prototype foundation, not yet a commercial MVP. It contains a Next.js App Router application, authenticated API routes, a deterministic TypeScript forecasting engine, CSV parsing, Stripe scaffolding, SQL migrations and unit tests. The dashboard now loads a workspace's latest saved model and persisted scenarios; end-to-end acceptance, reconciliation and several product workflows remain incomplete.
 
 ## Application gaps confirmed
 
-1. The main dashboard initializes financial assumptions in client state; it does not load an approved model or actuals from the authenticated workspace.
-2. The Decision Simulator calculates locally. Its Decision Ledger is React component state and is lost on reload; saved scenarios are not yet connected to the scenarios API.
+1. The main dashboard now loads a workspace's latest model version from the authenticated models API and supports saving draft/approved model versions. The simulator still calculates locally and requires a saved base model.
+2. Saved Decision Ledger scenarios now load from and persist to Supabase, including a model-version reference and deterministic output snapshot. This workflow has passed build/typecheck but still needs browser end-to-end and tenant-isolation testing.
 3. The visible Copilot preview is rule-based and does not call the server Copilot API.
-4. CSV actuals can be written through an authenticated API. The import path now uses stable row references and workspace currency, but imported actuals are not yet reconciled into dashboard forecasts.
+4. CSV actuals can be written through an authenticated API. The import path uses stable row references and workspace currency; the dashboard displays imported row counts but imported actuals are not yet reconciled into forecast assumptions.
 5. Fundraising and investor-reporting views are simplified calculators, not validated financial reporting.
 6. Password reset screens and a hardened auth callback have been added in the hardening branch; these flows still require end-to-end verification.
 7. Branding has been aligned to Avenor in the screens touched by this branch.
@@ -53,6 +53,7 @@ The repository is a prototype foundation, not yet a commercial MVP. It contains 
 ## Work completed in this hardening pass
 
 - Added repository hygiene files and environment-variable guidance.
+- Connected the dashboard to authenticated workspace/model APIs and persisted Decision Ledger scenarios with model-version snapshots.
 - Upgraded `@supabase/ssr` to 0.12.7, centralized the public Supabase key, and updated middleware to use `getClaims()` and preserve refreshed cookies/cache headers.
 - Hardened the auth callback and added password reset request/update screens.
 - Made CSV imports idempotent at the transaction-row level and use workspace currency.
@@ -68,9 +69,9 @@ The repository is a prototype foundation, not yet a commercial MVP. It contains 
 1. Add a separate staging Supabase project and preview-only credentials; re-enable one Vercel preview project only after isolation is verified.
 2. Test RLS with at least two users across at least two organizations, including read/insert/update/delete attempts.
 3. Verify sign-up, email confirmation, sign-in, password reset, session refresh, sign-out and workspace onboarding end-to-end.
-4. Connect dashboard and assumptions editor to persisted approved model versions; remove demo assumptions from real workspaces.
-5. Complete CSV preview, validation, error reporting, duplicate feedback and actuals-to-forecast reconciliation.
-6. Persist scenarios and Decision Ledger entries in Supabase, including model-version and output snapshots.
+4. Finish the model workflow: model editing/version selection, review controls, and clear draft-versus-approved semantics across all screens.
+5. Complete CSV import preview, validation, error reporting, duplicate feedback and actuals-to-forecast reconciliation.
+6. Connect the Copilot UI to the authenticated Copilot API and persist threads.
 7. Only then merge and redeploy to Production; run authenticated smoke tests on the canonical domain.
 
 ### P1 — before charging customers
