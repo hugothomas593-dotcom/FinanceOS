@@ -10,6 +10,8 @@ import {
   calculateFundraisingImpact,
   calculatePricingImpact,
   calculateWorkingCapitalImpact,
+  calculateUnitEconomics,
+  type CompanyKpis,
   simulateFinancialDecision,
   simulateHiringDecision,
   type ActualRecord,
@@ -128,9 +130,41 @@ export async function POST(request: Request) {
       .order('period', { ascending: false })
       .limit(5_000);
 
-    const actuals = (actualRows ?? []) as ActualRecord[];
-    const snapshot = buildCompanySnapshot(inputs, actuals, currency, latestModel?.status ?? null);
+    const allActualRows = (actualRows ?? []) as ActualRecord[];
+    const kpiRows = allActualRows.filter((row) => row.metric_key.startsWith('kpi:'));
+    const kpiPeriod = kpiRows
+      .map((row) => row.period)
+      .sort((a, b) => b.localeCompare(a))[0]?.slice(0, 7) ?? null;
+    const companyKpis: CompanyKpis = {};
+    for (const row of kpiRows) {
+      if (!kpiPeriod || row.period.slice(0, 7) !== kpiPeriod) continue;
+      const key = row.metric_key.replace(/^kpi:/, '') as keyof CompanyKpis;
+      if ([
+        'mrr',
+        'activeCustomers',
+        'newCustomers',
+        'churnedCustomers',
+        'marketingSpend',
+        'salesSpend',
+        'grossMarginPct',
+      ].includes(key)) {
+        companyKpis[key] = Number(row.amount);
+      }
+    }
+
+    const actuals = allActualRows.filter((row) => !row.metric_key.startsWith('kpi:'));
+    const snapshot = buildCompanySnapshot(
+      inputs,
+      actuals,
+      currency,
+      latestModel?.status ?? null,
+      companyKpis,
+    );
     const historical = analyzeHistoricalActuals(actuals);
+    const unitEconomics = calculateUnitEconomics(
+      companyKpis,
+      inputs ? (1 - inputs.cogsRatio) * 100 : undefined,
+    );
 
     let threadId = requestedThreadId ?? null;
     let threadTitle = message.replace(/\s+/g, ' ').slice(0, 72);
@@ -214,6 +248,19 @@ export async function POST(request: Request) {
             detail: historical,
           });
           return historical;
+        },
+      }),
+
+      analyze_unit_economics: tool({
+        description: 'Analyze SaaS business metrics for MRR, ARR, ARPA, blended CAC, monthly logo churn, CAC payback, gross-profit LTV and LTV/CAC. Only report a metric if its required inputs are available. State the metric period and missing fields.',
+        inputSchema: z.object({}),
+        execute: async () => {
+          toolEvidence.push({
+            title: 'SaaS unit economics',
+            summary: `Metrics period: ${kpiPeriod ?? 'not provided'}. ${unitEconomics.missingData.length} data limitations remain.`,
+            detail: unitEconomics,
+          });
+          return { period: kpiPeriod, ...unitEconomics };
         },
       }),
 
@@ -437,6 +484,10 @@ export async function POST(request: Request) {
           inflowTrendPct: historical.inflowTrendPct,
           outflowTrendPct: historical.outflowTrendPct,
           topSpendingCategories: historical.topSpendingCategories,
+        },
+        businessMetrics: {
+          period: kpiPeriod,
+          unitEconomics,
         },
         missingData: snapshot.missingData,
       },
