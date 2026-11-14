@@ -21,13 +21,13 @@ The repository is a functional prototype foundation, not a commercial MVP. It co
 
 ## Confirmed infrastructure and release gaps
 
-- The repository contains migrations `001` through `004`, but the connected Supabase project inspected during this audit returned no public tables and no migration history.
-- The Supabase project visible to the connected account did not exactly match the project reference recorded in the original project brief. No database changes were applied.
+- The only Supabase project visible to the connected account was `qeitvqzujytiiupmkmyp` (EU region, active). Its reference differs from the value in the original brief by a small suffix variation; it was the only accessible project and was empty before initialization. Migrations `001` through `006` have now been applied successfully to this project. Confirm that this is the intended Avenor project before connecting production traffic or importing customer data.
 - GitHub reported no Actions workflow runs for the inspected latest commit. No workflow files were present in the original repository tree.
 - GitHub status checks showed multiple Vercel contexts for similarly named projects: one failed deployment context and separate successful contexts. These are not sufficient to conclude that the user-facing domain is healthy.
-- The Vercel team required a one-time access approval before project configuration and build logs could be inspected.
+- The Vercel team required a one-time access approval before project configuration and build logs could be inspected. A user approval link has been generated; project identity and output settings remain unverified.
 - The original repository had no `package-lock.json`; dependency resolution was therefore not fully reproducible.
-- The existing build-status notes state that a complete Next.js build, full TypeScript project check, Vitest suite, Supabase migration execution, cross-tenant RLS tests, Stripe test-mode acceptance and end-to-end tests had not been completed.
+- The new GitHub Actions workflow has passed on the current hardening branch: dependency installation, 15 Vitest tests, Next.js production build and TypeScript check. This does not replace browser end-to-end or multi-tenant RLS tests.
+- Supabase security advisors now report no warning-level security findings after migration `006`; the remaining informational finding is the intentionally policy-free, server-only Stripe webhook receipt table. Performance advisors still report unused indexes because the new database has no application data and the relevant queries have not yet run.
 
 ## Reusable components
 
@@ -41,6 +41,7 @@ The repository is a functional prototype foundation, not a commercial MVP. It co
 ## Work started in this branch
 
 - Added a repository `.gitignore` and safe `.env.example`.
+- Applied Supabase migrations `001` through `006` to the only accessible empty EU project, including RLS policy role restrictions, a private SECURITY DEFINER implementation for onboarding, a non-definer public RPC wrapper, and missing foreign-key indexes.
 - Upgraded Supabase SSR support to the 0.12 line, added a shared public-key configuration helper, and aligned middleware with Supabase's current `getClaims()` guidance and session cache headers.
 - Hardened the auth callback and added password reset request/update screens.
 - Made CSV imports idempotent at the transaction-row level and use the workspace's configured base currency.
