@@ -1,4 +1,4 @@
-# FinanceOS engineering status — 13 November 2026
+# Avenor engineering status — 14 November 2026
 
 ## Work completed in this pass
 - Hardened deterministic financial input validation: finite numbers, bounded growth assumptions, integer forecast horizon, bounded headcount and forecast overflow checks.
@@ -31,3 +31,7 @@ The dashboard still uses illustrative local demo assumptions and a session/local
 - Run full dependency install, lockfile generation, Next.js production build, Vitest, browser E2E, accessibility, dependency audit and production staging acceptance.
 
 Do not accept customer financial data or payments until all release blockers are resolved and independently validated. No software can be guaranteed to have zero bugs; release readiness requires repeatable tests and monitoring.
+
+
+## Follow-up audit — 14 November 2026
+A detailed source audit is maintained in `docs/AVENOR_AUDIT_2026-11-14.md`. The connected Supabase project returned an empty public schema and no migration history; no SQL was applied because the project reference in the original brief did not exactly match the project visible to the connected account. Vercel project-level inspection remains pending team access approval. A CI workflow has been added in the hardening branch; its run must pass before any merge or release.
