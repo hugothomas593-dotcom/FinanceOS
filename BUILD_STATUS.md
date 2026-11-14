@@ -84,3 +84,8 @@ A detailed source audit is maintained in `docs/AVENOR_AUDIT_2026-11-14.md`. Verc
 - Simplified the Avenor chat language and made it a non-blocking desktop side panel; mobile uses a full-screen layout.
 - The app title and description now present Avenor as a financial workspace, not an AI demonstration.
 - No Production deployment. Final CI on commit `4c7e6db6668c282ee7e4cf4fdce9c30745b9ab54` passed 25 unit tests, Next.js production build and TypeScript.
+
+## EU compute region — 15 November 2026
+- Added `vercel.json` with `regions: ["dub1"]` so Vercel server functions run in Dublin (AWS `eu-west-1`), aligned to the Supabase project region.
+- The previously inspected READY Preview on commit `f86407ea15bd0aa7cef56bc5f7d8aaed366b361c` still ran in `iad1`; it predates this config and is not proof that the EU setting is active.
+- The new region setting needs to be verified from a fresh Vercel deployment before any data-residency claim is made.
