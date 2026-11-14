@@ -290,7 +290,7 @@ export async function POST(request: Request) {
           const model = modelOrUnavailable();
           if (!model) return unavailable;
           const result = calculateBreakEven(model);
-          toolEvidence.push({ title: 'Break-even analysis', summary: result.possible ? `Required monthly revenue: ${Math.round(result.requiredMonthlyRevenue).toLocaleString('en-GB')} ${currency}.` : result.reason, detail: result });
+          toolEvidence.push({ title: 'Break-even analysis', summary: result.possible ? `Required monthly revenue: ${Math.round(result.requiredMonthlyRevenue).toLocaleString('en-GB')} ${currency}.` : (result.reason ?? 'Break-even cannot be calculated under the current gross-margin assumptions.'), detail: result });
           return result;
         },
       }),
