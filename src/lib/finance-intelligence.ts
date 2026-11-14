@@ -4,7 +4,7 @@ import {
   type HireInput,
   type ModelInputs,
   type MonthResult,
-} from '@/lib/finance';
+} from './finance';
 
 export type ActualRecord = {
   period: string;
