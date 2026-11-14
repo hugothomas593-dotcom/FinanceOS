@@ -39,9 +39,8 @@ export async function middleware(request: NextRequest) {
   });
 
   // Supabase recommends getClaims() for server-side route protection.
-  const {
-    data: { claims },
-  } = await supabase.auth.getClaims();
+  const claimsResult = await supabase.auth.getClaims();
+  const claims = claimsResult.data?.claims ?? null;
   const userId = typeof claims?.sub === 'string' ? claims.sub : null;
 
   const protectedPage =
