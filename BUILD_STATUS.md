@@ -70,3 +70,10 @@ A detailed source audit is maintained in `docs/AVENOR_AUDIT_2026-11-14.md`. Verc
 - Added unit tests for new financial intelligence. Latest GitHub CI on `ff383ec6462988e785cdd948fb8708e8be6498fc` passed 25/25 unit tests, Next.js production build and TypeScript.
 - Preview deployment of the current Copilot commit could not be created: Vercel returned HTTP 402 `api-deployments-free-per-day` (100 deployments/day; retryAfter 24h). Existing Preview belongs to an older commit, and Production remains unchanged.
 - Staging Supabase remains isolated with 10 RLS-enabled tables; migration 007 scopes Copilot message history to its creator. Security advisor also warns that Supabase leaked-password protection is disabled; enable it before opening registration to public users.
+
+## Final verification caveats — 14 November 2026
+- Latest branch commit `343fecba6823af3d61e2ea3aa6d6a6008d90a896` passed GitHub Actions (25 unit tests, Next.js production build, TypeScript).
+- Vercel API declined a new Preview deployment with HTTP 402 `api-deployments-free-per-day` (100 deployments/day, 24-hour retry window). Existing Preview is for an earlier commit and does not include the new Copilot.
+- Local Vercel CLI fallback was unavailable in the connected runtime (no Vercel CLI token).
+- No live authenticated Copilot/AI Gateway request has been verified yet; UI/API/tool implementation is code/build validated only.
+- Supabase Auth advisor warns leaked-password protection is disabled; enable this before public registrations. Stripe webhook no-client-policy notice is intentional.
