@@ -1,6 +1,6 @@
-# FinanceOS — Founder Financial Decision Platform
+# Avenor — Founder Financial Decision Platform
 
-FinanceOS is an early SaaS codebase for European Seed-stage startups. It combines a financial dashboard, deterministic cash-flow forecasting, hiring/scenario modeling, a decision ledger, CSV actuals ingestion, authenticated multi-tenant APIs, an optional AI explanation layer, and Stripe subscription scaffolding.
+Avenor is an early SaaS codebase for European Seed-stage startups. It combines a financial dashboard, deterministic cash-flow forecasting, hiring/scenario modeling, a decision ledger, CSV actuals ingestion, authenticated multi-tenant APIs, an optional AI explanation layer, and Stripe subscription scaffolding.
 
 > **Honest release status:** this repository is not certified production-ready and must not be used with paying customers or sensitive live financial data until the deployment checklist below is completed. The dashboard still contains illustrative demo assumptions. External integrations require credentials and account setup.
 
