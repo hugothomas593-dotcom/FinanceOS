@@ -59,3 +59,14 @@ A detailed source audit is maintained in `docs/AVENOR_AUDIT_2026-11-14.md`. Verc
 - Enabled automatic Preview deployments only on `financeosss`; duplicate projects `financeos` and `financeoss` remain paused.
 - Vercel Preview deployment `dpl_EsRCMudbosD3vE1GSphkXMzgB9MV` for commit `b826a2b1b2c6cb88679dee0dc0c9eecaccd89454` reached `READY`. The first 30-minute runtime error-log window returned no entries; browser/authenticated smoke testing remains necessary.
 - Production domain and active Production deployment were not changed.
+
+
+## Avenor Intelligence — 14 November 2026
+- Added a persistent Gmail-style side-panel companion accessible across the authenticated dashboard; includes new chats, creator-private history, thread loading, busy/error states, calculation evidence, missing-data warnings and save-to-Decision-Ledger actions.
+- Added server-side ToolLoopAgent on Vercel AI Gateway with deterministic tools for company snapshot, historical transaction analysis, generalized operating-cash scenarios, hiring, break-even, affordable investment, pricing, fundraising/dilution and working-capital sensitivities.
+- Model default: `anthropic/claude-sonnet-4.6`, configurable through `AI_GATEWAY_MODEL`; inference is pinned to the EU. Vercel-hosted runtime is expected to use OIDC; a live authenticated AI Gateway request has not yet been validated.
+- Added a monthly Business Metrics screen and authenticated API. MRR, active/new/churned customers, marketing/sales spend and gross margin are saved by month with workspace access controls.
+- Copilot can now calculate ARPA, blended CAC, monthly logo churn, CAC payback, simplified gross-profit LTV and LTV/CAC. Missing inputs yield null metrics and explicit data requirements; imported cash inflows are not mislabeled as operating revenue.
+- Added unit tests for new financial intelligence. Latest GitHub CI on `ff383ec6462988e785cdd948fb8708e8be6498fc` passed 25/25 unit tests, Next.js production build and TypeScript.
+- Preview deployment of the current Copilot commit could not be created: Vercel returned HTTP 402 `api-deployments-free-per-day` (100 deployments/day; retryAfter 24h). Existing Preview belongs to an older commit, and Production remains unchanged.
+- Staging Supabase remains isolated with 10 RLS-enabled tables; migration 007 scopes Copilot message history to its creator. Security advisor also warns that Supabase leaked-password protection is disabled; enable it before opening registration to public users.
