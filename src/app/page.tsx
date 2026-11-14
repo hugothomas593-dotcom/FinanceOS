@@ -1,18 +1,51 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { forecast, summarize, type ModelInputs, type HireInput, type MonthResult } from '@/lib/finance';
 
 type View = 'Overview' | 'Decision simulator' | 'Decision ledger' | 'Company assumptions' | 'Data import' | 'Fundraising planner' | 'Investor reporting';
 const money = (v: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
 const compact = (v: number) => new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
-const initial: ModelInputs = { openingCash: 1_200_000, monthlyRevenue: 180_000, monthlyRevenueGrowth: .025, monthlyOpexExPayroll: 90_000, monthlyOpexGrowth: .01, cogsRatio: .15, existingMonthlyPayroll: 210_000, existingOtherNetCashAdjustments: 0 };
+const initial: ModelInputs = { openingCash: 0, monthlyRevenue: 0, monthlyRevenueGrowth: 0, monthlyOpexExPayroll: 0, monthlyOpexGrowth: 0, cogsRatio: 0, existingMonthlyPayroll: 0, existingOtherNetCashAdjustments: 0 };
 const months = 18;
 
-type SavedDecision = { id: number; title: string; detail: string; cashImpact: number; runwayImpact: number; created: string };
+type SavedDecision = { id: string; title: string; detail: string; cashImpact: number; runwayImpact: number; created: string };
+type WorkspaceMembership = {
+  organization_id: string;
+  role: string;
+  organizations: { id: string; name: string; country_code: string; base_currency: string } | null;
+};
+type ModelRow = {
+  id: string;
+  name: string;
+  status: 'draft' | 'approved' | 'archived';
+  assumptions: Record<string, unknown>;
+  created_at: string;
+};
+type ScenarioRow = {
+  id: string;
+  name: string;
+  scenario_type: string;
+  model_version_id: string | null;
+  assumptions: Record<string, unknown>;
+  outputs: Record<string, unknown>;
+  created_at: string;
+};
 
 export default function Home() {
   const [view, setView] = useState<View>('Overview');
+  const [organizationId, setOrganizationId] = useState('');
+  const [organizationName, setOrganizationName] = useState('');
+  const [currency, setCurrency] = useState('EUR');
+  const [workspaceLoading, setWorkspaceLoading] = useState(true);
+  const [workspaceError, setWorkspaceError] = useState('');
+  const [hasModel, setHasModel] = useState(false);
+  const [modelStatus, setModelStatus] = useState<'draft' | 'approved' | 'none'>('none');
+  const [modelVersionId, setModelVersionId] = useState('');
+  const [modelName, setModelName] = useState('Base financial plan');
+  const [modelBusy, setModelBusy] = useState(false);
+  const [modelUpdatedAt, setModelUpdatedAt] = useState('');
+  const [actualsCount, setActualsCount] = useState(0);
   const [cash, setCash] = useState(initial.openingCash);
   const [revenue, setRevenue] = useState(initial.monthlyRevenue);
   const [payroll, setPayroll] = useState(initial.existingMonthlyPayroll);
@@ -34,7 +67,92 @@ export default function Home() {
   const [importError, setImportError] = useState('');
   const [importBusy, setImportBusy] = useState(false);
   const [raiseAmount, setRaiseAmount] = useState(1500000);
+
   const [preMoney, setPreMoney] = useState(6000000);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadWorkspace() {
+      try {
+        const organizationsResponse = await fetch('/api/organizations', { cache: 'no-store' });
+        const organizationsData = await organizationsResponse.json();
+        if (!organizationsResponse.ok) throw new Error(organizationsData.error || 'Could not load your workspace');
+
+        const memberships = (organizationsData.organizations ?? []) as WorkspaceMembership[];
+        const rememberedId = localStorage.getItem('financeos.organizationId');
+        const selected = memberships.find((item) => item.organization_id === rememberedId) ?? memberships[0];
+
+        if (!selected) {
+          window.location.assign('/onboarding');
+          return;
+        }
+
+        const selectedOrganizationId = selected.organization_id;
+        const organization = selected.organizations;
+        localStorage.setItem('financeos.organizationId', selectedOrganizationId);
+
+        if (cancelled) return;
+        setOrganizationId(selectedOrganizationId);
+        setOrganizationName(organization?.name ?? 'Your company');
+        setCurrency((organization?.base_currency ?? 'EUR').trim());
+
+        const [modelsResponse, scenariosResponse, actualsResponse] = await Promise.all([
+          fetch(`/api/models?organizationId=${encodeURIComponent(selectedOrganizationId)}`, { cache: 'no-store' }),
+          fetch(`/api/scenarios?organizationId=${encodeURIComponent(selectedOrganizationId)}`, { cache: 'no-store' }),
+          fetch(`/api/actuals?organizationId=${encodeURIComponent(selectedOrganizationId)}`, { cache: 'no-store' }),
+        ]);
+
+        const [modelsData, scenariosData, actualsData] = await Promise.all([
+          modelsResponse.json(), scenariosResponse.json(), actualsResponse.json(),
+        ]);
+
+        if (cancelled) return;
+        if (!modelsResponse.ok) throw new Error(modelsData.error || 'Could not load financial models');
+
+        const models = (modelsData.models ?? []) as ModelRow[];
+        const latestModel = models[0];
+        if (latestModel) {
+          const assumptions = latestModel.assumptions as unknown as ModelInputs;
+          setCash(Number(assumptions.openingCash ?? 0));
+          setRevenue(Number(assumptions.monthlyRevenue ?? 0));
+          setPayroll(Number(assumptions.existingMonthlyPayroll ?? 0));
+          setOpex(Number(assumptions.monthlyOpexExPayroll ?? 0));
+          setGrowth(Number(assumptions.monthlyRevenueGrowth ?? 0) * 100);
+          setCogs(Number(assumptions.cogsRatio ?? 0) * 100);
+          setHasModel(true);
+          setModelStatus(latestModel.status === 'approved' ? 'approved' : 'draft');
+          setModelVersionId(latestModel.id);
+          setModelName(latestModel.name);
+          setModelUpdatedAt(new Date(latestModel.created_at).toLocaleString('en-GB'));
+        }
+
+        if (scenariosResponse.ok) {
+          const scenarios = (scenariosData.scenarios ?? []) as ScenarioRow[];
+          setSaved(scenarios.map((scenario) => ({
+            id: scenario.id,
+            title: scenario.name,
+            detail: `${scenario.scenario_type} scenario · saved to this workspace`,
+            cashImpact: Number(scenario.outputs.cashImpact ?? 0),
+            runwayImpact: Number(scenario.outputs.runwayImpact ?? 0),
+            created: new Date(scenario.created_at).toLocaleDateString('en-GB'),
+          })));
+        }
+
+        if (actualsResponse.ok) {
+          setActualsCount(((actualsData.actuals ?? []) as unknown[]).length);
+        }
+      } catch (error) {
+        if (!cancelled) setWorkspaceError(error instanceof Error ? error.message : 'Could not load your workspace');
+      } finally {
+        if (!cancelled) setWorkspaceLoading(false);
+      }
+    }
+
+    void loadWorkspace();
+    return () => { cancelled = true; };
+  }, []);
+
 
   const inputs: ModelInputs = { ...initial, openingCash: cash, monthlyRevenue: revenue, existingMonthlyPayroll: payroll, monthlyOpexExPayroll: opex, monthlyRevenueGrowth: growth / 100, cogsRatio: cogs / 100 };
   const hire: HireInput = { headcount, startMonth: startMonth - 1, grossAnnualSalary: salary, employerCostRate: employerRate / 100, benefitsMonthlyPerPerson: benefits, recruitingCostPerPerson: recruiting, equipmentCostPerPerson: equipment, productivityRampMonths: 6 };
@@ -56,11 +174,85 @@ export default function Home() {
     }
     setAnswerOpen(true);
   }
-  function saveDecision() {
-    const decision: SavedDecision = { id: Date.now(), title: `${headcount} engineer hire scenario`, detail: `Start month ${startMonth} · ${money(salary)} gross annual salary · ${employerRate}% employer-cost assumption`, cashImpact: impact, runwayImpact: (baseRunway ?? 0) - (scenarioRunway ?? 0), created: new Date().toLocaleDateString('en-GB') };
-    setSaved((items) => [decision, ...items]);
-    setToast('Scenario saved to your Decision Ledger');
-    window.setTimeout(() => setToast(''), 2600);
+
+  async function saveModel(status: 'draft' | 'approved') {
+    if (!organizationId) return;
+    setModelBusy(true);
+    setWorkspaceError('');
+    try {
+      const response = await fetch('/api/models', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId,
+          name: modelName.trim() || 'Base financial plan',
+          status,
+          assumptions: inputs,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not save the financial model');
+
+      setHasModel(true);
+      setModelStatus(status);
+      setModelVersionId(data.model.id);
+      setModelName(data.model.name);
+      setModelUpdatedAt(new Date(data.model.created_at).toLocaleString('en-GB'));
+      setToast(status === 'approved' ? 'Financial model approved and saved' : 'Draft model saved to your workspace');
+      window.setTimeout(() => setToast(''), 2600);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : 'Could not save the financial model');
+    } finally {
+      setModelBusy(false);
+    }
+  }
+
+  async function saveDecision() {
+    if (!organizationId || !hasModel) {
+      setToast('Save your company assumptions before creating a scenario');
+      window.setTimeout(() => setToast(''), 2600);
+      return;
+    }
+
+    try {
+      const name = `${headcount} engineer hire scenario`;
+      const cashImpact = impact;
+      const runwayImpact = (baseRunway ?? 0) - (scenarioRunway ?? 0);
+      const response = await fetch('/api/scenarios', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId,
+          modelVersionId: modelVersionId || null,
+          name,
+          scenarioType: 'hiring',
+          assumptions: { modelInputs: inputs, hire },
+          outputs: {
+            cashImpact,
+            runwayImpact,
+            baseEndingCash: baseSummary.endingCash,
+            scenarioEndingCash: scenarioSummary.endingCash,
+            forecastMonths: months,
+          },
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not save the scenario');
+
+      const decision: SavedDecision = {
+        id: data.scenario.id,
+        title: name,
+        detail: `Start month ${startMonth} · ${money(salary)} gross annual salary · ${employerRate}% employer-cost assumption`,
+        cashImpact,
+        runwayImpact,
+        created: new Date(data.scenario.created_at).toLocaleDateString('en-GB'),
+      };
+      setSaved((items) => [decision, ...items]);
+      setToast('Scenario saved to your Decision Ledger');
+      window.setTimeout(() => setToast(''), 2600);
+    } catch (error) {
+      setWorkspaceError(error instanceof Error ? error.message : 'Could not save the scenario');
+    }
   }
 
   const nav: { label: View; icon: string }[] = [
