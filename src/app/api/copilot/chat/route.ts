@@ -115,8 +115,11 @@ export async function POST(request: Request) {
           .maybeSingle();
 
     const inputs = latestModel ? safeModelInputs(latestModel.assumptions) : null;
-    const currency = membership.organizations?.base_currency?.trim() || 'EUR';
-    const organizationName = membership.organizations?.name || 'your company';
+    const organization = Array.isArray(membership.organizations)
+      ? membership.organizations[0]
+      : membership.organizations;
+    const currency = organization?.base_currency?.trim() || 'EUR';
+    const organizationName = organization?.name || 'your company';
 
     const { data: actualRows } = await supabase
       .from('financial_actuals')
