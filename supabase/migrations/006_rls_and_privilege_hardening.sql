@@ -3,6 +3,7 @@
 -- The onboarding RPC is intentionally callable by signed-in users only.
 revoke all on function public.create_organization_with_owner(text, char, char) from public, anon;
 grant execute on function public.create_organization_with_owner(text, char, char) to authenticated;
+alter function public.create_organization_with_owner(text, char, char) set search_path = '';
 
 -- Keep the membership helper outside PostgREST's exposed public schema.
 create schema if not exists private;
