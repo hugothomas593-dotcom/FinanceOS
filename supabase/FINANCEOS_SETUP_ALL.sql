@@ -247,7 +247,7 @@ returns uuid
 language plpgsql
 security definer
 set search_path = ''
-as $
+as $body$
 declare
   new_org_id uuid;
 begin
@@ -257,7 +257,51 @@ begin
   if length(trim(org_name)) < 2 or length(trim(org_name)) > 100 then
     raise exception 'Invalid organization name';
   end if;
-  if country !~ '^[A-Za-z]{2}
+  if country !~ '^[A-Za-z]{2}$' then
+    raise exception 'Invalid country code';
+  end if;
+  if currency !~ '^[A-Za-z]{3}$' then
+    raise exception 'Invalid currency code';
+  end if;
+
+  insert into public.organizations(name, country_code, base_currency)
+  values (trim(org_name), upper(country), upper(currency))
+  returning id into new_org_id;
+
+  insert into public.organization_members(organization_id, user_id, role)
+  values (new_org_id, (select auth.uid()), 'owner');
+
+  insert into public.audit_events(
+    organization_id, actor_id, event_type, entity_type, entity_id, after_state
+  )
+  values (
+    new_org_id, (select auth.uid()), 'organization.created',
+    'organization', new_org_id,
+    jsonb_build_object('name', trim(org_name))
+  );
+
+  return new_org_id;
+end;
+$body$;
+
+revoke all on function private.create_organization_with_owner(text, char, char) from public, anon;
+grant execute on function private.create_organization_with_owner(text, char, char) to authenticated;
+
+create or replace function public.create_organization_with_owner(
+  org_name text,
+  country char(2) default 'FR',
+  currency char(3) default 'EUR'
+)
+returns uuid
+language sql
+security invoker
+set search_path = ''
+as $body$
+  select private.create_organization_with_owner(org_name, country, currency);
+$body$;
+
+revoke all on function public.create_organization_with_owner(text, char, char) from public, anon;
+grant execute on function public.create_organization_with_owner(text, char, char) to authenticated;
 -- Remove old permissive policies before replacing them with authenticated-only policies.
 drop policy if exists "members can read their organizations" on public.organizations;
 drop policy if exists "members can read organization membership" on public.organization_members;
