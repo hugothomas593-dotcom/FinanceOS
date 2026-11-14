@@ -103,3 +103,8 @@ Supabase Auth advisor warns that leaked-password protection is disabled. Enable 
 - Vercel did not create a fresh Preview for the Copilot source due to HTTP 402 `api-deployments-free-per-day`; the existing READY Preview belongs to a prior commit and must not be used to validate the new Copilot.
 - No authenticated browser request to the Copilot or AI Gateway has been completed. OIDC/model configuration is code/build-validated only. Do not claim the assistant is live until the first authenticated test succeeds.
 - The Copilot is an analytical assistant, not an autonomous employee: it cannot perform accounting entries, transfer funds, execute payroll, approve expenditure, or provide accountable legal/tax decisions.
+
+## Server compute region alignment — 15 November 2026
+- The inspected Vercel Preview deployment `dpl_5SZKnSSskgW1P1z1Q2fpQtLVxYF4` for commit `f86407ea15bd0aa7cef56bc5f7d8aaed366b361c` reported region `iad1` (Washington, D.C.).
+- Supabase staging `fozwtnfzzancgdwjxopy` is in `eu-west-1` (Dublin). A `vercel.json` setting now pins Vercel Functions to `dub1` (Dublin) to avoid running server-side data queries in the US by default.
+- This is source-configured but not yet deployment-verified. The existing Preview predates the change; verify the region field on a fresh deployment before making a data-residency statement.
