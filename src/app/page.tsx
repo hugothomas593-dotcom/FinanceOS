@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { forecast, summarize, type ModelInputs, type HireInput, type MonthResult } from '@/lib/finance';
 import { AvenorCopilot } from '@/components/avenor-copilot';
 
-type View = 'Overview' | 'Decision simulator' | 'Decision ledger' | 'Company assumptions' | 'Data import' | 'Fundraising planner' | 'Investor reporting';
+type View = 'Overview' | 'Decision simulator' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting';
 const money = (v: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
 const compact = (v: number) => new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
 const initial: ModelInputs = { openingCash: 0, monthlyRevenue: 0, monthlyRevenueGrowth: 0, monthlyOpexExPayroll: 0, monthlyOpexGrowth: 0, cogsRatio: 0, existingMonthlyPayroll: 0, existingOtherNetCashAdjustments: 0 };
@@ -69,6 +69,20 @@ export default function Home() {
   const [raiseAmount, setRaiseAmount] = useState(1500000);
 
   const [preMoney, setPreMoney] = useState(6000000);
+  const [kpiPeriod, setKpiPeriod] = useState(new Date().toISOString().slice(0, 7));
+  const [businessKpis, setBusinessKpis] = useState({
+    mrr: '',
+    activeCustomers: '',
+    newCustomers: '',
+    churnedCustomers: '',
+    marketingSpend: '',
+    salesSpend: '',
+    grossMarginPct: '',
+  });
+  const [kpiLoading, setKpiLoading] = useState(false);
+  const [kpiBusy, setKpiBusy] = useState(false);
+  const [kpiHasData, setKpiHasData] = useState(false);
+  const [kpiError, setKpiError] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -154,6 +168,45 @@ export default function Home() {
   }, []);
 
 
+
+  useEffect(() => {
+    if (!organizationId) return;
+    let cancelled = false;
+    setKpiLoading(true);
+    setKpiError('');
+
+    async function loadBusinessMetrics() {
+      try {
+        const response = await fetch(
+          `/api/kpis?organizationId=${encodeURIComponent(organizationId)}&period=${encodeURIComponent(kpiPeriod)}`,
+          { cache: 'no-store' },
+        );
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not load business metrics');
+
+        if (cancelled) return;
+        const values = data.kpis ?? {};
+        setBusinessKpis({
+          mrr: values.mrr === undefined ? '' : String(values.mrr),
+          activeCustomers: values.activeCustomers === undefined ? '' : String(values.activeCustomers),
+          newCustomers: values.newCustomers === undefined ? '' : String(values.newCustomers),
+          churnedCustomers: values.churnedCustomers === undefined ? '' : String(values.churnedCustomers),
+          marketingSpend: values.marketingSpend === undefined ? '' : String(values.marketingSpend),
+          salesSpend: values.salesSpend === undefined ? '' : String(values.salesSpend),
+          grossMarginPct: values.grossMarginPct === undefined ? '' : String(values.grossMarginPct),
+        });
+        setKpiHasData(Boolean(data.hasData));
+      } catch (error) {
+        if (!cancelled) setKpiError(error instanceof Error ? error.message : 'Could not load business metrics');
+      } finally {
+        if (!cancelled) setKpiLoading(false);
+      }
+    }
+
+    void loadBusinessMetrics();
+    return () => { cancelled = true; };
+  }, [organizationId, kpiPeriod]);
+
   const inputs: ModelInputs = { ...initial, openingCash: cash, monthlyRevenue: revenue, existingMonthlyPayroll: payroll, monthlyOpexExPayroll: opex, monthlyRevenueGrowth: growth / 100, cogsRatio: cogs / 100 };
   const hire: HireInput = { headcount, startMonth: startMonth - 1, grossAnnualSalary: salary, employerCostRate: employerRate / 100, benefitsMonthlyPerPerson: benefits, recruitingCostPerPerson: recruiting, equipmentCostPerPerson: equipment, productivityRampMonths: 6 };
   const base = useMemo(() => forecast(inputs, [], months), [cash, revenue, payroll, opex, growth, cogs]);
@@ -199,6 +252,39 @@ export default function Home() {
       setWorkspaceError(error instanceof Error ? error.message : 'Could not save the financial model');
     } finally {
       setModelBusy(false);
+    }
+  }
+
+
+  async function saveBusinessMetrics() {
+    if (!organizationId) return;
+    const kpis = Object.fromEntries(
+      Object.entries(businessKpis)
+        .filter(([, value]) => value.trim() !== '')
+        .map(([key, value]) => [key, Number(value)]),
+    );
+    if (Object.keys(kpis).length === 0) {
+      setKpiError('Enter at least one metric before saving.');
+      return;
+    }
+
+    setKpiBusy(true);
+    setKpiError('');
+    try {
+      const response = await fetch('/api/kpis', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId, period: kpiPeriod, kpis }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not save business metrics');
+      setKpiHasData(true);
+      setToast(`Business metrics saved for ${kpiPeriod}`);
+      window.setTimeout(() => setToast(''), 2600);
+    } catch (error) {
+      setKpiError(error instanceof Error ? error.message : 'Could not save business metrics');
+    } finally {
+      setKpiBusy(false);
     }
   }
 
@@ -251,7 +337,7 @@ export default function Home() {
   }
 
   const nav: { label: View; icon: string }[] = [
-    { label: 'Overview', icon: '◫' }, { label: 'Decision simulator', icon: '⌁' }, { label: 'Decision ledger', icon: '▤' }, { label: 'Data import', icon: '⇧' }, { label: 'Fundraising planner', icon: '◇' }, { label: 'Investor reporting', icon: '▧' }, { label: 'Company assumptions', icon: '⚙' },
+    { label: 'Overview', icon: '◫' }, { label: 'Decision simulator', icon: '⌁' }, { label: 'Decision ledger', icon: '▤' }, { label: 'Business metrics', icon: '↗' }, { label: 'Data import', icon: '⇧' }, { label: 'Fundraising planner', icon: '◇' }, { label: 'Investor reporting', icon: '▧' }, { label: 'Company assumptions', icon: '⚙' },
   ];
 
   return <main className="app-shell">
@@ -297,6 +383,40 @@ export default function Home() {
 
         {view === 'Company assumptions' && <section className="surface assumptions-surface"><div className="section-kicker">FINANCIAL MODEL INPUTS</div><h2>Company assumptions</h2><label className="number-field"><span>Model name</span><input type="text" maxLength={100} value={modelName} onChange={e=>setModelName(e.target.value)}/></label><p className="form-intro">Enter your company's starting position and recurring monthly economics. Save a draft for review or approve a model version to use as your planning baseline.</p><div className="form-section-title">CASH & REVENUE</div><div className="form-grid"><NumberField label="Opening cash balance" value={cash} set={setCash} min={0} max={100000000} step={10000} prefix="€"/><NumberField label="Monthly revenue" value={revenue} set={setRevenue} min={0} max={10000000} step={5000} prefix="€"/><NumberField label="Monthly revenue growth" value={growth} set={setGrowth} min={-99} max={100} step={.5} suffix="%"/><NumberField label="Cost of goods sold" value={cogs} set={setCogs} min={0} max={100} step={1} suffix="%"/></div><div className="form-section-title">OPERATING COSTS</div><div className="form-grid"><NumberField label="Existing monthly payroll" value={payroll} set={setPayroll} min={0} max={10000000} step={5000} prefix="€"/><NumberField label="Other monthly operating expenses" value={opex} set={setOpex} min={0} max={10000000} step={5000} prefix="€"/></div><div className="assumption-actions"><button className="button-secondary" disabled={modelBusy || workspaceLoading} onClick={() => saveModel('draft')}>{modelBusy ? 'Saving…' : 'Save as draft'}</button><button className="button-primary" disabled={modelBusy || workspaceLoading} onClick={() => saveModel('approved')}>{modelBusy ? 'Saving…' : 'Approve & save model'}</button><span>Model status: {modelStatus === 'none' ? 'Not saved' : modelStatus}. Approval creates a new version; previous approved versions are archived.</span></div>{workspaceError && <p className="warning-text">{workspaceError}</p>}</section>}
 
+
+        {view === 'Business metrics' && <section className="surface assumptions-surface">
+          <div className="section-kicker">OPERATING PERFORMANCE & UNIT ECONOMICS</div>
+          <h2>Monthly business metrics</h2>
+          <p className="form-intro">Add the operating data Avenor needs to analyze acquisition efficiency, customer economics and retention. Blank fields remain unknown — Avenor will never treat missing values as zero.</p>
+          <label className="number-field">
+            <span>Reporting month</span>
+            <input type="month" value={kpiPeriod} onChange={e => setKpiPeriod(e.target.value)} />
+          </label>
+          {kpiLoading ? <p className="form-intro">Loading metrics for this month…</p> : <p className="form-intro">{kpiHasData ? 'Saved metrics found for this month. Update any value and save again.' : 'No business metrics have been entered for this month yet.'}</p>}
+          <div className="form-section-title">RECURRING REVENUE & CUSTOMER BASE</div>
+          <div className="form-grid">
+            <KpiField label={`Monthly recurring revenue (${currency})`} value={businessKpis.mrr} set={value=>setBusinessKpis(current=>({...current,mrr:value}))} min="0" step="100"/>
+            <KpiField label="Active customers (end of month)" value={businessKpis.activeCustomers} set={value=>setBusinessKpis(current=>({...current,activeCustomers:value}))} min="0" step="1"/>
+            <KpiField label="New customers this month" value={businessKpis.newCustomers} set={value=>setBusinessKpis(current=>({...current,newCustomers:value}))} min="0" step="1"/>
+            <KpiField label="Churned customers this month" value={businessKpis.churnedCustomers} set={value=>setBusinessKpis(current=>({...current,churnedCustomers:value}))} min="0" step="1"/>
+          </div>
+          <div className="form-section-title">ACQUISITION SPEND & MARGIN</div>
+          <div className="form-grid">
+            <KpiField label={`Marketing spend (${currency})`} value={businessKpis.marketingSpend} set={value=>setBusinessKpis(current=>({...current,marketingSpend:value}))} min="0" step="100"/>
+            <KpiField label={`Sales spend (${currency})`} value={businessKpis.salesSpend} set={value=>setBusinessKpis(current=>({...current,salesSpend:value}))} min="0" step="100"/>
+            <KpiField label="Gross margin (%) — period" value={businessKpis.grossMarginPct} set={value=>setBusinessKpis(current=>({...current,grossMarginPct:value}))} min="0" max="100" step="0.1"/>
+          </div>
+          <div className="assumption-warning">
+            <span>ⓘ</span>
+            <p><b>Use consistent definitions.</b> Active, new and churned customers must refer to the same customer population and month. Marketing and sales spend should use the same acquisition-cost scope. Avenor uses the saved figure as supplied and labels CAC/LTV as estimates.</p>
+          </div>
+          {kpiError && <p className="warning-text">{kpiError}</p>}
+          <div className="assumption-actions">
+            <button className="button-primary" disabled={kpiBusy || kpiLoading || workspaceLoading} onClick={() => void saveBusinessMetrics()}>{kpiBusy ? 'Saving…' : 'Save monthly business metrics'}</button>
+            <span>{kpiHasData ? 'Existing values will be updated for this reporting month.' : 'Only non-empty fields will be saved.'}</span>
+          </div>
+        </section>}
+
         {view === 'Data import' && <section className="surface assumptions-surface"><div className="section-kicker">FINANCIAL DATA INGESTION</div><h2>Import your financial actuals</h2><p className="form-intro">{actualsCount} records are currently stored in this workspace. Imported actuals are kept separately and are not yet included in the forecast.</p><p className="form-intro">Upload a CSV export. Required columns: Date, Amount. Optional: Description, Category. Positive amounts are inflows; negative amounts are outflows. Use ISO dates (YYYY-MM-DD).</p><label className="number-field"><span>CSV file</span><input type="file" accept=".csv,text/csv" onChange={async e=>{setImportError('');setImportRows([]);const f=e.target.files?.[0];if(!f)return;try{if(f.size>2_000_000)throw new Error('Maximum file size is 2 MB');const {normalizeActuals}=await import('@/lib/csv');setImportRows(normalizeActuals(await f.text(),f.name));}catch(err){setImportError(err instanceof Error?err.message:'Could not parse CSV');}}}/></label>{importError&&<p className="warning-text">{importError}</p>}{importRows.length>0&&<><p><b>{importRows.length}</b> records ready for import · {money(importRows.filter(x=>x.direction==='inflow').reduce((a,x)=>a+x.amount,0))} inflows · {money(importRows.filter(x=>x.direction==='outflow').reduce((a,x)=>a+x.amount,0))} outflows</p><div className="ledger-list">{importRows.slice(0,5).map((r,i)=><div className="decision-row" key={`${r.period}-${i}`}><div className="decision-icon">{r.direction==='inflow'?'↗':'↘'}</div><div className="decision-copy"><b>{r.description||r.category}</b><span>{r.period} · {r.category}</span></div><div className="decision-impact"><b>{money(r.amount)}</b><small>{r.direction}</small></div></div>)}</div><button className="button-primary" disabled={importBusy} onClick={async()=>{setImportBusy(true);try{const organizationId=localStorage.getItem('financeos.organizationId');if(!organizationId)throw new Error('Create or select an authenticated workspace first.');const csvText=await new Promise<string>((resolve,reject)=>{const f=(document.querySelector('input[type=file]') as HTMLInputElement)?.files?.[0];if(!f){reject(new Error('Select a CSV file'));return;}f.text().then(resolve,reject);});const res=await fetch('/api/actuals/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({organizationId,csv:csvText})});const data=await res.json();if(!res.ok)throw new Error(data.error||'Import failed');setToast(`${data.imported} records imported · ${data.skipped} duplicates skipped`);const actualsResponse=await fetch(`/api/actuals?organizationId=${encodeURIComponent(organizationId)}`,{cache:'no-store'});if(actualsResponse.ok){const actualsData=await actualsResponse.json();setActualsCount((actualsData.actuals??[]).length);}setImportRows([]);}catch(err){setImportError(err instanceof Error?err.message:'Import failed');}finally{setImportBusy(false);}}}>{importBusy?'Importing…':'Import records to workspace →'}</button></>}</section>}
 
         {view === 'Fundraising planner' && <section className="surface assumptions-surface"><div className="section-kicker">FUNDRAISING INTELLIGENCE</div><h2>Model your next round</h2><p className="form-intro">Estimate dilution and cash runway after a hypothetical equity raise. This is a simplified planning calculator, not a valuation opinion.</p><div className="form-grid"><NumberField label="Target raise" value={raiseAmount} set={setRaiseAmount} min={0} max={100000000} step={50000} prefix="€"/><NumberField label="Pre-money valuation" value={preMoney} set={setPreMoney} min={1} max={1000000000} step={250000} prefix="€"/></div><div className="metric-grid"><Metric label="Post-money valuation" value={money(preMoney+raiseAmount)} sub="Pre-money + new capital" trend="neutral" icon="◇"/><Metric label="New investor ownership" value={`${(raiseAmount/(preMoney+raiseAmount)*100).toFixed(1)}%`} sub="Before option-pool adjustments" trend="neutral" icon="%"/><Metric label="Cash after raise" value={money(cash+raiseAmount)} sub="Excludes fees and other financing" trend="positive" icon="↗"/><Metric label="Estimated runway" value={base[0].netCashFlow<0?`${((cash+raiseAmount)/Math.abs(base[0].netCashFlow)).toFixed(1)} months`:'Cash positive'} sub="Flat current monthly net burn assumption" trend="neutral" icon="◷"/></div><p className="form-intro">This calculation assumes a simple priced equity round, no convertibles, no option-pool increase, no fees and no other dilution. Validate with legal and finance advisers.</p></section>}
@@ -313,7 +433,7 @@ export default function Home() {
 
 function runway(row: MonthResult): number | null { return row.runwayMonths; }
 function Metric({label,value,sub,trend,icon}:{label:string;value:string;sub:string;trend:string;icon:string}) { return <div className="metric-card"><div className="metric-top"><span>{label}</span><i>{icon}</i></div><b className="metric-value">{value}</b><small className={trend === 'warning' ? 'warning-text' : ''}>{sub}</small></div>; }
-function NumberField({label,value,set,min,max,step=1,prefix,suffix}:{label:string;value:number;set:(n:number)=>void;min:number;max:number;step?:number;prefix?:string;suffix?:string}) { return <label className="number-field"><span>{label}</span><div className="number-input">{prefix && <i>{prefix}</i>}<input type="number" min={min} max={max} step={step} value={value} onChange={e=>set(Math.max(min,Math.min(max,Number(e.target.value))))}/>{suffix && <i>{suffix}</i>}</div></label>; }
+function KpiField({label,value,set,min,max,step}:{label:string;value:string;set:(v:string)=>void;min?:string;max?:string;step?:string}) { return <label className="number-field"><span>{label}</span><div className="number-input"><input type="number" min={min} max={max} step={step} value={value} placeholder="Not provided" onChange={e=>set(e.target.value)}/></div></label>; }\nfunction NumberField({label,value,set,min,max,step=1,prefix,suffix}:{label:string;value:number;set:(n:number)=>void;min:number;max:number;step?:number;prefix?:string;suffix?:string}) { return <label className="number-field"><span>{label}</span><div className="number-input">{prefix && <i>{prefix}</i>}<input type="number" min={min} max={max} step={step} value={value} onChange={e=>set(Math.max(min,Math.min(max,Number(e.target.value))))}/>{suffix && <i>{suffix}</i>}</div></label>; }
 function CompareBar({label,value,max}:{label:string;value:number;max:number}) { return <div className="compare-row"><div><span>{label}</span><b>{money(value)}</b></div><div className="bar-track"><i style={{width:`${Math.max(0,Math.min(100,value/max*100))}%`}}/></div></div>; }
 function DecisionRow({item,detailed=false}:{item:SavedDecision;detailed?:boolean}) { return <div className="decision-row"><div className="decision-icon">⌁</div><div className="decision-copy"><b>{item.title}</b><span>{item.detail}</span>{detailed && <small>Saved {item.created} · Scenario preserved independently of base plan</small>}</div><div className="decision-impact"><b className="negative-text">−{money(item.cashImpact)}</b><small>18-month cash impact</small></div></div>; }
 function makeChart(base:MonthResult[],scenario:MonthResult[]) { const all=[...base.map(x=>x.closingCash),...scenario.map(x=>x.closingCash)]; const min=Math.min(0,...all); const max=Math.max(...all,1); const x=(i:number)=>42+i*(702/17); const y=(v:number)=>185-(v-min)/(max-min)*150; const path=(arr:MonthResult[])=>arr.map((r,i)=>`${i===0?'M':'L'} ${x(i).toFixed(1)} ${y(r.closingCash).toFixed(1)}`).join(' '); const bp=path(base); const sp=path(scenario); return {labels:base.map((_,i)=>`M${i+1}`),basePath:bp,scenarioPath:sp,baseArea:`${bp} L 744 185 L 42 185 Z`,baseY:y(base[17].closingCash),scenarioY:y(scenario[17].closingCash)}; }
