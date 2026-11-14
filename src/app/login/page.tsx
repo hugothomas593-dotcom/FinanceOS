@@ -1,8 +1,8 @@
-
 'use client';
 
 import { useState, type FormEvent } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
+import { getSupabasePublicConfig } from '@/lib/supabase/config';
 
 export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -17,23 +17,14 @@ export default function LoginPage() {
     setMessage('');
 
     try {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      const config = getSupabasePublicConfig();
+      if (!config) throw new Error('Supabase configuration is missing.');
 
-      if (!url || !key) {
-        throw new Error('Supabase configuration is missing.');
-      }
-
-      const supabase = createBrowserClient(url, key);
+      const supabase = createBrowserClient(config.url, config.key);
 
       if (mode === 'login') {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
+        const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-
         window.location.assign('/');
         return;
       }
@@ -42,21 +33,20 @@ export default function LoginPage() {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: new URL('/auth/callback', window.location.origin).toString(),
         },
       });
 
       if (error) throw error;
 
-      setMessage(
-        data.session
-          ? 'Account created successfully. Redirecting...'
-          : 'Account created. Please check your email to confirm your address.'
-      );
+      if (data.session) {
+        window.location.assign('/onboarding');
+        return;
+      }
+
+      setMessage('Account created. Please check your email to confirm your address.');
     } catch (error) {
-      setMessage(
-        error instanceof Error ? error.message : 'An unexpected error occurred.'
-      );
+      setMessage(error instanceof Error ? error.message : 'An unexpected error occurred.');
     } finally {
       setBusy(false);
     }
@@ -67,15 +57,10 @@ export default function LoginPage() {
       <form className="login-card" onSubmit={submit}>
         <div className="brand">
           <span className="brand-mark">A</span>
-          <span>
-            avenor
-          </span>
+          <span>avenor</span>
         </div>
 
-        <h1>
-          {mode === 'login' ? 'Welcome back' : 'Create your workspace'}
-        </h1>
-
+        <h1>{mode === 'login' ? 'Welcome back' : 'Create your account'}</h1>
         <p>Financial clarity for your next decision.</p>
 
         <label>
@@ -112,6 +97,12 @@ export default function LoginPage() {
         </button>
 
         {message && <p role="status">{message}</p>}
+
+        {mode === 'login' && (
+          <p className="auth-help">
+            <a href="/forgot-password">Forgot your password?</a>
+          </p>
+        )}
 
         <button
           type="button"
