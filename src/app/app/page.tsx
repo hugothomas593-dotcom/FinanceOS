@@ -22,7 +22,7 @@ const compact = (v: number) => new Intl.NumberFormat('en-GB', { notation: 'compa
 const initial: ModelInputs = { openingCash: 0, monthlyRevenue: 0, monthlyRevenueGrowth: 0, monthlyOpexExPayroll: 0, monthlyOpexGrowth: 0, cogsRatio: 0, existingMonthlyPayroll: 0, existingOtherNetCashAdjustments: 0 };
 const months = 18;
 
-type SavedDecision = { id: string; title: string; detail: string; cashImpact: number | null; cashImpactLabel: string; created: string };
+type SavedDecision = { id: string; title: string; detail: string; cashImpact: number | null; cashImpactLabel?: string; created: string };
 type WorkspaceMembership = {
   organization_id: string;
   role: string;
@@ -59,6 +59,7 @@ function scenarioCashImpact(outputs: Record<string, unknown>) {
     { value: directImpact?.endingCash, label: '18-month closing-cash difference' },
     { value: directImpact?.endingCashDelta, label: '18-month closing-cash difference' },
     { value: nestedImpact?.endingCash, label: '18-month closing-cash difference' },
+    { value: outputs.cashImpact, label: '18-month closing-cash difference' },
     { value: outputs.totalEstimatedCashImpact, label: 'Estimated one-off cash impact' },
   ];
 
@@ -392,8 +393,8 @@ export default function Home() {
 
     try {
       const name = `${headcount} engineer hire scenario`;
-      const cashImpact = impact;
-      const runwayImpact = (baseRunway ?? 0) - (scenarioRunway ?? 0);
+      const cashImpact = scenarioSummary.endingCash - baseSummary.endingCash;
+      const runwayImpact = (scenarioRunway ?? 0) - (baseRunway ?? 0);
       const response = await fetch('/api/scenarios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -415,15 +416,8 @@ export default function Home() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not save the scenario');
 
-      const decision: SavedDecision = {
-        id: data.scenario.id,
-        title: name,
-        detail: `Start month ${startMonth} · ${money(salary, currency)} gross annual salary · ${employerRate}% employer-cost assumption`,
-        cashImpact,
-        runwayImpact,
-        created: new Date(data.scenario.created_at).toLocaleDateString('en-GB'),
-      };
-      setSaved((items) => [decision, ...items]);
+      const decision = toSavedDecision(data.scenario as ScenarioRow);
+      setSaved((items) => [decision, ...items.filter((item) => item.id !== decision.id)]);
       setToast('Scenario saved to your Decision Ledger');
       window.setTimeout(() => setToast(''), 2600);
     } catch (error) {
@@ -620,7 +614,7 @@ function DecisionRow({item,detailed=false,currency="EUR"}:{item:SavedDecision;de
     </div>
     <div className="decision-impact">
       {amount === null ? (
-        <><b>—</b><small>{item.cashImpactLabel}</small></>
+        <><b>—</b><small>{item.cashImpactLabel ?? '18-month closing-cash difference'}</small></>
       ) : (
         <><b className={amount < 0 ? 'negative-text' : amount > 0 ? 'positive-text' : ''}>{amount > 0 ? '+' : amount < 0 ? '−' : ''}{money(Math.abs(amount), currency)}</b><small>{item.cashImpactLabel}</small></>
       )}
