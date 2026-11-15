@@ -55,11 +55,15 @@ function scenarioCashImpact(outputs: Record<string, unknown>) {
   const directImpact = asRecord(outputs.impact);
   const nestedScenario = asRecord(outputs.scenario);
   const nestedImpact = asRecord(nestedScenario?.impact);
+  const legacyCashImpact = typeof outputs.cashImpact === 'number' && Number.isFinite(outputs.cashImpact)
+    ? -Math.abs(outputs.cashImpact)
+    : undefined;
   const candidates: Array<{ value: unknown; label: string }> = [
     { value: directImpact?.endingCash, label: '18-month closing-cash difference' },
     { value: directImpact?.endingCashDelta, label: '18-month closing-cash difference' },
     { value: nestedImpact?.endingCash, label: '18-month closing-cash difference' },
-    { value: outputs.cashImpact, label: '18-month closing-cash difference' },
+    { value: outputs.cashDelta, label: '18-month closing-cash difference' },
+    { value: legacyCashImpact, label: '18-month closing-cash difference' },
     { value: outputs.totalEstimatedCashImpact, label: 'Estimated one-off cash impact' },
   ];
 
@@ -393,8 +397,9 @@ export default function Home() {
 
     try {
       const name = `${headcount} engineer hire scenario`;
-      const cashImpact = scenarioSummary.endingCash - baseSummary.endingCash;
-      const runwayImpact = (scenarioRunway ?? 0) - (baseRunway ?? 0);
+      const cashDelta = scenarioSummary.endingCash - baseSummary.endingCash;
+      const cashImpact = Math.max(0, -cashDelta);
+      const runwayImpact = (baseRunway ?? 0) - (scenarioRunway ?? 0);
       const response = await fetch('/api/scenarios', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -406,6 +411,7 @@ export default function Home() {
           assumptions: { modelInputs: inputs, hire },
           outputs: {
             cashImpact,
+            cashDelta,
             runwayImpact,
             baseEndingCash: baseSummary.endingCash,
             scenarioEndingCash: scenarioSummary.endingCash,
