@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { forecast, summarize, type ModelInputs, type HireInput, type MonthResult } from '@/lib/finance';
 import { AvenorCopilot } from '@/components/avenor-copilot';
 
-match => match.trimEnd() + `
+type View = 'Overview' | 'Decision simulator' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
 const viewTitles: Record<View, string> = {
   Overview: 'Company overview',
   'Decision simulator': 'Plan a decision',
@@ -15,8 +15,9 @@ const viewTitles: Record<View, string> = {
   'Fundraising planner': 'Fundraising',
   'Investor reporting': 'Investor update',
   'Plan & billing': 'Billing',
-};`
-match => match.trimEnd() + "\nconst compactMoney = (v: number, currency = 'EUR') => new Intl.NumberFormat('en-GB', { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(v);"
+};
+const money = (v: number, currency = 'EUR') => new Intl.NumberFormat('en-GB', { style: 'currency', currency, maximumFractionDigits: 0 }).format(v);
+const compactMoney = (v: number, currency = 'EUR') => new Intl.NumberFormat('en-GB', { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(v);
 const compact = (v: number) => new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
 const initial: ModelInputs = { openingCash: 0, monthlyRevenue: 0, monthlyRevenueGrowth: 0, monthlyOpexExPayroll: 0, monthlyOpexGrowth: 0, cogsRatio: 0, existingMonthlyPayroll: 0, existingOtherNetCashAdjustments: 0 };
 const months = 18;
