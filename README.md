@@ -4,6 +4,9 @@ Avenor is an early SaaS codebase for European Seed-stage startups. It combines a
 
 > **Honest release status:** this repository is not certified production-ready and must not be used with paying customers or sensitive live financial data until the deployment checklist below is completed. The dashboard still contains illustrative demo assumptions. External integrations require credentials and account setup.
 
+## Commercial offer
+Avenor has one subscription only: **Avenor Founder — €59/month**. There are no feature tiers. Before enabling checkout, `STRIPE_PRICE_ID` must reference the single recurring EUR 59 price created in the Stripe account. The visible price in the application does not mean Stripe checkout is connected; configure and test the Stripe product, price, webhook and server credentials first.
+
 ## Stack
 - Next.js 15 App Router, React 19, TypeScript
 - Supabase Auth + Postgres + Row Level Security
