@@ -184,7 +184,7 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
   }
 
   if (/\b(raise|fundrais|funding round|dilution|pre[ -]?money|post[ -]?money|levee|lever|financement|valorisation)\b/.test(q)) {
-    const suppliedAmounts = [...q.matchAll(/\d[\d.,]*(?:\s*(?:k|m|million|thousand))?\s*(?:€|£|\$)/gi)]
+    const suppliedAmounts = [...q.matchAll(/(?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?\s*(?:€|£|\$)?/gi)]
       .map((match) => parseAmount(match[0]))
       .filter((value): value is number => value !== null);
     const raise = namedAmount(input.message, /(?:raise|raising|funding|round of)\D{0,28}((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)/i)
@@ -283,8 +283,8 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
   if (/\b(hire|hiring|recruit|employee|engineer|headcount|team size|embaucher|recruter|recrutement|personnes|salaries|ingenieur|effectif|equipe)\b/.test(q)) {
     const countMatch = q.match(/\b(\d+)\s*(?:new\s*)?(?:hires?|people|employees|engineers|staff|heads?|personnes?|salaries?|ingenieurs?)\b/i);
     const count = countMatch ? Number(countMatch[1]) : null;
-    const salary = namedAmount(q, /((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?\s*(?:€|£|\$)?)\s*(?:gross(?: annual)? salary|annual salary|per hire|per person|brut(?: annuel)?|par personne|par embauche)/i)
-      ?? namedAmount(q, /(?:gross(?: annual)? salary|annual salary|salary per hire|salary per person|salary of|salary:|brut annuel|salaire annuel|salaire de)\s*((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?\s*(?:€|£|\$)?)/i);
+    const salary = namedAmount(q, /(?:gross(?: annual)? salary|annual salary|salary per hire|salary per person|salary of|salary:|brut(?: annuel)?(?: de)?|salaire annuel(?: de)?|salaire de)\s*((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?\s*(?:€|£|\$)?)/i)
+      ?? namedAmount(q, /((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?\s*(?:€|£|\$)?)\s*(?:gross(?: annual)? salary|annual salary|per hire|per person|brut(?: annuel)?|par personne|par embauche)/i);
     const rateMatch = q.match(/(\d+(?:[.,]\d+)?)\s*%\s*(?:employer|payroll|charges|on-cost|loaded|de\s+charges?\s+patronales?|patronales?)/i)
       ?? q.match(/(?:employer|payroll|charges|on-cost|loaded|patronales?)[^\d%]{0,20}(\d+(?:[.,]\d+)?)\s*%/i);
     const rate = rateMatch ? Number(rateMatch[1].replace(',', '.')) / 100 : null;
