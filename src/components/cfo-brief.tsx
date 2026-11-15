@@ -11,7 +11,7 @@ type Brief = {
   forecast: {
     horizonMonths: number; openingCash: number; monthlyRevenue: number; monthlyOperatingCosts: number;
     endingCash: number; minimumCash: number; lowestCashMonth: number;
-    firstMonthCashNegative: number | null; firstMonthBelowSixMonthsRunway: number | null;
+    firstMonthCashNegative: number | null; firstMonthBelowSixMonthsRunway: number | null; targetRunwayMonths: number; firstMonthBelowTargetRunway: number | null;
   } | null;
   historical: {
     records: number; monthsCovered: number; averageMonthlyInflows: number; averageMonthlyOutflows: number;
@@ -92,6 +92,7 @@ export function CfoBrief({ organizationId }: { organizationId: string }) {
             <span className={styles.status}>{brief.modelStatus === 'approved' ? 'Approved plan' : brief.modelStatus === 'draft' ? 'Draft plan' : 'Plan not set up'}</span>
             <span>Updated {updated}</span>
             <span>{brief.historical.records.toLocaleString('en-GB')} transaction records</span>
+            <span>Founder runway target: {brief.forecast?.targetRunwayMonths ?? 12} months</span>
           </div>
 
           {brief.forecast ? (
