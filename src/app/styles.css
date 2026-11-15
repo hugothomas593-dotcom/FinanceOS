@@ -1128,3 +1128,115 @@ button, input, textarea, select { font-family: inherit; }
   .marketing-footer>div { grid-column: 1 / -1; gap: 18px; }
   .marketing-footer>small { justify-self: end; }
 }
+
+
+/* Clear founder-facing charts */
+.chart-panel .chart-summary .delta {
+  margin-left: auto;
+  color: #7d8c84;
+  font-size: 10px;
+  font-weight: 500;
+}
+.chart-panel .chart-summary .delta small {
+  color: #88968f;
+  font-size: 10px;
+  font-weight: 500;
+}
+.chart-wrap .y-axis-label {
+  fill: #829188;
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.chart-wrap .zero-line {
+  stroke: #aabbb0;
+  stroke-width: 1.35;
+  stroke-dasharray: 3 4;
+}
+.chart-foot {
+  gap: 12px;
+  line-height: 1.5;
+}
+.chart-foot span:last-child {
+  color: #87958d;
+  text-align: right;
+}
+.flow-panel {
+  min-width: 0;
+  min-height: 224px;
+}
+.flow-panel .surface-heading {
+  margin-bottom: 20px;
+}
+.flow-bars {
+  display: grid;
+  gap: 19px;
+  margin: 8px 0 18px;
+}
+.flow-item {
+  display: grid;
+  gap: 8px;
+}
+.flow-label {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.flow-label span {
+  color: #65766d;
+  font-size: 11px;
+}
+.flow-label b {
+  color: #344b3e;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.flow-track {
+  height: 10px;
+  width: 100%;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #edf1ee;
+}
+.flow-track i {
+  display: block;
+  height: 100%;
+  min-width: 0;
+  border-radius: inherit;
+  transition: width .2s ease;
+}
+.flow-income { background: #5c9478; }
+.flow-costs { background: #9baaa2; }
+.flow-item small {
+  color: #929f97;
+  font-size: 9px;
+  line-height: 1.45;
+}
+.flow-result {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid #e9eeea;
+  padding-top: 13px;
+}
+.flow-result span {
+  color: #718078;
+  font-size: 10px;
+}
+.flow-result b {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.cash-table-panel { margin-top: 16px; }
+.cash-table-panel .surface-heading p { margin-top: 5px; }
+@media (max-width: 620px) {
+  .chart-panel .chart-summary { align-items: flex-start; }
+  .chart-panel .chart-summary .delta { margin-left: 0; }
+  .chart-foot { flex-direction: column; }
+  .chart-foot span:last-child { text-align: left; }
+  .flow-label { align-items: flex-start; flex-direction: column; gap: 3px; }
+  .flow-result { align-items: flex-start; flex-direction: column; gap: 5px; }
+  .cash-table-panel { margin-top: 12px; }
+}
