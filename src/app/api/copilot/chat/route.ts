@@ -17,7 +17,7 @@ import {
   type ActualRecord,
 } from '@/lib/finance-intelligence';
 import { validateModelInputs, type HireInput, type ModelInputs } from '@/lib/finance';
-import { CompanyContextSchema, EMPTY_COMPANY_CONTEXT } from '@/lib/company-context';
+import { CompanyContextSchema, EMPTY_COMPANY_CONTEXT, type CompanyContext } from '@/lib/company-context';
 
 export const maxDuration = 60;
 
@@ -47,7 +47,7 @@ const formatInstructions = (
   organizationName: string,
   currency: string,
   snapshot: ReturnType<typeof buildCompanySnapshot>,
-  companyContext: ReturnType<typeof CompanyContextSchema.parse>,
+  companyContext: CompanyContext,
 ) => `You are Avenor Intelligence, the embedded finance and decision teammate for ${organizationName}.
 Your job is to help a founder understand the company's financial position and evaluate business decisions with the discipline of a strong finance lead.
 
