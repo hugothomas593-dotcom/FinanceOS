@@ -101,10 +101,12 @@ export function AvenorCopilot({
   organizationId,
   organizationName,
   currency = 'EUR',
+  embedded = false,
 }: {
   organizationId: string;
   organizationName: string;
   currency?: string;
+  embedded?: boolean;
 }) {
   const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
   const [open, setOpen] = useState(false);
@@ -269,22 +271,25 @@ export function AvenorCopilot({
 
   return (
     <>
-      <button
-        type="button"
-        className={styles.launcher}
-        onClick={() => setOpen((value) => !value)}
-        aria-label={open ? 'Close Avenor chat' : 'Open Avenor chat'}
-        aria-expanded={open}
-      >
-        <span className={styles.launcherIcon}>A</span>
-        <span className={styles.launcherLabel}>Open Copilot</span>
-        <span className={styles.launcherDot} />
-      </button>
+      {!embedded && (
+        <button
+          type="button"
+          className={styles.launcher}
+          onClick={() => setOpen((value) => !value)}
+          aria-label={open ? 'Close Avenor chat' : 'Open Avenor chat'}
+          aria-expanded={open}
+        >
+          <span className={styles.launcherIcon}>A</span>
+          <span className={styles.launcherLabel}>Open Copilot</span>
+          <span className={styles.launcherDot} />
+        </button>
+  
+        )}
 
-      {open && (
+      {(embedded || open) && (
         <>
-          <button className={styles.backdrop} type="button" aria-label="Close assistant" onClick={() => setOpen(false)} />
-          <aside className={styles.panel} aria-label="Avenor financial companion">
+          {!embedded && <button className={styles.backdrop} type="button" aria-label="Close assistant" onClick={() => setOpen(false)} />}
+          <aside className={embedded ? styles.embedded : styles.panel} aria-label="Avenor financial copilot">
             <header className={styles.header}>
               <div className={styles.headerBrand}>
                 <div className={styles.brandMark}>A</div>
@@ -296,7 +301,7 @@ export function AvenorCopilot({
               <div className={styles.headerActions}>
                 <button type="button" onClick={() => setHistoryOpen((value) => !value)} title="Conversation history" aria-label="Conversation history">◷</button>
                 <button type="button" onClick={startNewConversation} title="New conversation" aria-label="New conversation">＋</button>
-                <button type="button" onClick={() => setOpen(false)} title="Close" aria-label="Close">×</button>
+                {!embedded && <button type="button" onClick={() => setOpen(false)} title="Close" aria-label="Close">×</button>}
               </div>
             </header>
 
