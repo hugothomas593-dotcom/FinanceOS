@@ -168,6 +168,7 @@ export async function POST(request: Request) {
 
     let threadId = requestedThreadId ?? null;
     let threadTitle = message.replace(/\s+/g, ' ').slice(0, 72);
+    let threadCreatedAt = new Date().toISOString();
     if (!threadId) {
       const { data: newThread, error: threadError } = await supabase
         .from('copilot_threads')
@@ -182,10 +183,11 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Could not start a Copilot conversation' }, { status: 500 });
       }
       threadId = newThread.id;
+      threadCreatedAt = newThread.created_at;
     } else {
       const { data: existingThread } = await supabase
         .from('copilot_threads')
-        .select('id,title')
+        .select('id,title,created_at')
         .eq('id', threadId)
         .eq('organization_id', organizationId)
         .eq('created_by', user.id)
@@ -194,6 +196,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Conversation not found' }, { status: 404 });
       }
       threadTitle = existingThread.title || threadTitle;
+      threadCreatedAt = existingThread.created_at;
     }
 
     const { data: userMessage, error: userMessageError } = await supabase
@@ -511,7 +514,7 @@ export async function POST(request: Request) {
     }
 
     return NextResponse.json({
-      thread: { id: threadId, title: threadTitle },
+      thread: { id: threadId, title: threadTitle, created_at: threadCreatedAt },
       userMessage,
       assistantMessage,
       aiUnavailable,
