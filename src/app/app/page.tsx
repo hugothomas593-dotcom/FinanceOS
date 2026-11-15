@@ -587,4 +587,4 @@ function makeChart(base: MonthResult[]) {
     yTicks: [0, 1, 2, 3].map(index => ({ value: max - ((max - min) * index / 3), y: top + (plotHeight * index / 3) })),
     monthTicks: monthIndices.map(index => ({ x: x(index), label: `Month ${base[index].month}` })),
   };
-} ${x(i).toFixed(1)} ${y(r.closingCash).toFixed(1)}`).join(' '); const bp=path(base); const sp=path(scenario); return {labels:base.map((_,i)=>`M${i+1}`),basePath:bp,scenarioPath:sp,baseArea:`${bp} L 744 185 L 42 185 Z`,baseY:y(base[17].closingCash),scenarioY:y(scenario[17].closingCash)}; }
+}
