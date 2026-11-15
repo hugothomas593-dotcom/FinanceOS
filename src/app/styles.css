@@ -1787,3 +1787,18 @@ body {
   .copilot-page { height: calc(100vh - 115px); min-height: 540px; padding: 8px; }
   .page-heading h1 { font-size: 24px; }
 }
+
+.copilot-host { display: none; }
+.copilot-host.active { display: flex; flex: 1 1 auto; min-height: 0; }
+.copilot-host.active > .embedded { flex: 1 1 auto; min-height: 0; }
+.copilot-page { gap: 0; }
+.copilot-page .copilot-host.active { width: 100%; }
+@media (max-width: 900px) {
+  .nav-groups { display:flex; gap:15px; }
+  .nav-group { display:flex; align-items:center; }
+  .nav-group-items { display:flex; }
+}
+@media (max-width: 620px) {
+  .nav-item { padding: 7px 8px; font-size: 9px; }
+  .copilot-host.active > .embedded { min-height: 0; }
+}
