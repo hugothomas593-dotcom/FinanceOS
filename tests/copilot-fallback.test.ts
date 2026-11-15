@@ -71,7 +71,7 @@ describe('deterministic Copilot fallback', () => {
     const result = fallback('Can we hire 2 people at €60k gross annual salary with a 35% employer-cost rate?');
     expect(result.calculation?.title).toBe('Hiring plan simulation');
     expect(result.saveableScenario?.scenarioType).toBe('hiring');
-    expect(result.answer).toContain('€13,700');
+    expect(result.answer).toContain('€13,500');
   });
 
   it('calculates post-money dilution from supplied fundraising inputs', () => {
