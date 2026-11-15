@@ -89,3 +89,14 @@ A detailed source audit is maintained in `docs/AVENOR_AUDIT_2026-11-14.md`. Verc
 - Added `vercel.json` with `regions: ["dub1"]` so Vercel server functions run in Dublin (AWS `eu-west-1`), aligned to the Supabase project region.
 - The previously inspected READY Preview on commit `f86407ea15bd0aa7cef56bc5f7d8aaed366b361c` still ran in `iad1`; it predates this config and is not proof that the EU setting is active.
 - The new region setting needs to be verified from a fresh Vercel deployment before any data-residency claim is made.
+ 
+## Weekly CFO Brief implementation — 15 November 2026
+- Added a deterministic Brief engine using the latest approved model (or the latest draft when none is approved), up to 5,000 imported transaction records and the latest monthly business metrics.
+- Added authenticated `GET /api/brief?organizationId=...`; workspace membership is verified server-side.
+- Added on-demand 18-month outlook metrics, cash-negative and below-six-month-runway flags, significant historical inflow/outflow trends, limited-data warnings and foreign-currency exclusion. No FX conversion is inferred and imported actuals are not reconciled into the forecast.
+- Added the Weekly CFO Brief panel to the Copilot-first authenticated Overview, with manual refresh and a path to discuss the brief with Copilot.
+- Added regression tests for cash/runway alerts, missing model handling, historical trends and currency mismatches.
+- GitHub Actions CI run #104 on commit `55cf17b5db432dbbd353f765ecb80a9508b6e8bb` passed. A follow-up wording fix and README documentation were committed afterward; the CI run for the final head must be checked separately.
+- Vercel Preview creation remains blocked by the Hobby daily deployment limit. No deployment or Production change was made.
+- Staging security advisor: leaked-password protection is disabled and must be enabled before public registration. `stripe_webhook_events` has RLS enabled and no client-facing policy (fail-closed/server-only); six unused-index notices are informational on the near-empty staging project.
+- Live AI Gateway inference still has a 403 account-verification/billing blocker. Stripe credentials and recurring EUR 59 price/webhook configuration are still absent; no payments are enabled.
