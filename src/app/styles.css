@@ -1825,3 +1825,256 @@ body {
   border-color:#94a9ed;
   box-shadow:0 0 0 3px rgba(49,91,214,.08);
 }
+
+
+/* -------------------------------------------------------------------------- */
+/* Avenor public identity — aligned with the navy / cobalt product workspace  */
+/* -------------------------------------------------------------------------- */
+.a-marketing {
+  --a-ink: #17243a;
+  --a-muted: #69788d;
+  --a-line: #e4eaf2;
+  --a-paper: #f5f7fb;
+  --a-green: #315bd6;
+  --a-soft: #edf2ff;
+  color: var(--a-ink);
+  background: var(--a-paper);
+}
+.a-header {
+  background: rgba(255,255,255,.96);
+  border-bottom-color: #e5eaf2;
+}
+.a-brand { color: #1b2d46; }
+.a-brand-mark, .a-preview-mark, .a-answer-mark {
+  background: #1c2c46;
+  color: #fff;
+}
+.a-header nav a, .a-login { color: #69788d; }
+.a-header nav a:hover, .a-login:hover { color: #315bd6; }
+.a-button-dark {
+  color: #fff;
+  background: #315bd6;
+  box-shadow: 0 5px 15px rgba(49,91,214,.14);
+}
+.a-button-dark:hover {
+  background: #244abf;
+  box-shadow: 0 8px 19px rgba(49,91,214,.2);
+}
+.a-button-light { color: #315bd6; background: #edf2ff; }
+.a-button-light:hover { background: #fff; }
+.a-hero {
+  background: linear-gradient(118deg,#f7f9fd 0%,#f0f4fc 55%,#eaf0ff 100%);
+}
+.a-hero-glow {
+  background: radial-gradient(circle,rgba(111,143,235,.2),rgba(111,143,235,0) 69%);
+}
+.a-eyebrow, .a-section-label { color: #5f73a4; }
+.a-eyebrow>span {
+  background: #315bd6;
+  box-shadow: 0 0 0 4px #e0e8ff;
+}
+.a-hero h1 { color: #172941; }
+.a-hero h1 em, .a-marketing h2 em { color: #4168d8; }
+.a-hero-lede { color: #68788f; }
+.a-text-link { color: #315bd6; }
+.a-hero-proof { color: #62738c; }
+.a-hero-proof span { color: #5876cf; }
+.a-hero-proof i { background: #dce4f3; }
+.a-preview-window {
+  border-color: #dfe6f1;
+  box-shadow: 0 22px 60px rgba(27,47,79,.11),0 2px 8px rgba(27,47,79,.035);
+}
+.a-preview-header, .a-preview-answer { border-color: #e7ecf4; }
+.a-preview-brand b, .a-preview-answer h3 { color: #20334e; }
+.a-preview-brand small, .a-preview-answer>p { color: #7a899e; }
+.a-preview-tag { color: #536aa8; background: #edf2ff; }
+.a-preview-context { border-color: #e8edf5; background: #f8faff; color: #71819a; }
+.a-context-dot { background: #239777; }
+.a-preview-context i { background: #dfe6f0; }
+.a-context-lock { color: #8290a4; }
+.a-preview-body { background: #f8faff; }
+.a-preview-question { border-color: #dfe7fb; background: #edf2ff; }
+.a-preview-question span { color: #7184bd; }
+.a-preview-question p { color: #344b79; }
+.a-preview-answer-head b { color: #304765; }
+.a-preview-answer-head>span { color: #8a97aa; }
+.a-preview-metrics>div { border-color: #e5eaf2; background: #f8faff; }
+.a-preview-metrics small { color: #7d8ca2; }
+.a-preview-metrics b { color: #1e3454; }
+.a-preview-comparison span { color: #687a93; }
+.a-preview-comparison b { color: #405674; }
+.a-bar { background: #e8edf6; }
+.a-bar:after { background: #4268d7; }
+.a-bar-base:after { background: #4268d7; }
+.a-bar-hire:after { background: #a8b5ca; }
+.a-bar-later:after { background: #7893d9; }
+.a-preview-foot { border-color: #e8edf4; color: #70819b; }
+.a-preview-composer { border-color: #dfe6f1; color: #8d9aab; }
+.a-preview-composer i { background: #315bd6; }
+.a-preview-note { border-color: #e3e9f3; color: #60728c; box-shadow: 0 7px 20px rgba(27,47,79,.07); }
+.a-preview-note span { color: #315bd6; }
+.a-hero-bottom { border-color: #dfe6f0; color: #8794a8; }
+.a-intro, .a-method { background: #fff; }
+.a-marketing h2 { color: #1b2d46; }
+.a-intro-grid>div p, .a-method-copy>p { color: #6e7e94; }
+.a-jobs, .a-pricing { background: #f1f4fa; }
+.a-section-heading>p, .a-pricing-copy>p { color: #6e7d94; }
+.a-job-card { border-color: #e1e7f0; background: rgba(255,255,255,.9); }
+.a-job-top { color: #7185b8; }
+.a-job-top i { border-color: #e1e7f0; color: #4268d7; }
+.a-job-card h3 { color: #233852; }
+.a-job-card>p { color: #6e7e94; }
+.a-job-examples span { background: #edf2ff; color: #526da9; }
+.a-method-points { border-color: #e7ecf3; }
+.a-method-points>div { border-color: #e7ecf3; }
+.a-method-points>div>span { color: #6480ca; }
+.a-method-points b { color: #30445f; }
+.a-method-points p { color: #78879b; }
+.a-pricing-assurance { color: #4968bc; }
+.a-pricing-assurance span { background: #315bd6; }
+.a-price-card {
+  border-color: #dfe6f1;
+  box-shadow: 0 16px 40px rgba(27,47,79,.065);
+}
+.a-price-top { color: #61738c; }
+.a-price-dot { color: #315bd6; }
+.a-price strong { color: #1b304d; }
+.a-price>span, .a-price-description { color: #718097; }
+.a-price-rule { background: #e8edf5; }
+.a-price-card li { color: #51647f; }
+.a-price-card li span { color: #315bd6; }
+.a-price-card>small { color: #8794a7; }
+.a-final-cta { background: #172941; }
+.a-final-cta .a-section-label { color: #aabbe9; }
+.a-final-cta h2 { color: #f4f7ff; }
+.a-final-cta h2 em { color: #a9bdf4; }
+.a-final-cta>p { color: #c1cce0; }
+.a-footer { background: #122238; }
+.a-footer .a-brand { color: #f3f6fc; }
+.a-footer .a-brand-mark { background: #edf2ff; color: #244abf; }
+.a-footer>span { color: #b4bfd0; }
+.a-footer>div a { color: #c7d1df; }
+.a-footer>div a:hover { color: #fff; }
+.a-footer>small { color: #8999ae; }
+
+/* Sign-in and sign-up should feel like the same product, not a second brand. */
+.login-shell {
+  min-height: 100vh;
+  padding: 28px 18px;
+  background:
+    radial-gradient(ellipse at 12% 12%,rgba(120,151,235,.12),transparent 37%),
+    radial-gradient(ellipse at 92% 88%,rgba(174,194,240,.14),transparent 35%),
+    #f5f7fb;
+}
+.login-card {
+  width: min(100%,430px);
+  gap: 17px;
+  padding: 38px;
+  border: 1px solid #e1e7f1;
+  border-radius: 16px;
+  background: rgba(255,255,255,.97);
+  box-shadow: 0 18px 52px rgba(24,42,68,.085);
+}
+.login-card .auth-home-link {
+  color: #687b99;
+  font-size: 11px;
+  text-decoration: none;
+}
+.login-card .auth-home-link:hover { color: #315bd6; }
+.login-card .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  color: #1b2d46;
+  font-family: Inter,ui-sans-serif,system-ui,sans-serif;
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: -.8px;
+}
+.login-card .brand-mark {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px 8px 8px 3px;
+  background: #1c2c46;
+  color: #fff;
+  font: 20px Georgia,serif;
+}
+.login-card h1 {
+  margin: 10px 0 0;
+  color: #1b2d46;
+  font-family: Inter,ui-sans-serif,system-ui,sans-serif;
+  font-size: 27px;
+  font-weight: 680;
+  letter-spacing: -.85px;
+}
+.login-card>p { color: #73829a; font-size: 12px; line-height: 1.6; }
+.login-card label { color: #405572; font-size: 11px; font-weight: 650; }
+.login-card input {
+  min-height: 44px;
+  border: 1px solid #dfe6f0;
+  border-radius: 8px;
+  padding: 11px 12px;
+  background: #fff;
+  color: #263a55;
+  outline: none;
+  font: inherit;
+  font-size: 12px;
+  transition: border-color .15s ease,box-shadow .15s ease;
+}
+.login-card input::placeholder { color: #9aa6b7; }
+.login-card input:focus {
+  border-color: #91a8ef;
+  box-shadow: 0 0 0 3px rgba(49,91,214,.1);
+}
+.login-card .button-primary {
+  min-height: 46px;
+  border: 1px solid #315bd6;
+  border-radius: 8px;
+  background: #315bd6;
+  color: #fff;
+  font-size: 12px;
+}
+.login-card .button-primary:hover:not(:disabled) { background: #244abf; }
+.login-card .button-primary:disabled { opacity: .65; cursor: wait; }
+.login-card .button-secondary {
+  min-height: 43px;
+  border: 1px solid #dfe6f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #45607f;
+  font-size: 11px;
+}
+.login-card .button-secondary:hover { background: #f7f9fd; border-color: #cbd7ea; }
+.login-card .auth-help a { color: #315bd6; font-size: 11px; text-decoration: none; }
+.login-card [role="status"] {
+  padding: 10px 12px;
+  border: 1px solid #dce6fa;
+  border-radius: 8px;
+  background: #f3f6ff;
+  color: #405b98;
+  font-size: 11px;
+  line-height: 1.55;
+}
+.login-card button:focus-visible, .login-card a:focus-visible, .a-marketing a:focus-visible {
+  outline: 3px solid rgba(49,91,214,.25);
+  outline-offset: 3px;
+}
+@media (max-width: 620px) {
+  .a-header-inner, .a-hero-inner, .a-hero-bottom { width: calc(100% - 32px); }
+  .a-hero { padding-top: 44px; }
+  .a-hero h1 { letter-spacing: -1.5px; }
+  .a-hero-bottom { font-size: 7px; }
+  .a-intro, .a-jobs, .a-method, .a-pricing { padding: 64px 17px; }
+  .a-job-grid { grid-template-columns: 1fr; }
+  .a-job-card { min-height: 0; }
+  .a-job-card>p { min-height: 0; }
+  .a-footer { grid-template-columns: 1fr; gap: 13px; }
+  .a-footer>div { flex-wrap: wrap; }
+  .login-card { padding: 30px 23px; border-radius: 13px; }
+  .login-card h1 { font-size: 24px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .a-button { transition: none; }
+  .a-button:hover { transform: none; }
+}
