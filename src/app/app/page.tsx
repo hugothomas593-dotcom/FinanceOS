@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { forecast, summarize, type ModelInputs, type MonthResult } from '@/lib/finance';
 import { AvenorCopilot } from '@/components/avenor-copilot';
 import { CfoBrief } from '@/components/cfo-brief';
+import { EMPTY_COMPANY_CONTEXT, companyContextCompletion, type CompanyContext } from '@/lib/company-context';
 
 type View = 'Overview' | 'CFO Brief' | 'Financial overview' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
 const viewTitles: Record<View, string> = {
@@ -94,6 +95,10 @@ export default function Home() {
   const [organizationId, setOrganizationId] = useState('');
   const [organizationName, setOrganizationName] = useState('');
   const [currency, setCurrency] = useState('EUR');
+  const [companyContext, setCompanyContext] = useState<CompanyContext>(EMPTY_COMPANY_CONTEXT);
+  const [contextBusy, setContextBusy] = useState(false);
+  const [contextError, setContextError] = useState('');
+  const [contextUpdatedAt, setContextUpdatedAt] = useState('');
   const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
   const [workspaceError, setWorkspaceError] = useState('');
@@ -157,8 +162,19 @@ export default function Home() {
 
   useEffect(() => {
     const navigateToCopilot = () => setView('Overview');
+    const openCompanySetup = () => setView('Company assumptions');
+    const openDataImport = () => setView('Data import');
+    const openFinancialOverview = () => setView('Financial overview');
     window.addEventListener('avenor:open-copilot', navigateToCopilot);
-    return () => window.removeEventListener('avenor:open-copilot', navigateToCopilot);
+    window.addEventListener('avenor:open-company-setup', openCompanySetup);
+    window.addEventListener('avenor:open-data-import', openDataImport);
+    window.addEventListener('avenor:open-financial-overview', openFinancialOverview);
+    return () => {
+      window.removeEventListener('avenor:open-copilot', navigateToCopilot);
+      window.removeEventListener('avenor:open-company-setup', openCompanySetup);
+      window.removeEventListener('avenor:open-data-import', openDataImport);
+      window.removeEventListener('avenor:open-financial-overview', openFinancialOverview);
+    };
   }, []);
 
   useEffect(() => {
@@ -198,14 +214,15 @@ export default function Home() {
         setOrganizationName(organization?.name ?? 'Your company');
         setCurrency((organization?.base_currency ?? 'EUR').trim());
 
-        const [modelsResponse, scenariosResponse, actualsResponse] = await Promise.all([
+        const [modelsResponse, scenariosResponse, actualsResponse, contextResponse] = await Promise.all([
           fetch(`/api/models?organizationId=${encodeURIComponent(selectedOrganizationId)}`, { cache: 'no-store' }),
           fetch(`/api/scenarios?organizationId=${encodeURIComponent(selectedOrganizationId)}`, { cache: 'no-store' }),
           fetch(`/api/actuals?organizationId=${encodeURIComponent(selectedOrganizationId)}`, { cache: 'no-store' }),
+          fetch(`/api/context?organizationId=${encodeURIComponent(selectedOrganizationId)}`, { cache: 'no-store' }),
         ]);
 
-        const [modelsData, scenariosData, actualsData] = await Promise.all([
-          modelsResponse.json(), scenariosResponse.json(), actualsResponse.json(),
+        const [modelsData, scenariosData, actualsData, contextData] = await Promise.all([
+          modelsResponse.json(), scenariosResponse.json(), actualsResponse.json(), contextResponse.json(),
         ]);
 
         if (cancelled) return;
@@ -235,6 +252,13 @@ export default function Home() {
 
         if (actualsResponse.ok) {
           setActualsCount(((actualsData.actuals ?? []) as unknown[]).length);
+        }
+
+        if (contextResponse.ok) {
+          setCompanyContext(contextData.context ?? EMPTY_COMPANY_CONTEXT);
+          setContextUpdatedAt(contextData.updatedAt ?? '');
+        } else {
+          setContextError(contextData.error || 'Company context could not be loaded');
         }
       } catch (error) {
         if (!cancelled) setWorkspaceError(error instanceof Error ? error.message : 'Could not load your workspace');
@@ -312,6 +336,29 @@ export default function Home() {
   const chart = makeChart(base);
   const monthlyOperatingCosts = base[0].cogs + base[0].payroll + base[0].nonPayrollOpex;
   const flowMaximum = Math.max(base[0].revenue, monthlyOperatingCosts, 1);
+
+  async function saveCompanyContext() {
+    if (!organizationId) return;
+    setContextBusy(true);
+    setContextError('');
+    try {
+      const response = await fetch('/api/context', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId, context: companyContext }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not save company context');
+      setCompanyContext(data.context ?? companyContext);
+      setContextUpdatedAt(data.updatedAt ?? new Date().toISOString());
+      setToast('Company context saved. Copilot will use it in future analyses.');
+      window.setTimeout(() => setToast(''), 3200);
+    } catch (cause) {
+      setContextError(cause instanceof Error ? cause.message : 'Could not save company context');
+    } finally {
+      setContextBusy(false);
+    }
+  }
 
   async function saveModel(status: 'draft' | 'approved') {
     if (!organizationId) return;
@@ -432,7 +479,15 @@ export default function Home() {
         {view !== 'Overview' && <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{viewTitles[view]}</h1><p>{view === 'CFO Brief' ? 'A clear management review of cash, performance, risks and recommended actions.' : view === 'Financial overview' ? 'Explore your cash position, operating forecast and the main signals in your financial plan.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit company setup <span>↗</span></button></div></div>}
 
         <div className={`copilot-host ${view === 'Overview' ? 'active' : 'inactive'}`}>
-          <AvenorCopilot organizationId={organizationId} organizationName={organizationName} currency={currency} embedded />
+          <AvenorCopilot
+            organizationId={organizationId}
+            organizationName={organizationName}
+            currency={currency}
+            embedded
+            contextCompletion={companyContextCompletion(companyContext)}
+            hasFinancialModel={hasModel}
+            hasImportedActuals={actualsCount > 0}
+          />
         </div>
 
         {view === 'CFO Brief' && organizationId && <CfoBrief organizationId={organizationId} />}
@@ -509,7 +564,38 @@ export default function Home() {
 
         {view === 'Decision ledger' && <section className="surface ledger-surface"><div className="surface-heading"><div><div className="section-kicker">DECISION HISTORY</div><h2>Your decision ledger</h2><p>Scenarios saved for review. Saving a scenario never changes the approved base plan.</p></div><button className="button-primary" onClick={() => setView('Overview')}>＋ New scenario</button></div>{saved.length === 0 ? <div className="empty-state large-empty"><div className="empty-icon">▤</div><b>Your ledger is ready</b><p>Once you save a scenario, it will appear here with its assumptions and projected cash impact.</p><button className="button-primary" onClick={() => setView('Overview')}>Build your first scenario →</button></div> : <div className="ledger-list">{saved.map(item => <DecisionRow key={item.id} item={item} detailed currency={currency}/>)}</div>}</section>}
 
-        {view === 'Company assumptions' && <section className="surface assumptions-surface"><div className="section-kicker">FINANCIAL MODEL INPUTS</div><h2>Company assumptions</h2><label className="number-field"><span>Model name</span><input type="text" maxLength={100} value={modelName} onChange={e=>setModelName(e.target.value)}/></label><p className="form-intro">Enter your company's starting position and recurring monthly economics. Save a draft for review or approve a model version to use as your planning baseline.</p><div className="form-section-title">CASH & REVENUE</div><div className="form-grid"><NumberField label="Opening cash balance" value={cash} set={setCash} min={0} max={100000000} step={10000} prefix={currencySymbol}/><NumberField label="Monthly revenue" value={revenue} set={setRevenue} min={0} max={10000000} step={5000} prefix={currencySymbol}/><NumberField label="Monthly revenue growth" value={growth} set={setGrowth} min={-99} max={100} step={.5} suffix="%"/><NumberField label="Direct costs as % of sales" value={cogs} set={setCogs} min={0} max={100} step={1} suffix="%"/></div><div className="form-section-title">OPERATING COSTS</div><div className="form-grid"><NumberField label="Current monthly team costs" value={payroll} set={setPayroll} min={0} max={10000000} step={5000} prefix={currencySymbol}/><NumberField label="Other monthly running costs" value={opex} set={setOpex} min={0} max={10000000} step={5000} prefix={currencySymbol}/></div><div className="assumption-actions"><button className="button-secondary" disabled={modelBusy || workspaceLoading} onClick={() => saveModel('draft')}>{modelBusy ? 'Saving…' : 'Save as draft'}</button><button className="button-primary" disabled={modelBusy || workspaceLoading} onClick={() => saveModel('approved')}>{modelBusy ? 'Saving…' : 'Approve & save model'}</button><span>Model status: {modelStatus === 'none' ? 'Not saved' : modelStatus}. Approval creates a new version; previous approved versions are archived.</span></div>{workspaceError && <p className="warning-text">{workspaceError}</p>}</section>}
+        {view === 'Company assumptions' && <>
+          <section className="surface assumptions-surface company-context-surface">
+            <div className="section-kicker">PERSISTENT COMPANY MEMORY</div>
+            <h2>Help Avenor understand your business</h2>
+            <p className="form-intro">These founder-provided details stay in your workspace and are included in future Copilot conversations. They are business context, not verified accounting data.</p>
+            <div className="form-section-title">WHAT YOU DO</div>
+            <div className="form-grid">
+              <label className="number-field"><span>Industry</span><input maxLength={100} value={companyContext.industry} onChange={e=>setCompanyContext(current=>({...current,industry:e.target.value}))} placeholder="e.g. B2B software"/></label>
+              <label className="number-field"><span>Business model</span><select value={companyContext.businessModel} onChange={e=>setCompanyContext(current=>({...current,businessModel:e.target.value as CompanyContext['businessModel']}))}><option value="saas">SaaS / subscription</option><option value="marketplace">Marketplace</option><option value="services">Services</option><option value="ecommerce">E-commerce</option><option value="hardware">Hardware</option><option value="other">Other</option></select></label>
+              <label className="number-field"><span>Company stage</span><select value={companyContext.stage} onChange={e=>setCompanyContext(current=>({...current,stage:e.target.value as CompanyContext['stage']}))}><option value="idea">Idea / validation</option><option value="pre-seed">Pre-seed</option><option value="seed">Seed</option><option value="series-a">Series A</option><option value="series-b">Series B+</option><option value="profitable">Profitable / bootstrapped</option><option value="other">Other</option></select></label>
+              <label className="number-field"><span>Geography</span><input maxLength={160} value={companyContext.geography} onChange={e=>setCompanyContext(current=>({...current,geography:e.target.value}))} placeholder="e.g. France and Benelux"/></label>
+              <label className="number-field"><span>Pricing model</span><input maxLength={160} value={companyContext.pricingModel} onChange={e=>setCompanyContext(current=>({...current,pricingModel:e.target.value}))} placeholder="e.g. €99 per seat / month"/></label>
+              <label className="number-field"><span>Target customer</span><input maxLength={300} value={companyContext.targetCustomer} onChange={e=>setCompanyContext(current=>({...current,targetCustomer:e.target.value}))} placeholder="e.g. Finance teams at SaaS startups"/></label>
+            </div>
+            <label className="number-field"><span>Product or service description</span><textarea rows={3} maxLength={600} value={companyContext.productDescription} onChange={e=>setCompanyContext(current=>({...current,productDescription:e.target.value}))} placeholder="What do customers buy, and what problem do you solve?"/></label>
+            <div className="form-section-title">GOALS & WATCH THRESHOLDS</div>
+            <div className="form-grid">
+              <label className="number-field"><span>Main company goal</span><input maxLength={240} value={companyContext.mainGoal} onChange={e=>setCompanyContext(current=>({...current,mainGoal:e.target.value}))} placeholder="e.g. Reach €50k MRR"/></label>
+              <label className="number-field"><span>Next milestone</span><input maxLength={240} value={companyContext.nextMilestone} onChange={e=>setCompanyContext(current=>({...current,nextMilestone:e.target.value}))} placeholder="e.g. Prepare the next round"/></label>
+              <NumberField label="Target runway" value={companyContext.targetRunwayMonths} set={n=>setCompanyContext(current=>({...current,targetRunwayMonths:n}))} min={3} max={36} step={1} suffix="months"/>
+              <KpiField label="Monthly churn watch threshold (%)" value={companyContext.churnWatchThresholdPct===null?'':String(companyContext.churnWatchThresholdPct)} set={value=>setCompanyContext(current=>({...current,churnWatchThresholdPct:value.trim()===''?null:Number(value)}))} min="0" max="100" step="0.5"/>
+              <KpiField label="CAC payback watch threshold (months)" value={companyContext.cacPaybackWatchMonths===null?'':String(companyContext.cacPaybackWatchMonths)} set={value=>setCompanyContext(current=>({...current,cacPaybackWatchMonths:value.trim()===''?null:Number(value)}))} min="0.1" max="60" step="0.5"/>
+            </div>
+            <label className="number-field"><span>Other context Avenor should remember</span><textarea rows={3} maxLength={1000} value={companyContext.founderNotes} onChange={e=>setCompanyContext(current=>({...current,founderNotes:e.target.value}))} placeholder="Constraints, planned launches, hiring plans or important assumptions."/></label>
+            <div className="assumption-actions">
+              <button className="button-primary" disabled={contextBusy || workspaceLoading} onClick={() => void saveCompanyContext()}>{contextBusy?'Saving…':'Save company context'}</button>
+              <span>{companyContextCompletion(companyContext)}% complete · {contextUpdatedAt ? 'Updated '+new Date(contextUpdatedAt).toLocaleDateString('en-GB') : 'Not saved yet'} · Thresholds are your own planning preferences.</span>
+            </div>
+            {contextError && <p className="warning-text" role="alert">{contextError}</p>}
+          </section>
+          <section className="surface assumptions-surface"><div className="section-kicker">FINANCIAL MODEL INPUTS</div><h2>Company assumptions</h2><label className="number-field"><span>Model name</span><input type="text" maxLength={100} value={modelName} onChange={e=>setModelName(e.target.value)}/></label><p className="form-intro">Enter your company's starting position and recurring monthly economics. Save a draft for review or approve a model version to use as your planning baseline.</p><div className="form-section-title">CASH & REVENUE</div><div className="form-grid"><NumberField label="Opening cash balance" value={cash} set={setCash} min={0} max={100000000} step={10000} prefix={currencySymbol}/><NumberField label="Monthly revenue" value={revenue} set={setRevenue} min={0} max={10000000} step={5000} prefix={currencySymbol}/><NumberField label="Monthly revenue growth" value={growth} set={setGrowth} min={-99} max={100} step={.5} suffix="%"/><NumberField label="Direct costs as % of sales" value={cogs} set={setCogs} min={0} max={100} step={1} suffix="%"/></div><div className="form-section-title">OPERATING COSTS</div><div className="form-grid"><NumberField label="Current monthly team costs" value={payroll} set={setPayroll} min={0} max={10000000} step={5000} prefix={currencySymbol}/><NumberField label="Other monthly running costs" value={opex} set={setOpex} min={0} max={10000000} step={5000} prefix={currencySymbol}/></div><div className="assumption-actions"><button className="button-secondary" disabled={modelBusy || workspaceLoading} onClick={() => saveModel('draft')}>{modelBusy ? 'Saving…' : 'Save as draft'}</button><button className="button-primary" disabled={modelBusy || workspaceLoading} onClick={() => saveModel('approved')}>{modelBusy ? 'Saving…' : 'Approve & save model'}</button><span>Model status: {modelStatus === 'none' ? 'Not saved' : modelStatus}. Approval creates a new version; previous approved versions are archived.</span></div>{workspaceError && <p className="warning-text">{workspaceError}</p>}</section>
+        </>}
 
 
         {view === 'Business metrics' && <section className="surface assumptions-surface">
