@@ -14,7 +14,7 @@ export function verifyStripeSignature(
     .map(([, value]) => value)
     .filter((value): value is string => Boolean(value));
 
-  if (!timestamp || !/^\\d+$/.test(timestamp) || !signatures.length || !webhookSecret) return false;
+  if (!timestamp || timestamp.length === 0 || [...timestamp].some((character) => character < '0' || character > '9') || !signatures.length || !webhookSecret) return false;
   const timestampSeconds = Number(timestamp);
   if (!Number.isSafeInteger(timestampSeconds)) return false;
   if (Math.abs(nowMs / 1000 - timestampSeconds) > toleranceSeconds) return false;
