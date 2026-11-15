@@ -332,3 +332,131 @@
   .backdrop { background: rgba(21, 37, 48, .3); pointer-events: auto; }
   .panel { inset: 0; width: 100vw; border-radius: 0; }
 }
+
+
+/* Readability pass: the Copilot should feel like a finance workspace, not a tiny chat widget. */
+.launcher {
+  min-height: 44px;
+  padding: 7px 14px 7px 8px;
+  border-color: #dce6df;
+  border-radius: 8px;
+  color: #254b39;
+  box-shadow: 0 3px 14px rgba(22,42,30,.09);
+}
+.launcherIcon, .brandMark, .welcomeIcon, .messageAvatar {
+  background: #215b43;
+  color: #fff;
+  border-radius: 7px;
+}
+.launcherIcon { width: 29px; height: 29px; font-size: 13px; }
+.launcherLabel { font-size: 12px; font-weight: 650; }
+.panel {
+  width: min(468px, calc(100vw - 24px));
+  color: #1e3026;
+  border-color: #dfe8e1;
+  border-radius: 10px;
+  box-shadow: 0 12px 38px rgba(20,42,28,.16);
+}
+.header { min-height: 66px; padding: 12px 16px; border-color: #e6ece7; }
+.brandMark { width: 32px; height: 32px; font-size: 13px; }
+.headerBrand strong { color: #20372a; font-size: 13px; }
+.headerBrand span { color: #6f7f74; font-size: 10px; }
+.headerActions button { width: 31px; height: 31px; color: #63736a; }
+.workspaceStrip {
+  min-height: 36px;
+  padding: 0 16px;
+  background: #f8faf8;
+  color: #586b5e;
+  font-size: 10px;
+}
+.workspaceStrip .currency { background: #edf4ef; color: #315e46; font-size: 9px; }
+.connected { color: #718178; font-size: 9px; }
+.messages { padding: 20px 18px 14px; gap: 18px; }
+.welcome { padding: 13px 4px 0; }
+.welcomeIcon { width: 36px; height: 36px; margin-bottom: 17px; font-size: 13px; }
+.eyebrow, .suggestionHeading { color: #75857b; font-size: 9px; letter-spacing: .08em; }
+.welcome h2 {
+  color: #20362a;
+  font-size: 22px;
+  line-height: 1.25;
+  letter-spacing: -.6px;
+  margin: 8px 0 9px;
+}
+.welcome p { color: #66766b; font-size: 12px; line-height: 1.65; margin-bottom: 21px; }
+.suggestionHeading { margin-bottom: 9px; }
+.suggestions { gap: 7px; }
+.suggestions button {
+  border-color: #e1e9e2;
+  border-radius: 7px;
+  padding: 10px 11px;
+  color: #41594a;
+  font-size: 11px;
+  line-height: 1.45;
+}
+.suggestions b { color: #47755b; font-size: 13px; }
+.userMessage .messageBody, .assistantMessage .messageBody {
+  border-radius: 8px;
+  padding: 11px 12px;
+}
+.userMessage .messageBody { background: #f3f7f3; border-color: #e4ebe4; }
+.assistantMessage { gap: 9px; }
+.messageAvatar { flex-basis: 28px; width: 28px; height: 28px; font-size: 11px; }
+.messageMeta { margin-bottom: 8px; }
+.messageMeta strong { color: #365b43; font-size: 10px; }
+.messageMeta time { color: #89968d; font-size: 9px; }
+.fallbackTag { font-size: 8px; }
+.messageText { color: #354a3b; font-size: 12px; line-height: 1.68; }
+.messageText p { margin-bottom: 9px; }
+.messageText h4 { color: #253f2e; font-size: 13px; margin: 12px 0 5px; }
+.messageText ul, .messageText ol { margin: 5px 0 10px; }
+.messageText li { margin: 4px 0; }
+.metricEvidence { gap: 7px; margin-top: 11px; }
+.metricEvidence div { padding: 9px; border-radius: 7px; }
+.metricEvidence span { color: #748379; font-size: 9px; }
+.metricEvidence strong { color: #315c43; font-size: 12px; }
+.evidenceDetails, .missingDetails { margin-top: 10px; border-radius: 7px; padding: 9px 10px; }
+.evidenceDetails summary, .missingDetails summary { color: #546c5b; font-size: 10px; }
+.calculation { padding-top: 9px; margin-top: 9px; }
+.calculation strong { color: #3d674b; font-size: 10px; }
+.calculation p { color: #63756a; font-size: 10px; line-height: 1.55; }
+.calculation pre { font-size: 9px; }
+.missingDetails ul { font-size: 10px; line-height: 1.6; }
+.saveButton {
+  margin-top: 10px;
+  border-radius: 7px;
+  padding: 8px 10px;
+  background: #f0f6f1;
+  color: #2d6143;
+  font-size: 10px;
+}
+.thinking strong { font-size: 11px; }
+.thinking span:not(.messageAvatar) { font-size: 9px; }
+.composer {
+  margin: 0 15px;
+  padding: 10px 11px 8px;
+  border-color: #dce7de;
+  border-radius: 8px;
+}
+.composer textarea { min-height: 54px; color: #263c2d; font-size: 12px; }
+.composerBottom span { color: #718077; font-size: 9px; }
+.composerBottom button { width: 30px; height: 30px; background: #245f47; }
+.disclaimer { padding: 8px 16px 11px; color: #829087; font-size: 9px; }
+.error { margin: 8px 15px 0; font-size: 10px; }
+.history { padding: 16px; }
+.historyHeading { margin-bottom: 11px; }
+.historyHeading strong { color: #263d2e; font-size: 12px; }
+.historyHeading button { font-size: 10px; }
+.threadItem { padding: 11px 9px; }
+.threadItem span { font-size: 11px; }
+.threadItem small { color: #7e8e83; font-size: 9px; }
+.historyEmpty { font-size: 11px; }
+.loadingInline { font-size: 10px; }
+.unitEconomics { margin-top: 10px; padding: 10px; border-radius: 7px; }
+.unitHeading strong { font-size: 10px; }
+.unitHeading span { font-size: 9px; }
+@media (max-width: 620px) {
+  .messages { padding: 15px 12px 10px; }
+  .welcome h2 { font-size: 21px; }
+  .suggestions button { padding: 10px; }
+  .composer { margin: 0 11px; }
+}
