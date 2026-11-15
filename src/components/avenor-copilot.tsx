@@ -122,10 +122,20 @@ export function AvenorCopilot({
 
   useEffect(() => {
     const openCompanion = (event: Event) => {
-      const detail = (event as CustomEvent<string>).detail;
+      const detail = (event as CustomEvent<string | { message?: string; newConversation?: boolean }>).detail;
+      const message = typeof detail === 'string' ? detail : detail?.message;
+      const newConversation = typeof detail === 'object' && detail !== null && detail.newConversation === true;
+
       setOpen(true);
       setHistoryOpen(false);
-      if (detail) setDraft(detail);
+      setError('');
+
+      if (newConversation) {
+        setThreadId(null);
+        setMessages([]);
+        setSavedMessages([]);
+      }
+      if (message) setDraft(message);
       window.setTimeout(() => inputRef.current?.focus(), 50);
     };
     window.addEventListener('avenor:open-copilot', openCompanion);
@@ -267,7 +277,7 @@ export function AvenorCopilot({
         aria-expanded={open}
       >
         <span className={styles.launcherIcon}>A</span>
-        <span className={styles.launcherLabel}>Ask Avenor</span>
+        <span className={styles.launcherLabel}>Open Copilot</span>
         <span className={styles.launcherDot} />
       </button>
 
