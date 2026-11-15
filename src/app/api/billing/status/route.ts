@@ -18,7 +18,7 @@ export async function GET(request: Request) {
 
     const { data: subscription, error } = await supabase
       .from('subscriptions')
-      .select('status,current_period_end,stripe_customer_id')
+      .select('status,current_period_end,stripe_customer_id,stripe_subscription_id')
       .eq('organization_id', organizationId.data)
       .maybeSingle();
     if (error) return NextResponse.json({ error: 'Could not load subscription status' }, { status: 500 });
