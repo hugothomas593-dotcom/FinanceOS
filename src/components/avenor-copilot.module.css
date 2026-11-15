@@ -499,3 +499,227 @@
   .panel { width: 100vw; }
   .messages { padding: 15px 12px 10px; }
 }
+
+
+/* Embedded Copilot — the primary Avenor workspace */
+.embedded {
+  position: relative;
+  z-index: 1;
+  inset: auto;
+  width: 100%;
+  height: auto;
+  min-height: 590px;
+  max-height: none;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  color: #17243a;
+  border: 1px solid #e2e8f1;
+  border-radius: 15px;
+  box-shadow: 0 8px 30px rgba(23, 41, 65, .055);
+}
+.embedded .header {
+  flex: 0 0 auto;
+  min-height: 62px;
+  padding: 11px 19px;
+  background: #fff;
+  border-bottom: 1px solid #edf0f5;
+}
+.embedded .brandMark { background: #1d2f4b; color: #fff; border-radius: 8px; }
+.embedded .headerBrand strong { color: #1c2d46; font-size: 13px; }
+.embedded .headerBrand span { color: #8491a4; font-size: 10px; }
+.embedded .headerActions button {
+  width: 34px;
+  height: 34px;
+  border: 1px solid #e5eaf1;
+  border-radius: 8px;
+  color: #65758e;
+  background: #fff;
+  font-size: 16px;
+}
+.embedded .headerActions button:hover { color: #315bd6; background: #f5f7ff; border-color: #dce5ff; }
+.embedded .workspaceStrip {
+  flex: 0 0 auto;
+  min-height: 39px;
+  padding: 0 19px;
+  background: #f8faff;
+  color: #75839b;
+  font-size: 10px;
+  border-bottom: 1px solid #eef1f7;
+}
+.embedded .workspaceStrip .currency {
+  background: #eaf0ff;
+  color: #3e5fc3;
+  border-radius: 5px;
+  padding: 3px 7px;
+  font-size: 9px;
+}
+.embedded .connected { color: #8592a4; font-size: 9px; }
+.embedded .messages {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 34px clamp(18px, 5.8vw, 74px) 26px;
+  gap: 20px;
+  scroll-behavior: smooth;
+}
+.embedded .welcome {
+  width: 100%;
+  max-width: 850px;
+  margin: auto;
+  padding: 15px 0 24px;
+}
+.embedded .welcomeIcon {
+  width: 39px;
+  height: 39px;
+  margin-bottom: 20px;
+  border-radius: 11px;
+  background: #1d2f4b;
+  color: #fff;
+  font-size: 15px;
+}
+.embedded .eyebrow, .embedded .suggestionHeading {
+  color: #7f8da3;
+  font-size: 9px;
+  letter-spacing: .12em;
+}
+.embedded .welcome h2 {
+  max-width: 700px;
+  margin: 10px 0 11px;
+  color: #1b2c44;
+  font-size: clamp(25px, 3vw, 34px);
+  font-weight: 650;
+  line-height: 1.18;
+  letter-spacing: -.9px;
+}
+.embedded .welcome p {
+  max-width: 690px;
+  margin: 0 0 27px;
+  color: #6c7b90;
+  font-size: 13px;
+  line-height: 1.75;
+}
+.embedded .suggestionHeading { margin-bottom: 10px; }
+.embedded .suggestions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px;
+}
+.embedded .suggestions button {
+  min-height: 58px;
+  padding: 12px 14px;
+  border: 1px solid #e3e9f2;
+  border-radius: 9px;
+  background: #fff;
+  color: #43546c;
+  text-align: left;
+  font-size: 11px;
+  line-height: 1.5;
+  transition: border-color .12s ease, background .12s ease, transform .12s ease;
+}
+.embedded .suggestions button:hover {
+  border-color: #c8d5fa;
+  background: #f8faff;
+  transform: translateY(-1px);
+}
+.embedded .suggestions b { color: #4265d3; font-size: 15px; }
+.embedded .userMessage, .embedded .assistantMessage {
+  width: 100%;
+  max-width: 850px;
+  margin: 0 auto;
+}
+.embedded .userMessage .messageBody, .embedded .assistantMessage .messageBody {
+  padding: 13px 15px;
+  border-radius: 10px;
+}
+.embedded .userMessage .messageBody { background: #f4f6fb; border-color: #e9edf5; }
+.embedded .assistantMessage { gap: 11px; }
+.embedded .messageAvatar {
+  width: 30px;
+  height: 30px;
+  flex-basis: 30px;
+  border-radius: 9px;
+  background: #1d2f4b;
+  color: #fff;
+}
+.embedded .messageMeta strong { color: #315bd6; font-size: 10px; }
+.embedded .messageMeta time { color: #98a3b2; font-size: 9px; }
+.embedded .messageText { color: #34445a; font-size: 13px; line-height: 1.75; }
+.embedded .messageText h4 { color: #1c2f49; font-size: 14px; }
+.embedded .metricEvidence { gap: 8px; }
+.embedded .metricEvidence div { border-color: #e5eaf2; background: #f8faff; }
+.embedded .metricEvidence strong { color: #315bd6; }
+.embedded .evidenceDetails, .embedded .missingDetails { border-color: #e2e8f2; background: #f8faff; }
+.embedded .evidenceDetails summary, .embedded .missingDetails summary { color: #516785; }
+.embedded .calculation strong { color: #3659c4; }
+.embedded .calculation p { color: #62728b; }
+.embedded .saveButton {
+  border: 1px solid #dce5ff;
+  border-radius: 8px;
+  background: #eef3ff;
+  color: #315bd6;
+  padding: 9px 12px;
+  font-size: 11px;
+}
+.embedded .thinking { max-width: 850px; width: 100%; margin: 0 auto; }
+.embedded .thinking strong { color: #243954; }
+.embedded .thinking span:not(.messageAvatar) { color: #7c899b; }
+.embedded .composer {
+  flex: 0 0 auto;
+  width: calc(100% - 48px);
+  max-width: 850px;
+  margin: 0 auto;
+  padding: 12px 13px 10px;
+  border: 1px solid #dce4f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 5px 18px rgba(29, 48, 77, .055);
+}
+.embedded .composer:focus-within { border-color: #9eb1ee; box-shadow: 0 0 0 3px rgba(49,91,214,.08); }
+.embedded .composer textarea {
+  min-height: 65px;
+  max-height: 180px;
+  color: #23364f;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.embedded .composer textarea::placeholder { color: #9aa6b7; }
+.embedded .composerBottom span { color: #8794a7; font-size: 9px; }
+.embedded .composerBottom button {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: #315bd6;
+  color: white;
+  font-size: 18px;
+}
+.embedded .composerBottom button:hover:not(:disabled) { background: #244abf; }
+.embedded .disclaimer { flex: 0 0 auto; padding: 9px 16px 12px; color: #98a3b2; font-size: 9px; }
+.embedded .error { max-width: 850px; width: calc(100% - 48px); margin: 9px auto; border-color: #f0dada; background: #fff8f8; color: #a14d55; font-size: 10px; }
+.embedded .history { width: 100%; max-width: 850px; margin: 0 auto; padding: 24px 30px; }
+.embedded .historyHeading strong { color: #1f334e; font-size: 13px; }
+.embedded .historyHeading button { color: #315bd6; font-size: 11px; }
+.embedded .threadItem { border-color: #edf0f5; padding: 13px 10px; }
+.embedded .threadItem span { color: #43546b; font-size: 12px; }
+.embedded .threadItem small { color: #8d9aad; font-size: 10px; }
+.embedded .threadActive, .embedded .threadItem:hover { background: #f4f7ff; }
+.embedded .historyEmpty { color: #8794a7; font-size: 11px; }
+
+@media (max-width: 700px) {
+  .embedded { min-height: 500px; border-radius: 10px; }
+  .embedded .header { padding: 9px 11px; min-height: 56px; }
+  .embedded .workspaceStrip { padding: 0 12px; }
+  .embedded .messages { padding: 20px 12px 16px; gap: 15px; }
+  .embedded .welcome { padding: 7px 1px 14px; }
+  .embedded .welcome h2 { font-size: 25px; }
+  .embedded .welcome p { font-size: 12px; margin-bottom: 20px; }
+  .embedded .suggestions { grid-template-columns: 1fr; gap: 7px; }
+  .embedded .suggestions button { min-height: 46px; padding: 10px 11px; }
+  .embedded .composer { width: calc(100% - 22px); padding: 10px; }
+  .embedded .composer textarea { min-height: 56px; font-size: 12px; }
+  .embedded .disclaimer { padding: 8px 11px 10px; font-size: 8px; }
+  .embedded .userMessage, .embedded .assistantMessage { max-width: 100%; }
+  .embedded .history { padding: 17px 12px; }
+}
