@@ -22,12 +22,13 @@ const jobs = [
 ];
 
 const included = [
-  'AI Copilot grounded in your company model and workspace data',
-  '18-month cash forecast and runway analysis',
+  'AI Copilot grounded in your company model and persistent business context',
+  '18-month cash forecast with founder-configured runway alerts',
+  'CFO Brief with proactive cash, churn and CAC watchpoints',
   'Hiring, spending, pricing and fundraising scenarios',
-  'Persistent conversations and saved decision history',
+  'Persistent conversations and a traceable Decision Ledger',
   'CSV transaction analysis and monthly business metrics',
-  'Break-even, working-capital and unit-economics analysis',
+  'Break-even, working-capital and SaaS unit-economics analysis',
 ];
 
 function Brand() {
