@@ -6,7 +6,7 @@ import { AvenorCopilot } from '@/components/avenor-copilot';
 
 type View = 'Overview' | 'Decision simulator' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
 const viewTitles: Record<View, string> = {
-  Overview: 'Company overview',
+  Overview: 'Your finance copilot',
   'Decision simulator': 'Plan a decision',
   'Decision ledger': 'Saved decisions',
   'Company assumptions': 'Company setup',
@@ -453,7 +453,7 @@ export default function Home() {
   }
 
   const nav: { label: View; title: string; icon: string }[] = [
-    { label: 'Overview', title: 'Overview', icon: '◫' },
+    { label: 'Overview', title: 'Copilot', icon: '✳' },
     { label: 'Decision simulator', title: 'Plan a decision', icon: '⌁' },
     { label: 'Decision ledger', title: 'Saved decisions', icon: '▤' },
     { label: 'Business metrics', title: 'Growth metrics', icon: '↗' },
@@ -468,16 +468,55 @@ export default function Home() {
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">A</span><span>avenor</span></div>
       <div className="workspace-switch"><div className="workspace-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div><div><b>{organizationName || 'Your company'}</b><small>Financial workspace</small></div><span className="chevron">⌄</span></div>
-      <div className="nav-caption">WORKSPACE</div>
+      <div className="nav-caption">YOUR FINANCE WORKSPACE</div>
       <nav>{nav.map(item => <button key={item.label} className={`nav-item ${view === item.label ? 'selected' : ''}`} onClick={() => setView(item.label)}><span className="nav-icon">{item.icon}</span>{item.title}{item.label === 'Decision ledger' && saved.length > 0 && <span className="nav-count">{saved.length}</span>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="help-card"><div className="help-icon">?</div><b>Need a second look?</b><p>Review a decision against your company numbers.</p><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Ask Avenor <span>→</span></button></div><div className="profile"><div className="profile-avatar">A</div><div><b>Workspace account</b><small>Signed-in user</small></div><span className="more">···</span></div></div>
+      <div className="sidebar-bottom"><div className="help-card"><div className="help-icon">?</div><b>Work through a decision</b><p>Ask Avenor what the numbers mean before you commit.</p><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Ask Avenor <span>→</span></button></div><div className="profile"><div className="profile-avatar">A</div><div><b>Workspace account</b><small>Signed-in user</small></div><span className="more">···</span></div></div>
     </aside>
 
     <section className="main-area">
-      <header className="topbar"><div className="breadcrumb">{organizationName || 'Your company'} <span>/</span> {viewTitles[view]}</div><div className="top-actions"><span className="sync-status"><i/> {workspaceLoading ? 'Loading workspace' : hasModel ? (modelStatus === 'approved' ? 'Plan approved' : 'Plan needs review') : 'Add company numbers'}</span><button className="button-secondary" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Ask Avenor</button><div className="top-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div></div></header>
+      <header className="topbar"><div className="breadcrumb">{organizationName || 'Your company'} <span>/</span> {viewTitles[view]}</div><div className="top-actions"><span className="sync-status"><i/> {workspaceLoading ? 'Loading workspace' : hasModel ? (modelStatus === 'approved' ? 'Plan approved' : 'Plan needs review') : 'Add company numbers'}</span><button className="button-secondary" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Open Copilot</button><div className="top-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div></div></header>
       <div className="page-content">
-        <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{viewTitles[view]}</h1><p>{view === 'Overview' ? 'See how long your cash may last, what drives your spending and what your next decision could change.' : view === 'Decision simulator' ? 'Compare the financial impact of a decision before you make it.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit company setup <span>↗</span></button></div></div>
+        <div className="page-heading"><div><div className="overline">{view === 'Overview' ? 'AVENOR INTELLIGENCE' : 'FINANCIAL WORKSPACE'} <span className="live-dot"/></div><h1>{viewTitles[view]}</h1><p>{view === 'Overview' ? 'Start with a question. Avenor brings your company numbers into the conversation and helps you test the next decision.' : view === 'Decision simulator' ? 'Compare the financial impact of a decision before you make it.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit company setup <span>↗</span></button></div></div>
 
+        {view === 'Overview' && <section className="copilot-home">
+          <div className="copilot-home-main">
+            <div className="copilot-home-label"><span>a</span> YOUR AI FINANCE PARTNER</div>
+            <h2>What decision are you working through?</h2>
+            <p className="copilot-home-description">Ask in plain language. Avenor uses your saved financial plan, actuals and operating metrics to model the options and explain the trade-offs.</p>
+            <div className="copilot-home-compose">
+              <textarea
+                aria-label="Ask Avenor about a financial decision"
+                value={question}
+                onChange={(event) => setQuestion(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: { message: question, newConversation: true } }));
+                  }
+                }}
+                placeholder="For example: can we afford two new hires and still keep 12 months of runway?"
+                rows={2}
+                maxLength={4000}
+              />
+              <button
+                disabled={!organizationId || !question.trim()}
+                onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: { message: question, newConversation: true } }))}
+              >Ask Avenor <span>↑</span></button>
+            </div>
+            <div className="copilot-home-suggestions">
+              <button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: { message: 'Can we afford to hire another person and keep at least 12 months of runway?', newConversation: true } }))}>Can we afford another hire?</button>
+              <button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: { message: 'What happens to our cash if revenue is 20% lower for the next six months?', newConversation: true } }))}>What if revenue slows?</button>
+              <button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: { message: 'How much could we invest while keeping 12 months of runway?', newConversation: true } }))}>What can we afford to invest?</button>
+            </div>
+          </div>
+          <aside className="copilot-home-side">
+            <span>HOW AVENOR HELPS</span>
+            <div className="copilot-home-value"><i>↗</i><div><b>Model the decision</b><p>Hiring, spending, pricing and funding scenarios.</p></div></div>
+            <div className="copilot-home-value"><i>◷</i><div><b>See the cash impact</b><p>Runway, break-even and an 18-month outlook.</p></div></div>
+            <div className="copilot-home-value"><i>✓</i><div><b>Keep the reasoning</b><p>Review assumptions and save decisions to your ledger.</p></div></div>
+          </aside>
+        </section>}
+        
         {view === 'Overview' && <>
           {workspaceLoading ? <section className="surface empty-state large-empty"><b>Loading your financial workspace…</b></section>
             : workspaceError ? <section className="surface empty-state large-empty"><b>Workspace could not be loaded</b><p>{workspaceError}</p><button className="button-secondary" onClick={() => window.location.reload()}>Retry</button></section>
@@ -511,7 +550,27 @@ export default function Home() {
                 <circle cx={chart.baseX} cy={chart.baseY} r="5" className="base-point"/>
               </svg>
               <div className="chart-foot"><span>Forecast based on your saved assumptions</span><span>Not a live bank balance</span></div>
-            </div></section><section className="surface copilot-panel"><div className="copilot-top"><div className="copilot-symbol">A</div><span className="beta-pill">DECISION SUPPORT</span></div><div className="section-kicker">ASK AVENOR</div><h2>Need to work through a decision?</h2><p className="copilot-description">Ask about your numbers, compare options or understand a change to your plan.</p><div className="prompt-chips"><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'Can we afford to hire three engineers in January?' }))}>Can we afford to hire?</button><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'Explain our current runway and the main cash risks.' }))}>Explain our runway</button></div><div className="copilot-input"><textarea value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => {if (e.key === 'Enter' && !e.shiftKey) {e.preventDefault();setView('Decision simulator');analyze();}}} placeholder="Ask about cash, costs, growth or a business decision..."/><button aria-label="Analyse question" onClick={() => {setView('Decision simulator');analyze();}}>↑</button></div><small className="copilot-footnote">Answers use your saved model and available workspace data.</small><button className="button-primary full-button" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Open Avenor chat <span>→</span></button></section>
+            </div></section><section className="surface signal-panel">
+              <div className="surface-heading">
+                <div><div className="section-kicker">MODEL SIGNALS</div><h2>What your forecast is flagging</h2><p>Simple checks from the current saved model.</p></div>
+                <span className="beta-pill">18 MONTHS</span>
+              </div>
+              <div className="signal-list">
+                <div className={baseSummary.firstMonthCashNegative ? 'signal-row critical' : 'signal-row'}>
+                  <i />
+                  <div><b>{baseSummary.firstMonthCashNegative ? 'Cash falls below zero' : 'Cash stays above zero'}</b><p>{baseSummary.firstMonthCashNegative ? 'The current forecast first goes negative in month ' + baseSummary.firstMonthCashNegative + '.' : 'No negative closing-cash month is identified in this 18-month forecast.'}</p></div>
+                </div>
+                <div className={baseSummary.firstMonthBelowSixMonthsRunway ? 'signal-row warning' : 'signal-row'}>
+                  <i />
+                  <div><b>{baseSummary.firstMonthBelowSixMonthsRunway ? 'Runway drops below six months' : 'No short-runway point flagged'}</b><p>{baseSummary.firstMonthBelowSixMonthsRunway ? 'The current forecast first falls below six months of runway in month ' + baseSummary.firstMonthBelowSixMonthsRunway + '.' : 'The current forecast does not identify a month below six months of runway.'}</p></div>
+                </div>
+                <div className="signal-row">
+                  <i />
+                  <div><b>{actualsCount.toLocaleString('en-GB')} imported transaction records</b><p>{actualsCount > 0 ? 'Historical actuals are available for analysis, but are not yet reconciled into the forecast.' : 'Import a CSV to give Avenor more historical context.'}</p></div>
+                </div>
+              </div>
+              <button className="text-button" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: { message: 'Review the main risks and assumptions in my current forecast. What should I look at first?', newConversation: true } }))}>Ask Avenor to review these signals →</button>
+            </section>
           </div>
           <div className="lower-grid">
             <section className="surface flow-panel">
@@ -580,7 +639,19 @@ export default function Home() {
         {view === 'Plan & billing' && <section className="surface billing-surface">
           <div className="section-kicker">ACCOUNT & SUBSCRIPTION</div>
           <h2>Plan and billing</h2>
-          <p className="form-intro">Your subscription is linked to this company workspace. Payment details are handled by Stripe; Avenor never stores your card information.</p>
+          <p className="form-intro">One founder membership. Every Avenor feature is included in the same plan—there are no feature tiers.</p>
+          <div className="billing-single-plan">
+            <div><span className="plan-eyebrow">ONE SUBSCRIPTION</span><h3>Avenor Founder</h3><p>AI financial decision support, cash forecasting, scenario analysis, operating metrics and your saved decision history.</p></div>
+            <div className="billing-single-price"><strong>€59</strong><span> / month</span></div>
+          </div>
+          <ul className="billing-included">
+            <li>Copilot with persistent conversation history</li>
+            <li>18-month cash forecast and runway analysis</li>
+            <li>Hiring, spending, pricing and fundraising scenarios</li>
+            <li>CSV actuals and cash-movement analysis</li>
+            <li>Business metrics and SaaS unit economics</li>
+            <li>Decision Ledger and financial snapshots</li>
+          </ul>
           {billingLoading ? <p className="form-intro">Checking your subscription…</p> : <>
             <div className="billing-grid">
               <div><span>Subscription status</span><b>{billingStatus?.subscriptionStatus ? billingStatus.subscriptionStatus.replaceAll('_', ' ') : 'No subscription linked'}</b></div>
@@ -589,7 +660,7 @@ export default function Home() {
             </div>
             <div className="billing-actions">
               {billingStatus?.canManageBilling && <button className="button-secondary" disabled={billingBusy} onClick={() => void openBillingAction('/api/billing/portal')}>{billingBusy ? 'Opening…' : 'Manage subscription'}</button>}
-              {!billingStatus?.subscriptionStatus && billingStatus?.canStartCheckout && <button className="button-primary" disabled={billingBusy} onClick={() => void openBillingAction('/api/billing/checkout')}>{billingBusy ? 'Opening secure checkout…' : 'Choose a subscription'}</button>}
+              {!billingStatus?.subscriptionStatus && billingStatus?.canStartCheckout && <button className="button-primary" disabled={billingBusy} onClick={() => void openBillingAction('/api/billing/checkout')}>{billingBusy ? 'Opening secure checkout…' : 'Subscribe — €59/month'}</button>}
               {!billingStatus?.billingConfigured && <p className="billing-note">Online checkout is not connected yet. A Stripe test-mode price and secure server credentials must be configured before payments can be tested.</p>}
             </div>
           </>}
