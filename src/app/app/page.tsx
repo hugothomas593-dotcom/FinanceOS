@@ -93,6 +93,7 @@ function toSavedDecision(scenario: ScenarioRow): SavedDecision {
 export default function Home() {
   const [view, setView] = useState<View>('Overview');
   const [organizationId, setOrganizationId] = useState('');
+  const [workspaceMemberships, setWorkspaceMemberships] = useState<WorkspaceMembership[]>([]);
   const [organizationName, setOrganizationName] = useState('');
   const [currency, setCurrency] = useState('EUR');
   const [companyContext, setCompanyContext] = useState<CompanyContext>(EMPTY_COMPANY_CONTEXT);
@@ -201,6 +202,8 @@ export default function Home() {
         if (!organizationsResponse.ok) throw new Error(organizationsData.error || 'Could not load your workspace');
 
         const memberships = (organizationsData.organizations ?? []) as WorkspaceMembership[];
+        if (cancelled) return;
+        setWorkspaceMemberships(memberships);
         const rememberedId = localStorage.getItem('financeos.organizationId');
         const selected = memberships.find((item) => item.organization_id === rememberedId) ?? memberships[0];
 
@@ -487,7 +490,28 @@ export default function Home() {
   return <main className="app-shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">A</span><span>avenor</span></div>
-      <div className="workspace-switch"><div className="workspace-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div><div><b>{organizationName || 'Your company'}</b><small>Financial workspace</small></div><span className="chevron">⌄</span></div>
+      <label className={`workspace-switch workspace-switch-control ${workspaceMemberships.length > 1 ? 'is-switchable' : ''}`}>
+        <div className="workspace-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div>
+        <div><b>{organizationName || 'Your company'}</b><small>{workspaceMemberships.length > 1 ? 'Switch workspace' : 'Financial workspace'}</small></div>
+        {workspaceMemberships.length > 1 && <span className="chevron" aria-hidden="true">⌄</span>}
+        <select
+          aria-label="Switch workspace"
+          value={organizationId}
+          disabled={workspaceMemberships.length < 2}
+          onChange={(event) => {
+            const nextOrganizationId = event.target.value;
+            if (!nextOrganizationId || nextOrganizationId === organizationId) return;
+            localStorage.setItem('financeos.organizationId', nextOrganizationId);
+            window.location.assign('/app');
+          }}
+        >
+          {workspaceMemberships.map((membership) => (
+            <option key={membership.organization_id} value={membership.organization_id}>
+              {membership.organizations?.name ?? 'Your company'}
+            </option>
+          ))}
+        </select>
+      </label>
       <nav className="nav-groups">{navGroups.map(group => <div className="nav-group" key={group.title}><div className="nav-group-label">{group.title}</div><div className="nav-group-items">{group.items.map(item => <button key={item.label} className={`nav-item ${view === item.label ? 'selected' : ''}`} onClick={() => setView(item.label)}><span className="nav-icon">{item.icon}</span>{item.title}{item.label === 'Decision ledger' && saved.length > 0 && <span className="nav-count">{saved.length}</span>}{item.label === 'CFO Brief' && insightCount > 0 && <span className="nav-count">{insightCount}</span>}</button>)}</div></div>)}</nav>
       <div className="sidebar-bottom"><div className="profile"><div className="profile-avatar">A</div><div><b>Workspace account</b><small>Signed-in user</small></div><span className="more">···</span></div></div>
     </aside>
