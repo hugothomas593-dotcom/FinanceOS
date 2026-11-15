@@ -2078,3 +2078,22 @@ body {
   .a-button { transition: none; }
   .a-button:hover { transform: none; }
 }
+
+
+/* Native, keyboard-accessible workspace picker over the existing sidebar card. */
+.workspace-switch-control { position: relative; cursor: default; }
+.workspace-switch-control.is-switchable { cursor: pointer; }
+.workspace-switch-control>select {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.workspace-switch-control:focus-within {
+  outline: 2px solid rgba(49,91,214,.28);
+  outline-offset: 2px;
+}
+.workspace-switch-control>select:disabled { display: none; }
