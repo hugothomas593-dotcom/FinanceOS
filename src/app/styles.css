@@ -1392,7 +1392,7 @@ button, input, textarea, select { font-family: inherit; }
 .a-marketing h2 { margin: 0; color: #1b382a; font: 400 clamp(37px,4vw,54px)/1.08 Georgia,"Times New Roman",serif; letter-spacing: -1.5px; }
 .a-intro-grid>div p { margin: 0 0 12px; color: #69796f; font-size: 12px; line-height: 1.85; }
 .a-jobs { padding: 108px 32px 116px; background: #f2f5f0; }
-.a-section-heading { width: min(1120px,100%); margin: 0 auto; display: flex; align-items: end; justify-content: space-between; gap: 55px; }
+.a-section-heading { width: min(1120px,100%); margin: 0 auto; display: flex; align-items: flex-end; justify-content: space-between; gap: 55px; }
 .a-section-heading h2 { margin-top: 20px; }
 .a-section-heading>p { max-width: 330px; margin: 0 0 5px; color: #6d7c72; font-size: 12px; line-height: 1.8; }
 .a-job-grid { width: min(1120px,100%); margin: 58px auto 0; display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 13px; }
