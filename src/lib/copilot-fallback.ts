@@ -285,14 +285,19 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
     const count = countMatch ? Number(countMatch[1]) : null;
     const salary = namedAmount(q, /((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?\s*(?:€|£|\$)?)\s*(?:gross(?: annual)? salary|annual salary|per hire|per person|brut(?: annuel)?|par personne|par embauche)/i)
       ?? namedAmount(q, /(?:gross(?: annual)? salary|annual salary|salary per hire|salary per person|salary of|salary:|brut annuel|salaire annuel|salaire de)\s*((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?\s*(?:€|£|\$)?)/i);
-      ?? namedAmount(input.message, /(?:gross(?: annual)? salary|annual salary|salary per hire|salary per person|salary of|salary:)\s*((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)/i);
-    const rateMatch = q.match(/(\d+(?:[.,]\d+)?)\s*%\s*(?:employer|payroll|charges|on-cost|loaded|patronales?)/i)
+    const rateMatch = q.match(/(\d+(?:[.,]\d+)?)\s*%\s*(?:employer|payroll|charges|on-cost|loaded|de\s+charges?\s+patronales?|patronales?)/i)
       ?? q.match(/(?:employer|payroll|charges|on-cost|loaded|patronales?)[^\d%]{0,20}(\d+(?:[.,]\d+)?)\s*%/i);
-      ?? input.message.match(/(?:employer|payroll|charges|on-cost|loaded)[^\d%]{0,20}(\d+(?:[.,]\d+)?)\s*%/i);
     const rate = rateMatch ? Number(rateMatch[1].replace(',', '.')) / 100 : null;
     if (!count || salary === null || rate === null) {
-      const missing = [!count ? 'number of hires' : '', salary === null ? 'gross annual salary per person' : '', rate === null ? 'employer-cost rate' : ''].filter(Boolean).join(', ');
-      return unavailableInput(missing, 'Please supply these assumptions. Recruitment, benefits and equipment will be excluded unless you provide them; no productivity or revenue uplift is assumed.');
+      const missing = [
+        !count ? (french ? 'le nombre de recrutements' : 'number of hires') : '',
+        salary === null ? (french ? 'le salaire brut annuel par personne' : 'gross annual salary per person') : '',
+        rate === null ? (french ? 'le taux de charges patronales' : 'employer-cost rate') : '',
+      ].filter(Boolean).join(', ');
+      return unavailableInput(
+        missing,
+        french ? 'Précise ces hypothèses. Les frais de recrutement, avantages et équipements seront exclus s’ils ne sont pas renseignés ; aucun gain de productivité ou chiffre d’affaires supplémentaire n’est supposé.' : 'Please supply these assumptions. Recruitment, benefits and equipment will be excluded unless you provide them; no productivity or revenue uplift is assumed.',
+      );
     }
     const hire: HireInput = {
       headcount: count,
