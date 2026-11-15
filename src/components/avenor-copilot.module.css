@@ -753,3 +753,24 @@
  .setupRows section small { font-size:8px; }
  .setupRows button { font-size:8px; }
 }
+
+.proactiveNudge {
+  display:flex;
+  align-items:center;
+  gap:10px;
+  width:100%;
+  margin:0 0 19px;
+  padding:11px 13px;
+  border:1px solid #e9dfc7;
+  border-radius:9px;
+  background:#fffbf2;
+  color:#6d5a35;
+  text-align:left;
+  cursor:pointer;
+}
+.proactiveNudge:hover { border-color:#d9c89f; background:#fff8e9; }
+.proactiveIcon { width:23px; height:23px; display:grid; place-items:center; flex:none; border-radius:50%; background:#f4e9ce; color:#8c6d31; font-weight:800; font-size:12px; }
+.proactiveNudge>span:nth-child(2) { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; }
+.proactiveNudge b { color:#6f592e; font-size:10px; }
+.proactiveNudge small { color:#927d56; font-size:8px; line-height:1.4; }
+.proactiveNudge>strong { flex:none; color:#856831; font-size:9px; }
