@@ -1,21 +1,22 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { forecast, summarize, type ModelInputs, type HireInput, type MonthResult } from '@/lib/finance';
+import { forecast, summarize, type ModelInputs, type MonthResult } from '@/lib/finance';
 import { AvenorCopilot } from '@/components/avenor-copilot';
 import { CfoBrief } from '@/components/cfo-brief';
 
-type View = 'Overview' | 'Decision simulator' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
+type View = 'Overview' | 'CFO Brief' | 'Financial overview' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
 const viewTitles: Record<View, string> = {
-  Overview: 'Your finance copilot',
-  'Decision simulator': 'Plan a decision',
+  Overview: 'Copilot',
+  'CFO Brief': 'CFO Brief',
+  'Financial overview': 'Financial overview',
   'Decision ledger': 'Saved decisions',
   'Company assumptions': 'Company setup',
   'Business metrics': 'Growth metrics',
-  'Data import': 'Import data',
-  'Fundraising planner': 'Fundraising',
+  'Data import': 'Import transactions',
+  'Fundraising planner': 'Fundraising planner',
   'Investor reporting': 'Investor update',
-  'Plan & billing': 'Billing',
+  'Plan & billing': 'Plan & billing',
 };
 const money = (v: number, currency = 'EUR') => new Intl.NumberFormat('en-GB', { style: 'currency', currency, maximumFractionDigits: 0 }).format(v);
 const compactMoney = (v: number, currency = 'EUR') => new Intl.NumberFormat('en-GB', { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(v);
@@ -109,14 +110,6 @@ export default function Home() {
   const [opex, setOpex] = useState(initial.monthlyOpexExPayroll);
   const [growth, setGrowth] = useState(initial.monthlyRevenueGrowth * 100);
   const [cogs, setCogs] = useState(initial.cogsRatio * 100);
-  const [salary, setSalary] = useState(55_000);
-  const [headcount, setHeadcount] = useState(3);
-  const [startMonth, setStartMonth] = useState(2);
-  const [employerRate, setEmployerRate] = useState(42);
-  const [recruiting, setRecruiting] = useState(2_500);
-  const [equipment, setEquipment] = useState(1_500);
-  const [benefits, setBenefits] = useState(150);
-  const [question, setQuestion] = useState('Can we hire three engineers in January?');
   const [saved, setSaved] = useState<SavedDecision[]>([]);
   const [toast, setToast] = useState('');
 
@@ -307,22 +300,12 @@ export default function Home() {
   }, [organizationId, view]);
 
   const inputs: ModelInputs = { ...initial, openingCash: cash, monthlyRevenue: revenue, existingMonthlyPayroll: payroll, monthlyOpexExPayroll: opex, monthlyRevenueGrowth: growth / 100, cogsRatio: cogs / 100 };
-  const hire: HireInput = { headcount, startMonth: startMonth - 1, grossAnnualSalary: salary, employerCostRate: employerRate / 100, benefitsMonthlyPerPerson: benefits, recruitingCostPerPerson: recruiting, equipmentCostPerPerson: equipment, productivityRampMonths: 6 };
   const base = useMemo(() => forecast(inputs, [], months), [cash, revenue, payroll, opex, growth, cogs]);
-  const scenario = useMemo(() => forecast(inputs, [hire], months), [cash, revenue, payroll, opex, growth, cogs, salary, headcount, startMonth, employerRate, recruiting, equipment, benefits]);
   const baseSummary = summarize(base);
-  const scenarioSummary = summarize(scenario);
-  const impact = baseSummary.endingCash - scenarioSummary.endingCash;
-  const monthlyHireCost = headcount * (salary * (1 + employerRate / 100) / 12 + benefits);
   const baseRunway = runway(base[0]);
-  const scenarioRunway = runway(scenario[0]);
   const chart = makeChart(base);
   const monthlyOperatingCosts = base[0].cogs + base[0].payroll + base[0].nonPayrollOpex;
   const flowMaximum = Math.max(base[0].revenue, monthlyOperatingCosts, 1);
-
-  function analyze() {
-    window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: question }));
-  }
 
   async function saveModel(status: 'draft' | 'approved') {
     if (!organizationId) return;
@@ -389,49 +372,6 @@ export default function Home() {
     }
   }
 
-  async function saveDecision() {
-    if (!organizationId || !hasModel) {
-      setToast('Save your company assumptions before creating a scenario');
-      window.setTimeout(() => setToast(''), 2600);
-      return;
-    }
-
-    try {
-      const name = `${headcount} engineer hire scenario`;
-      const cashDelta = scenarioSummary.endingCash - baseSummary.endingCash;
-      const cashImpact = Math.max(0, -cashDelta);
-      const runwayImpact = (baseRunway ?? 0) - (scenarioRunway ?? 0);
-      const response = await fetch('/api/scenarios', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organizationId,
-          modelVersionId: modelVersionId || null,
-          name,
-          scenarioType: 'hiring',
-          assumptions: { modelInputs: inputs, hire },
-          outputs: {
-            cashImpact,
-            cashDelta,
-            runwayImpact,
-            baseEndingCash: baseSummary.endingCash,
-            scenarioEndingCash: scenarioSummary.endingCash,
-            forecastMonths: months,
-          },
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Could not save the scenario');
-
-      const decision = toSavedDecision(data.scenario as ScenarioRow);
-      setSaved((items) => [decision, ...items.filter((item) => item.id !== decision.id)]);
-      setToast('Scenario saved to your Decision Ledger');
-      window.setTimeout(() => setToast(''), 2600);
-    } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : 'Could not save the scenario');
-    }
-  }
-
   async function openBillingAction(endpoint: '/api/billing/checkout' | '/api/billing/portal') {
     if (!organizationId) return;
     setBillingBusy(true);
@@ -453,73 +393,43 @@ export default function Home() {
     }
   }
 
-  const nav: { label: View; title: string; icon: string }[] = [
-    { label: 'Overview', title: 'Copilot', icon: '✳' },
-    { label: 'Decision simulator', title: 'Plan a decision', icon: '⌁' },
-    { label: 'Decision ledger', title: 'Saved decisions', icon: '▤' },
-    { label: 'Business metrics', title: 'Growth metrics', icon: '↗' },
-    { label: 'Data import', title: 'Import data', icon: '⇧' },
-    { label: 'Fundraising planner', title: 'Fundraising', icon: '◇' },
-    { label: 'Investor reporting', title: 'Investor update', icon: '▧' },
-    { label: 'Company assumptions', title: 'Company setup', icon: '⚙' },
-    { label: 'Plan & billing', title: 'Billing', icon: '€' },
+  const navGroups: { title: string; items: { label: View; title: string; icon: string }[] }[] = [
+    { title: 'WORKSPACE', items: [
+      { label: 'Overview', title: 'Copilot', icon: '✳' },
+      { label: 'CFO Brief', title: 'CFO Brief', icon: '◷' },
+      { label: 'Financial overview', title: 'Financial overview', icon: '▦' },
+    ] },
+    { title: 'OPERATIONS', items: [
+      { label: 'Business metrics', title: 'Growth metrics', icon: '↗' },
+      { label: 'Data import', title: 'Import transactions', icon: '⇧' },
+      { label: 'Fundraising planner', title: 'Fundraising planner', icon: '◇' },
+      { label: 'Investor reporting', title: 'Investor update', icon: '▧' },
+    ] },
+    { title: 'RECORDS & SETTINGS', items: [
+      { label: 'Decision ledger', title: 'Saved decisions', icon: '▤' },
+      { label: 'Company assumptions', title: 'Company setup', icon: '⚙' },
+      { label: 'Plan & billing', title: 'Plan & billing', icon: '€' },
+    ] },
   ];
 
   return <main className="app-shell">
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">A</span><span>avenor</span></div>
       <div className="workspace-switch"><div className="workspace-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div><div><b>{organizationName || 'Your company'}</b><small>Financial workspace</small></div><span className="chevron">⌄</span></div>
-      <div className="nav-caption">YOUR FINANCE WORKSPACE</div>
-      <nav>{nav.map(item => <button key={item.label} className={`nav-item ${view === item.label ? 'selected' : ''}`} onClick={() => setView(item.label)}><span className="nav-icon">{item.icon}</span>{item.title}{item.label === 'Decision ledger' && saved.length > 0 && <span className="nav-count">{saved.length}</span>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="help-card"><div className="help-icon">?</div><b>Work through a decision</b><p>Ask Avenor what the numbers mean before you commit.</p><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Ask Avenor <span>→</span></button></div><div className="profile"><div className="profile-avatar">A</div><div><b>Workspace account</b><small>Signed-in user</small></div><span className="more">···</span></div></div>
+      <nav className="nav-groups">{navGroups.map(group => <div className="nav-group" key={group.title}><div className="nav-group-label">{group.title}</div><div className="nav-group-items">{group.items.map(item => <button key={item.label} className={`nav-item ${view === item.label ? 'selected' : ''}`} onClick={() => setView(item.label)}><span className="nav-icon">{item.icon}</span>{item.title}{item.label === 'Decision ledger' && saved.length > 0 && <span className="nav-count">{saved.length}</span>}</button>)}</div></div>)}</nav>
+      <div className="sidebar-bottom"><div className="profile"><div className="profile-avatar">A</div><div><b>Workspace account</b><small>Signed-in user</small></div><span className="more">···</span></div></div>
     </aside>
 
     <section className="main-area">
-      <header className="topbar"><div className="breadcrumb">{organizationName || 'Your company'} <span>/</span> {viewTitles[view]}</div><div className="top-actions"><span className="sync-status"><i/> {workspaceLoading ? 'Loading workspace' : hasModel ? (modelStatus === 'approved' ? 'Plan approved' : 'Plan needs review') : 'Add company numbers'}</span><button className="button-secondary" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Open Copilot</button><div className="top-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div></div></header>
-      <div className="page-content">
-        <div className="page-heading"><div><div className="overline">{view === 'Overview' ? 'AVENOR INTELLIGENCE' : 'FINANCIAL WORKSPACE'} <span className="live-dot"/></div><h1>{viewTitles[view]}</h1><p>{view === 'Overview' ? 'Start with a question. Avenor brings your company numbers into the conversation and helps you test the next decision.' : view === 'Decision simulator' ? 'Compare the financial impact of a decision before you make it.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit company setup <span>↗</span></button></div></div>
+      <header className="topbar"><div className="breadcrumb">{organizationName || 'Your company'} <span>/</span> {viewTitles[view]}</div><div className="top-actions"><span className="sync-status"><i/> {workspaceLoading ? 'Loading workspace' : hasModel ? (modelStatus === 'approved' ? 'Plan approved' : 'Plan needs review') : 'Company setup needed'}</span><div className="top-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div></div></header>
+      <div className={`page-content ${view === 'Overview' ? 'copilot-page' : ''}`}>
+        {view !== 'Overview' && <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{viewTitles[view]}</h1><p>{view === 'CFO Brief' ? 'A clear management review of cash, performance, risks and recommended actions.' : view === 'Financial overview' ? 'Explore your cash position, operating forecast and the main signals in your financial plan.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit company setup <span>↗</span></button></div></div>}
 
-        {view === 'Overview' && <section className="copilot-home">
-          <div className="copilot-home-main">
-            <div className="copilot-home-label"><span>a</span> YOUR AI FINANCE PARTNER</div>
-            <h2>What decision are you working through?</h2>
-            <p className="copilot-home-description">Ask in plain language. Avenor uses your saved financial plan, actuals and operating metrics to model the options and explain the trade-offs.</p>
-            <div className="copilot-home-compose">
-              <textarea
-                aria-label="Ask Avenor about a financial decision"
-                value={question}
-                onChange={(event) => setQuestion(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === 'Enter' && !event.shiftKey) {
-                    event.preventDefault();
-                    window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: { message: question, newConversation: true } }));
-                  }
-                }}
-                placeholder="For example: can we afford two new hires and still keep 12 months of runway?"
-                rows={2}
-                maxLength={4000}
-              />
-              <button
-                disabled={!organizationId || !question.trim()}
-                onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: { message: question, newConversation: true } }))}
-              >Ask Avenor <span>↑</span></button>
-            </div>
-            <div className="copilot-home-suggestions">
-              <button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: { message: 'Can we afford to hire another person and keep at least 12 months of runway?', newConversation: true } }))}>Can we afford another hire?</button>
-              <button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: { message: 'What happens to our cash if revenue is 20% lower for the next six months?', newConversation: true } }))}>What if revenue slows?</button>
-              <button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: { message: 'How much could we invest while keeping 12 months of runway?', newConversation: true } }))}>What can we afford to invest?</button>
-            </div>
-          </div>
-          <aside className="copilot-home-side">
-            <span>HOW AVENOR HELPS</span>
-            <div className="copilot-home-value"><i>↗</i><div><b>Model the decision</b><p>Hiring, spending, pricing and funding scenarios.</p></div></div>
-            <div className="copilot-home-value"><i>◷</i><div><b>See the cash impact</b><p>Runway, break-even and an 18-month outlook.</p></div></div>
-            <div className="copilot-home-value"><i>✓</i><div><b>Keep the reasoning</b><p>Review assumptions and save decisions to your ledger.</p></div></div>
-          </aside>
-        </section>}
-        {view === 'Overview' && organizationId && <CfoBrief organizationId={organizationId} />}
+        {view === 'Overview' && <AvenorCopilot organizationId={organizationId} organizationName={organizationName} currency={currency} embedded />}
+
+        {view === 'CFO Brief' && organizationId && <CfoBrief organizationId={organizationId} />}
         
-        {view === 'Overview' && <>
+        {view === 'Financial overview' && <>
           {workspaceLoading ? <section className="surface empty-state large-empty"><b>Loading your financial workspace…</b></section>
             : workspaceError ? <section className="surface empty-state large-empty"><b>Workspace could not be loaded</b><p>{workspaceError}</p><button className="button-secondary" onClick={() => window.location.reload()}>Retry</button></section>
             : !hasModel ? <section className="surface empty-state large-empty"><div className="empty-icon">◈</div><b>Add your company's starting numbers</b><p>Your workspace is ready. Add your starting cash, monthly revenue, team costs and other expenses. Avenor will use these figures to show how long your cash may last and help you compare decisions.</p><button className="button-primary" onClick={() => setView('Company assumptions')}>Set up company assumptions →</button></section>
@@ -583,18 +493,13 @@ export default function Home() {
               </div>
               <div className="flow-result"><span>Estimated cash change this month</span><b className={base[0].netCashFlow >= 0 ? 'positive-text' : 'negative-text'}>{base[0].netCashFlow > 0 ? '+' : ''}{money(base[0].netCashFlow, currency)}</b></div>
             </section>
-            <section className="surface decision-card"><div className="surface-heading"><div><div className="section-kicker">YOUR NEXT MOVES</div><h2>Decisions you have explored</h2></div><button className="text-button" onClick={() => setView('Decision ledger')}>View all →</button></div>{saved.length === 0 ? <div className="empty-state"><div className="empty-icon">⌁</div><b>No saved decisions yet</b><p>Try a hiring or growth decision. Save it here to compare options later.</p><button className="button-secondary" onClick={() => setView('Decision simulator')}>Plan your first decision</button></div> : saved.slice(0,2).map(item => <DecisionRow key={item.id} item={item} currency={currency}/>)}</section>
+            <section className="surface decision-card"><div className="surface-heading"><div><div className="section-kicker">YOUR NEXT MOVES</div><h2>Decisions you have explored</h2></div><button className="text-button" onClick={() => setView('Decision ledger')}>View all →</button></div>{saved.length === 0 ? <div className="empty-state"><div className="empty-icon">⌁</div><b>No saved decisions yet</b><p>Try a hiring or growth decision. Save it here to compare options later.</p><button className="button-secondary" onClick={() => setView('Overview')}>Plan your first decision</button></div> : saved.slice(0,2).map(item => <DecisionRow key={item.id} item={item} currency={currency}/>)}</section>
           </div>
-          <section className="surface table-panel cash-table-panel"><div className="surface-heading"><div><div className="section-kicker">THE NEXT SIX MONTHS</div><h2>How your cash could move month by month</h2><p>Use this breakdown to see the steps behind the forecast</p></div><button className="text-button" onClick={() => setView('Decision simulator')}>Try a decision →</button></div><div className="table-scroll"><table><thead><tr><th>MONTH</th><th>REVENUE</th><th>NET CASH CHANGE</th><th>CASH LEFT</th><th>RUNWAY</th></tr></thead><tbody>{base.slice(0,6).map(row => <tr key={row.month}><td>Month {row.month}</td><td>{money(row.revenue, currency)}</td><td className={row.netCashFlow >= 0 ? 'positive-text' : 'negative-text'}>{row.netCashFlow > 0 ? '+' : ''}{money(row.netCashFlow, currency)}</td><td className="strong-cell">{money(row.closingCash, currency)}</td><td>{row.runwayMonths === null ? 'Cash-flow positive' : `${row.runwayMonths.toFixed(1)} mo.`}</td></tr>)}</tbody></table></div></section>
+          <section className="surface table-panel cash-table-panel"><div className="surface-heading"><div><div className="section-kicker">THE NEXT SIX MONTHS</div><h2>How your cash could move month by month</h2><p>Use this breakdown to see the steps behind the forecast</p></div><button className="text-button" onClick={() => setView('Overview')}>Try a decision →</button></div><div className="table-scroll"><table><thead><tr><th>MONTH</th><th>REVENUE</th><th>NET CASH CHANGE</th><th>CASH LEFT</th><th>RUNWAY</th></tr></thead><tbody>{base.slice(0,6).map(row => <tr key={row.month}><td>Month {row.month}</td><td>{money(row.revenue, currency)}</td><td className={row.netCashFlow >= 0 ? 'positive-text' : 'negative-text'}>{row.netCashFlow > 0 ? '+' : ''}{money(row.netCashFlow, currency)}</td><td className="strong-cell">{money(row.closingCash, currency)}</td><td>{row.runwayMonths === null ? 'Cash-flow positive' : `${row.runwayMonths.toFixed(1)} mo.`}</td></tr>)}</tbody></table></div></section>
           </>}
         </>}
 
-        {view === 'Decision simulator' && <div className="simulator-layout"><section className="surface simulator-form"><div className="section-kicker">SCENARIO BUILDER</div><h2>Model a hiring decision</h2><p className="form-intro">Change the assumptions below. Avenor recalculates the cash impact instantly without changing your base plan.</p><div className="form-section-title">HIRING PLAN</div><div className="form-grid"><NumberField label="Number of hires" value={headcount} set={setHeadcount} min={1} max={50} step={1}/><NumberField label="Start month" value={startMonth} set={setStartMonth} min={1} max={18} step={1} suffix="month"/><NumberField label="Gross yearly salary per hire" value={salary} set={setSalary} min={0} max={500000} step={1000} prefix={currencySymbol}/><NumberField label="Employer charges on salary" value={employerRate} set={setEmployerRate} min={0} max={100} step={1} suffix="%"/><NumberField label="Benefits / person / month" value={benefits} set={setBenefits} min={0} max={10000} step={50} prefix={currencySymbol}/><NumberField label="Recruitment / person" value={recruiting} set={setRecruiting} min={0} max={50000} step={100} prefix={currencySymbol}/><NumberField label="Equipment / person" value={equipment} set={setEquipment} min={0} max={20000} step={100} prefix={currencySymbol}/></div><div className="assumption-warning"><span>ⓘ</span><p><b>Employer-cost rate is an assumption.</b> The {employerRate}% rate is illustrative, not a verified French payroll calculation. Confirm the loaded cost with a qualified payroll provider.</p></div><button className="button-secondary full-button" onClick={() => {setHeadcount(3);setSalary(55000);setStartMonth(2);setEmployerRate(42);setBenefits(150);setRecruiting(2500);setEquipment(1500);}}>Reset to example scenario</button></section>
-          <div className="simulator-results"><section className="surface result-hero"><div className="result-header"><div><div className="section-kicker">SCENARIO RESULT</div><h2>Hiring impact analysis</h2></div><span className="scenario-badge">Unsaved scenario</span></div><div className="result-metrics"><div><small>Recurring monthly cost</small><b>{money(monthlyHireCost, currency)}</b><span>{headcount} hires · fully loaded estimate</span></div><div><small>One-off costs</small><b>{money(headcount * (recruiting + equipment), currency)}</b><span>Recruitment + equipment</span></div><div><small>18-month cash impact</small><b className="negative-text">−{money(impact, currency)}</b><span>Compared with base case</span></div></div><div className="result-explanation"><div className="explain-icon">i</div><div><b>What this means</b><p>Under the current assumptions, this hiring plan reduces projected month-18 cash by <strong>{money(impact, currency)}</strong>. No additional revenue or productivity benefit from these hires is assumed.</p></div></div><button className="button-primary" disabled={!hasModel} onClick={saveDecision}>Save to Decision Ledger <span>→</span></button></section>
-            <section className="surface"><div className="surface-heading"><div><div className="section-kicker">BASE CASE VS. SCENARIO</div><h2>Cash position comparison</h2></div></div><div className="comparison-bars"><CompareBar label="Base case · month 18" value={baseSummary.endingCash} max={Math.max(baseSummary.endingCash,scenarioSummary.endingCash,1)} currency={currency}/><CompareBar label="Hiring scenario · month 18" value={scenarioSummary.endingCash} max={Math.max(baseSummary.endingCash,scenarioSummary.endingCash,1)} currency={currency}/></div><div className="runway-comparison"><div><small>Base case first-month runway</small><b>{baseRunway === null ? 'Cash positive' : `${baseRunway.toFixed(1)} months`}</b></div><div><small>Scenario first-month runway</small><b>{scenarioRunway === null ? 'Cash positive' : `${scenarioRunway.toFixed(1)} months`}</b></div></div></section>
-            <section className="surface"><div className="surface-heading"><div><div className="section-kicker">DECISION SUPPORT</div><h2>Explore the wider business impact</h2></div><span className="beta-pill">FULL FINANCE ANALYSIS</span></div><p className="form-intro">Ask Avenor to combine this scenario with revenue changes, cost reductions, pricing, marketing investment, fundraising or working-capital decisions.</p><button className="button-primary full-button" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: question }))}>Continue this analysis with Avenor <span>→</span></button></section></div></div>}
-
-        {view === 'Decision ledger' && <section className="surface ledger-surface"><div className="surface-heading"><div><div className="section-kicker">DECISION HISTORY</div><h2>Your decision ledger</h2><p>Scenarios saved for review. Saving a scenario never changes the approved base plan.</p></div><button className="button-primary" onClick={() => setView('Decision simulator')}>＋ New scenario</button></div>{saved.length === 0 ? <div className="empty-state large-empty"><div className="empty-icon">▤</div><b>Your ledger is ready</b><p>Once you save a scenario, it will appear here with its assumptions and projected cash impact.</p><button className="button-primary" onClick={() => setView('Decision simulator')}>Build your first scenario →</button></div> : <div className="ledger-list">{saved.map(item => <DecisionRow key={item.id} item={item} detailed currency={currency}/>)}</div>}</section>}
+        {view === 'Decision ledger' && <section className="surface ledger-surface"><div className="surface-heading"><div><div className="section-kicker">DECISION HISTORY</div><h2>Your decision ledger</h2><p>Scenarios saved for review. Saving a scenario never changes the approved base plan.</p></div><button className="button-primary" onClick={() => setView('Overview')}>＋ New scenario</button></div>{saved.length === 0 ? <div className="empty-state large-empty"><div className="empty-icon">▤</div><b>Your ledger is ready</b><p>Once you save a scenario, it will appear here with its assumptions and projected cash impact.</p><button className="button-primary" onClick={() => setView('Overview')}>Build your first scenario →</button></div> : <div className="ledger-list">{saved.map(item => <DecisionRow key={item.id} item={item} detailed currency={currency}/>)}</div>}</section>}
 
         {view === 'Company assumptions' && <section className="surface assumptions-surface"><div className="section-kicker">FINANCIAL MODEL INPUTS</div><h2>Company assumptions</h2><label className="number-field"><span>Model name</span><input type="text" maxLength={100} value={modelName} onChange={e=>setModelName(e.target.value)}/></label><p className="form-intro">Enter your company's starting position and recurring monthly economics. Save a draft for review or approve a model version to use as your planning baseline.</p><div className="form-section-title">CASH & REVENUE</div><div className="form-grid"><NumberField label="Opening cash balance" value={cash} set={setCash} min={0} max={100000000} step={10000} prefix={currencySymbol}/><NumberField label="Monthly revenue" value={revenue} set={setRevenue} min={0} max={10000000} step={5000} prefix={currencySymbol}/><NumberField label="Monthly revenue growth" value={growth} set={setGrowth} min={-99} max={100} step={.5} suffix="%"/><NumberField label="Direct costs as % of sales" value={cogs} set={setCogs} min={0} max={100} step={1} suffix="%"/></div><div className="form-section-title">OPERATING COSTS</div><div className="form-grid"><NumberField label="Current monthly team costs" value={payroll} set={setPayroll} min={0} max={10000000} step={5000} prefix={currencySymbol}/><NumberField label="Other monthly running costs" value={opex} set={setOpex} min={0} max={10000000} step={5000} prefix={currencySymbol}/></div><div className="assumption-actions"><button className="button-secondary" disabled={modelBusy || workspaceLoading} onClick={() => saveModel('draft')}>{modelBusy ? 'Saving…' : 'Save as draft'}</button><button className="button-primary" disabled={modelBusy || workspaceLoading} onClick={() => saveModel('approved')}>{modelBusy ? 'Saving…' : 'Approve & save model'}</button><span>Model status: {modelStatus === 'none' ? 'Not saved' : modelStatus}. Approval creates a new version; previous approved versions are archived.</span></div>{workspaceError && <p className="warning-text">{workspaceError}</p>}</section>}
 
@@ -670,10 +575,9 @@ export default function Home() {
           <p className="billing-footnote">No payment is taken from this screen. You will be redirected to Stripe to review and confirm any payment.</p>
         </section>}
 
-        <footer className="app-footer"><span>Avenor <b>·</b> Private beta</span><span>{hasModel ? (modelStatus === 'approved' ? 'Approved financial model' : 'Draft financial model') : 'Financial model not configured'} · Not accounting or tax advice</span></footer>
+        {view !== 'Overview' && <footer className="app-footer"><span>Avenor <b>·</b> Private beta</span><span>{hasModel ? (modelStatus === 'approved' ? 'Approved financial model' : 'Draft financial model') : 'Financial model not configured'} · Not accounting or tax advice</span></footer>}
       </div>
     </section>
-    <AvenorCopilot organizationId={organizationId} organizationName={organizationName} currency={currency} />
     {toast && <div className="toast"><span>✓</span>{toast}</div>}
   </main>;
 }
