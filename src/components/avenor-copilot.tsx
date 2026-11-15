@@ -401,7 +401,7 @@ export function AvenorCopilot({
                           <div className={styles.messageMeta}>
                             <strong>{message.role === 'user' ? 'You' : 'Avenor'}</strong>
                             <time>{new Date(message.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</time>
-                            {evidence?.aiUnavailable && <span className={styles.fallbackTag}>Limited mode</span>}
+                            {evidence?.aiUnavailable && <span className={styles.fallbackTag} title="Calculated locally from saved workspace data; no external AI response was used">Local analysis</span>}
                           </div>
                           <div className={styles.messageText}>{renderSafeText(message.content)}</div>
 
