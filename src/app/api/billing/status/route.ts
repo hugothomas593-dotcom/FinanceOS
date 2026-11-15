@@ -24,11 +24,17 @@ export async function GET(request: Request) {
     if (error) return NextResponse.json({ error: 'Could not load subscription status' }, { status: 500 });
 
     const billingRole = ['owner', 'admin'].includes(member.role);
-    const billingConfigured = Boolean(
+    const checkoutConfigured = Boolean(
       process.env.STRIPE_SECRET_KEY &&
       process.env.STRIPE_PRICE_ID &&
       process.env.NEXT_PUBLIC_APP_URL,
     );
+    const webhookConfigured = Boolean(
+      process.env.STRIPE_WEBHOOK_SECRET &&
+      process.env.SUPABASE_SERVICE_ROLE_KEY &&
+      process.env.NEXT_PUBLIC_SUPABASE_URL,
+    );
+    const billingConfigured = checkoutConfigured && webhookConfigured;
 
     return NextResponse.json({
       billingConfigured,
