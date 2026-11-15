@@ -1,532 +1,141 @@
-'use client';
+import Link from 'next/link';
 
-import { useEffect, useMemo, useState } from 'react';
-import { forecast, summarize, type ModelInputs, type HireInput, type MonthResult } from '@/lib/finance';
-import { AvenorCopilot } from '@/components/avenor-copilot';
+const features = [
+  { number: '01', title: 'Protect your runway', copy: 'See how a change in spending, revenue or hiring affects the cash you have left — before you commit.' },
+  { number: '02', title: 'Make the next hire with confidence', copy: 'Translate salary, employer costs and start dates into a clear view of the financial impact.' },
+  { number: '03', title: 'Understand the levers', copy: 'Explore break-even, pricing, customer economics and fundraising scenarios in one place.' },
+];
 
-type View = 'Overview' | 'Decision simulator' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
-const money = (v: number, currency = 'EUR') => new Intl.NumberFormat('en-GB', { style: 'currency', currency, maximumFractionDigits: 0 }).format(v);
-const compact = (v: number) => new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
-const initial: ModelInputs = { openingCash: 0, monthlyRevenue: 0, monthlyRevenueGrowth: 0, monthlyOpexExPayroll: 0, monthlyOpexGrowth: 0, cogsRatio: 0, existingMonthlyPayroll: 0, existingOtherNetCashAdjustments: 0 };
-const months = 18;
-
-type SavedDecision = { id: string; title: string; detail: string; cashImpact: number; runwayImpact: number; created: string };
-type WorkspaceMembership = {
-  organization_id: string;
-  role: string;
-  organizations: { id: string; name: string; country_code: string; base_currency: string } | null;
-};
-type ModelRow = {
-  id: string;
-  name: string;
-  status: 'draft' | 'approved' | 'archived';
-  assumptions: Record<string, unknown>;
-  created_at: string;
-};
-type ScenarioRow = {
-  id: string;
-  name: string;
-  scenario_type: string;
-  model_version_id: string | null;
-  assumptions: Record<string, unknown>;
-  outputs: Record<string, unknown>;
-  created_at: string;
-};
-
-export default function Home() {
-  const [view, setView] = useState<View>('Overview');
-  const [organizationId, setOrganizationId] = useState('');
-  const [organizationName, setOrganizationName] = useState('');
-  const [currency, setCurrency] = useState('EUR');
-  const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
-  const [workspaceLoading, setWorkspaceLoading] = useState(true);
-  const [workspaceError, setWorkspaceError] = useState('');
-  const [hasModel, setHasModel] = useState(false);
-  const [modelStatus, setModelStatus] = useState<'draft' | 'approved' | 'none'>('none');
-  const [modelVersionId, setModelVersionId] = useState('');
-  const [modelName, setModelName] = useState('Base financial plan');
-  const [modelBusy, setModelBusy] = useState(false);
-  const [modelUpdatedAt, setModelUpdatedAt] = useState('');
-  const [actualsCount, setActualsCount] = useState(0);
-  const [cash, setCash] = useState(initial.openingCash);
-  const [revenue, setRevenue] = useState(initial.monthlyRevenue);
-  const [payroll, setPayroll] = useState(initial.existingMonthlyPayroll);
-  const [opex, setOpex] = useState(initial.monthlyOpexExPayroll);
-  const [growth, setGrowth] = useState(initial.monthlyRevenueGrowth * 100);
-  const [cogs, setCogs] = useState(initial.cogsRatio * 100);
-  const [salary, setSalary] = useState(55_000);
-  const [headcount, setHeadcount] = useState(3);
-  const [startMonth, setStartMonth] = useState(2);
-  const [employerRate, setEmployerRate] = useState(42);
-  const [recruiting, setRecruiting] = useState(2_500);
-  const [equipment, setEquipment] = useState(1_500);
-  const [benefits, setBenefits] = useState(150);
-  const [question, setQuestion] = useState('Can we hire three engineers in January?');
-  const [saved, setSaved] = useState<SavedDecision[]>([]);
-  const [toast, setToast] = useState('');
-  const [importRows, setImportRows] = useState<{period:string;category:string;description:string;amount:number;direction:'inflow'|'outflow';source:string}[]>([]);
-  const [importError, setImportError] = useState('');
-  const [importBusy, setImportBusy] = useState(false);
-  const [raiseAmount, setRaiseAmount] = useState(1500000);
-
-  const [preMoney, setPreMoney] = useState(6000000);
-  const [kpiPeriod, setKpiPeriod] = useState(new Date().toISOString().slice(0, 7));
-  const [businessKpis, setBusinessKpis] = useState({
-    mrr: '',
-    activeCustomers: '',
-    newCustomers: '',
-    churnedCustomers: '',
-    marketingSpend: '',
-    salesSpend: '',
-    grossMarginPct: '',
-  });
-  const [kpiLoading, setKpiLoading] = useState(false);
-  const [kpiBusy, setKpiBusy] = useState(false);
-  const [kpiHasData, setKpiHasData] = useState(false);
-  const [kpiError, setKpiError] = useState('');
-  const [billingLoading, setBillingLoading] = useState(false);
-  const [billingBusy, setBillingBusy] = useState(false);
-  const [billingError, setBillingError] = useState('');
-  const [billingStatus, setBillingStatus] = useState<{
-    billingConfigured: boolean;
-    subscriptionStatus: string | null;
-    currentPeriodEnd: string | null;
-    canStartCheckout: boolean;
-    canManageBilling: boolean;
-  } | null>(null);
-
-  useEffect(() => {
-    const billingReturn = new URLSearchParams(window.location.search).get('billing');
-    if (!billingReturn) return;
-    setView('Plan & billing');
-    if (billingReturn === 'success') setToast('Checkout completed. Confirming your subscription…');
-    if (billingReturn === 'cancelled') setToast('Checkout cancelled. No payment was taken.');
-    window.history.replaceState({}, '', window.location.pathname);
-    window.setTimeout(() => setToast(''), 4200);
-  }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadWorkspace() {
-      try {
-        const organizationsResponse = await fetch('/api/organizations', { cache: 'no-store' });
-        const organizationsData = await organizationsResponse.json();
-        if (!organizationsResponse.ok) throw new Error(organizationsData.error || 'Could not load your workspace');
-
-        const memberships = (organizationsData.organizations ?? []) as WorkspaceMembership[];
-        const rememberedId = localStorage.getItem('financeos.organizationId');
-        const selected = memberships.find((item) => item.organization_id === rememberedId) ?? memberships[0];
-
-        if (!selected) {
-          window.location.assign('/onboarding');
-          return;
-        }
-
-        const selectedOrganizationId = selected.organization_id;
-        const organization = selected.organizations;
-        localStorage.setItem('financeos.organizationId', selectedOrganizationId);
-
-        if (cancelled) return;
-        setOrganizationId(selectedOrganizationId);
-        setOrganizationName(organization?.name ?? 'Your company');
-        setCurrency((organization?.base_currency ?? 'EUR').trim());
-
-        const [modelsResponse, scenariosResponse, actualsResponse] = await Promise.all([
-          fetch(`/api/models?organizationId=${encodeURIComponent(selectedOrganizationId)}`, { cache: 'no-store' }),
-          fetch(`/api/scenarios?organizationId=${encodeURIComponent(selectedOrganizationId)}`, { cache: 'no-store' }),
-          fetch(`/api/actuals?organizationId=${encodeURIComponent(selectedOrganizationId)}`, { cache: 'no-store' }),
-        ]);
-
-        const [modelsData, scenariosData, actualsData] = await Promise.all([
-          modelsResponse.json(), scenariosResponse.json(), actualsResponse.json(),
-        ]);
-
-        if (cancelled) return;
-        if (!modelsResponse.ok) throw new Error(modelsData.error || 'Could not load financial models');
-
-        const models = (modelsData.models ?? []) as ModelRow[];
-        const latestModel = models[0];
-        if (latestModel) {
-          const assumptions = latestModel.assumptions as unknown as ModelInputs;
-          setCash(Number(assumptions.openingCash ?? 0));
-          setRevenue(Number(assumptions.monthlyRevenue ?? 0));
-          setPayroll(Number(assumptions.existingMonthlyPayroll ?? 0));
-          setOpex(Number(assumptions.monthlyOpexExPayroll ?? 0));
-          setGrowth(Number(assumptions.monthlyRevenueGrowth ?? 0) * 100);
-          setCogs(Number(assumptions.cogsRatio ?? 0) * 100);
-          setHasModel(true);
-          setModelStatus(latestModel.status === 'approved' ? 'approved' : 'draft');
-          setModelVersionId(latestModel.id);
-          setModelName(latestModel.name);
-          setModelUpdatedAt(new Date(latestModel.created_at).toLocaleString('en-GB'));
-        }
-
-        if (scenariosResponse.ok) {
-          const scenarios = (scenariosData.scenarios ?? []) as ScenarioRow[];
-          setSaved(scenarios.map((scenario) => ({
-            id: scenario.id,
-            title: scenario.name,
-            detail: `${scenario.scenario_type} scenario · saved to this workspace`,
-            cashImpact: Number(scenario.outputs.cashImpact ?? 0),
-            runwayImpact: Number(scenario.outputs.runwayImpact ?? 0),
-            created: new Date(scenario.created_at).toLocaleDateString('en-GB'),
-          })));
-        }
-
-        if (actualsResponse.ok) {
-          setActualsCount(((actualsData.actuals ?? []) as unknown[]).length);
-        }
-      } catch (error) {
-        if (!cancelled) setWorkspaceError(error instanceof Error ? error.message : 'Could not load your workspace');
-      } finally {
-        if (!cancelled) setWorkspaceLoading(false);
-      }
-    }
-
-    void loadWorkspace();
-    return () => { cancelled = true; };
-  }, []);
-
-
-
-  useEffect(() => {
-    if (!organizationId) return;
-    let cancelled = false;
-    setKpiLoading(true);
-    setKpiError('');
-
-    async function loadBusinessMetrics() {
-      try {
-        const response = await fetch(
-          `/api/kpis?organizationId=${encodeURIComponent(organizationId)}&period=${encodeURIComponent(kpiPeriod)}`,
-          { cache: 'no-store' },
-        );
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Could not load business metrics');
-
-        if (cancelled) return;
-        const values = data.kpis ?? {};
-        setBusinessKpis({
-          mrr: values.mrr === undefined ? '' : String(values.mrr),
-          activeCustomers: values.activeCustomers === undefined ? '' : String(values.activeCustomers),
-          newCustomers: values.newCustomers === undefined ? '' : String(values.newCustomers),
-          churnedCustomers: values.churnedCustomers === undefined ? '' : String(values.churnedCustomers),
-          marketingSpend: values.marketingSpend === undefined ? '' : String(values.marketingSpend),
-          salesSpend: values.salesSpend === undefined ? '' : String(values.salesSpend),
-          grossMarginPct: values.grossMarginPct === undefined ? '' : String(values.grossMarginPct),
-        });
-        setKpiHasData(Boolean(data.hasData));
-      } catch (error) {
-        if (!cancelled) setKpiError(error instanceof Error ? error.message : 'Could not load business metrics');
-      } finally {
-        if (!cancelled) setKpiLoading(false);
-      }
-    }
-
-    void loadBusinessMetrics();
-    return () => { cancelled = true; };
-  }, [organizationId, kpiPeriod]);
-
-  useEffect(() => {
-    if (!organizationId || view !== 'Plan & billing') return;
-    let cancelled = false;
-    setBillingLoading(true);
-    setBillingError('');
-    fetch(`/api/billing/status?organizationId=${encodeURIComponent(organizationId)}`, { cache: 'no-store' })
-      .then(async (response) => {
-        const data = await response.json();
-        if (!response.ok) throw new Error(data.error || 'Could not load billing status');
-        if (!cancelled) setBillingStatus(data);
-      })
-      .catch((error) => {
-        if (!cancelled) setBillingError(error instanceof Error ? error.message : 'Could not load billing status');
-      })
-      .finally(() => { if (!cancelled) setBillingLoading(false); });
-    return () => { cancelled = true; };
-  }, [organizationId, view]);
-
-  const inputs: ModelInputs = { ...initial, openingCash: cash, monthlyRevenue: revenue, existingMonthlyPayroll: payroll, monthlyOpexExPayroll: opex, monthlyRevenueGrowth: growth / 100, cogsRatio: cogs / 100 };
-  const hire: HireInput = { headcount, startMonth: startMonth - 1, grossAnnualSalary: salary, employerCostRate: employerRate / 100, benefitsMonthlyPerPerson: benefits, recruitingCostPerPerson: recruiting, equipmentCostPerPerson: equipment, productivityRampMonths: 6 };
-  const base = useMemo(() => forecast(inputs, [], months), [cash, revenue, payroll, opex, growth, cogs]);
-  const scenario = useMemo(() => forecast(inputs, [hire], months), [cash, revenue, payroll, opex, growth, cogs, salary, headcount, startMonth, employerRate, recruiting, equipment, benefits]);
-  const baseSummary = summarize(base);
-  const scenarioSummary = summarize(scenario);
-  const impact = baseSummary.endingCash - scenarioSummary.endingCash;
-  const monthlyHireCost = headcount * (salary * (1 + employerRate / 100) / 12 + benefits);
-  const baseRunway = runway(base[0]);
-  const scenarioRunway = runway(scenario[0]);
-  const chart = makeChart(base, scenario);
-
-  function analyze() {
-    window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: question }));
-  }
-
-  async function saveModel(status: 'draft' | 'approved') {
-    if (!organizationId) return;
-    setModelBusy(true);
-    setWorkspaceError('');
-    try {
-      const response = await fetch('/api/models', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organizationId,
-          name: modelName.trim() || 'Base financial plan',
-          status,
-          assumptions: inputs,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Could not save the financial model');
-
-      setHasModel(true);
-      setModelStatus(status);
-      setModelVersionId(data.model.id);
-      setModelName(data.model.name);
-      setModelUpdatedAt(new Date(data.model.created_at).toLocaleString('en-GB'));
-      setToast(status === 'approved' ? 'Financial model approved and saved' : 'Draft model saved to your workspace');
-      window.setTimeout(() => setToast(''), 2600);
-    } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : 'Could not save the financial model');
-    } finally {
-      setModelBusy(false);
-    }
-  }
-
-
-  async function saveBusinessMetrics() {
-    if (!organizationId) return;
-    const kpis = Object.fromEntries(
-      Object.entries(businessKpis)
-        .filter(([, value]) => value.trim() !== '')
-        .map(([key, value]) => [key, Number(value)]),
-    );
-    if (Object.keys(kpis).length === 0) {
-      setKpiError('Enter at least one metric before saving.');
-      return;
-    }
-
-    setKpiBusy(true);
-    setKpiError('');
-    try {
-      const response = await fetch('/api/kpis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organizationId, period: kpiPeriod, kpis }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Could not save business metrics');
-      setKpiHasData(true);
-      setToast(`Business metrics saved for ${kpiPeriod}`);
-      window.setTimeout(() => setToast(''), 2600);
-    } catch (error) {
-      setKpiError(error instanceof Error ? error.message : 'Could not save business metrics');
-    } finally {
-      setKpiBusy(false);
-    }
-  }
-
-  async function saveDecision() {
-    if (!organizationId || !hasModel) {
-      setToast('Save your company assumptions before creating a scenario');
-      window.setTimeout(() => setToast(''), 2600);
-      return;
-    }
-
-    try {
-      const name = `${headcount} engineer hire scenario`;
-      const cashImpact = impact;
-      const runwayImpact = (baseRunway ?? 0) - (scenarioRunway ?? 0);
-      const response = await fetch('/api/scenarios', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          organizationId,
-          modelVersionId: modelVersionId || null,
-          name,
-          scenarioType: 'hiring',
-          assumptions: { modelInputs: inputs, hire },
-          outputs: {
-            cashImpact,
-            runwayImpact,
-            baseEndingCash: baseSummary.endingCash,
-            scenarioEndingCash: scenarioSummary.endingCash,
-            forecastMonths: months,
-          },
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Could not save the scenario');
-
-      const decision: SavedDecision = {
-        id: data.scenario.id,
-        title: name,
-        detail: `Start month ${startMonth} · ${money(salary, currency)} gross annual salary · ${employerRate}% employer-cost assumption`,
-        cashImpact,
-        runwayImpact,
-        created: new Date(data.scenario.created_at).toLocaleDateString('en-GB'),
-      };
-      setSaved((items) => [decision, ...items]);
-      setToast('Scenario saved to your Decision Ledger');
-      window.setTimeout(() => setToast(''), 2600);
-    } catch (error) {
-      setWorkspaceError(error instanceof Error ? error.message : 'Could not save the scenario');
-    }
-  }
-
-  async function openBillingAction(endpoint: '/api/billing/checkout' | '/api/billing/portal') {
-    if (!organizationId) return;
-    setBillingBusy(true);
-    setBillingError('');
-    try {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ organizationId }),
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || 'Billing request failed');
-      if (typeof data.url !== 'string') throw new Error('The billing provider did not return a secure link');
-      window.location.assign(data.url);
-    } catch (error) {
-      setBillingError(error instanceof Error ? error.message : 'Billing request failed');
-    } finally {
-      setBillingBusy(false);
-    }
-  }
-
-  const nav: { label: View; icon: string }[] = [
-    { label: 'Overview', icon: '◫' }, { label: 'Decision simulator', icon: '⌁' }, { label: 'Decision ledger', icon: '▤' }, { label: 'Business metrics', icon: '↗' }, { label: 'Data import', icon: '⇧' }, { label: 'Fundraising planner', icon: '◇' }, { label: 'Investor reporting', icon: '▧' }, { label: 'Company assumptions', icon: '⚙' }, { label: 'Plan & billing', icon: '€' },
-  ];
-
-  return <main className="app-shell">
-    <aside className="sidebar">
-      <div className="brand"><span className="brand-mark">A</span><span>avenor</span></div>
-      <div className="workspace-switch"><div className="workspace-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div><div><b>{organizationName || 'Your company'}</b><small>Financial workspace</small></div><span className="chevron">⌄</span></div>
-      <div className="nav-caption">WORKSPACE</div>
-      <nav>{nav.map(item => <button key={item.label} className={`nav-item ${view === item.label ? 'selected' : ''}`} onClick={() => setView(item.label)}><span className="nav-icon">{item.icon}</span>{item.label}{item.label === 'Decision ledger' && saved.length > 0 && <span className="nav-count">{saved.length}</span>}</button>)}</nav>
-      <div className="sidebar-bottom"><div className="help-card"><div className="help-icon">?</div><b>Need a second look?</b><p>Review a decision against your company numbers.</p><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Ask Avenor <span>→</span></button></div><div className="profile"><div className="profile-avatar">A</div><div><b>Workspace account</b><small>Signed-in user</small></div><span className="more">···</span></div></div>
-    </aside>
-
-    <section className="main-area">
-      <header className="topbar"><div className="breadcrumb">{organizationName || 'Your company'} <span>/</span> {view}</div><div className="top-actions"><span className="sync-status"><i/> {workspaceLoading ? 'Loading workspace' : hasModel ? (modelStatus === 'approved' ? 'Approved model' : 'Draft model · review required') : 'Setup required'}</span><button className="button-secondary" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Ask Avenor</button><div className="top-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div></div></header>
-      <div className="page-content">
-        <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{view === 'Overview' ? 'Overview' : view}</h1><p>{view === 'Overview' ? 'Cash position, operating performance and the assumptions behind your forecast.' : view === 'Decision simulator' ? 'Compare the financial impact of a decision before you make it.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit assumptions <span>↗</span></button></div></div>
-
-        {view === 'Overview' && <>
-          {workspaceLoading ? <section className="surface empty-state large-empty"><b>Loading your financial workspace…</b></section>
-            : workspaceError ? <section className="surface empty-state large-empty"><b>Workspace could not be loaded</b><p>{workspaceError}</p><button className="button-secondary" onClick={() => window.location.reload()}>Retry</button></section>
-            : !hasModel ? <section className="surface empty-state large-empty"><div className="empty-icon">◈</div><b>Set up your company's first financial model</b><p>Your workspace is connected. Add your opening cash, monthly revenue, payroll and operating expenses before using forecasts or decision scenarios. Avenor will save these assumptions to your private workspace.</p><button className="button-primary" onClick={() => setView('Company assumptions')}>Set up company assumptions →</button></section>
-            : <>
-          <div className="notice"><span className="notice-icon">ⓘ</span><div><b>{modelStatus === 'approved' ? 'Approved company financial model.' : 'Draft financial model — review before relying on projections.'}</b><span>{actualsCount > 0 ? `${actualsCount} actual records are stored in this workspace; they are not yet reconciled into the forecast.` : 'Forecasts are calculated from the saved assumptions shown in Company assumptions.'}</span></div><button onClick={() => setView('Company assumptions')}>Review assumptions <span>→</span></button></div>
-          <div className="metric-grid">
-            <Metric label="Cash available" value={money(cash, currency)} sub="Starting cash in saved model" trend="neutral" icon="◈" />
-            <Metric label="Revenue this month" value={money(revenue, currency)} sub={`${growth.toFixed(1)}% assumed monthly growth`} trend="positive" icon="↗" />
-            <Metric label="Cash used this month" value={money(Math.max(0, -base[0].netCashFlow), currency)} sub="After money coming in" trend="neutral" icon="⌁" />
-            <Metric label="Time until cash runs out" value={baseRunway === null ? 'Cash positive' : `${baseRunway.toFixed(1)} months`} sub="At today’s level of income and spending" trend={baseRunway !== null && baseRunway < 9 ? 'warning' : 'positive'} icon="◷" />
-          </div>
-          <section className="decision-intro">
-            <div className="decision-intro-copy">
-              <div className="section-kicker">THE AVENOR DIFFERENCE</div>
-              <h2>Know what a decision will cost before you commit.</h2>
-              <p>Avenor connects your company numbers to the choices in front of you — how much you can spend, how hiring changes your runway, and what to do next.</p>
-            </div>
-            <div className="decision-intro-actions">
-              <button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'What can we afford to spend while keeping at least 12 months of runway?' }))}>What can we afford?</button>
-              <button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'Can we afford another hire, and what happens to our runway?' }))}>Can we afford to hire?</button>
-              <button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'What happens if revenue is 20% lower than forecast for the next six months?' }))}>What if revenue slows?</button>
-            </div>
-          </section>
-          <div className="dashboard-grid">
-            <section className="surface chart-panel"><div className="surface-heading"><div><div className="section-kicker">LOOKING AHEAD</div><h2>Will we have enough cash?</h2><p>Estimated cash balance over the next 18 months</p></div><div className="legend"><span><i className="legend-base"/>Base case</span><span><i className="legend-scenario"/>Hiring scenario</span></div></div><div className="chart-summary"><b>{money(baseSummary.endingCash, currency)}</b><span>Projected cash at month 18</span><span className={`delta ${impact >= 0 ? 'negative' : 'positive'}`}>{impact >= 0 ? '−' : '+'}{money(Math.abs(impact), currency)} <small>hiring impact</small></span></div><div className="chart-wrap"><svg viewBox="0 0 760 230" role="img" aria-label="18 month cash forecast chart"><defs><linearGradient id="areaFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#6a9b88" stopOpacity=".18"/><stop offset="100%" stopColor="#6a9b88" stopOpacity="0"/></linearGradient></defs>{[35,85,135,185].map(y=><line key={y} x1="42" x2="744" y1={y} y2={y} className="grid-line"/>)}{chart.labels.map((m,i)=><text key={m} x={42+i*(702/17)} y="218" className="axis-label" textAnchor="middle">{i % 3 === 0 ? m : ''}</text>)}<path d={chart.baseArea} fill="url(#areaFill)"/><path d={chart.basePath} className="base-line"/><path d={chart.scenarioPath} className="scenario-line"/><circle cx="744" cy={chart.baseY} r="4" className="base-point"/><circle cx="744" cy={chart.scenarioY} r="4" className="scenario-point"/></svg><div className="chart-foot"><span>Forecast starts today</span><span>Workspace base currency · {currency}</span></div></div></section>
-            <section className="surface copilot-panel"><div className="copilot-top"><div className="copilot-symbol">A</div><span className="beta-pill">DECISION SUPPORT</span></div><div className="section-kicker">ASK AVENOR</div><h2>Need to work through a decision?</h2><p className="copilot-description">Ask about your numbers, compare options or understand a change to your plan.</p><div className="prompt-chips"><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'Can we afford to hire three engineers in January?' }))}>Can we afford to hire?</button><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'Explain our current runway and the main cash risks.' }))}>Explain our runway</button></div><div className="copilot-input"><textarea value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => {if (e.key === 'Enter' && !e.shiftKey) {e.preventDefault();setView('Decision simulator');analyze();}}} placeholder="Ask about cash, costs, growth or a business decision..."/><button aria-label="Analyse question" onClick={() => {setView('Decision simulator');analyze();}}>↑</button></div><small className="copilot-footnote">Answers use your saved model and available workspace data.</small><button className="button-primary full-button" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Open Avenor chat <span>→</span></button></section>
-          </div>
-          <div className="lower-grid"><section className="surface table-panel"><div className="surface-heading"><div><div className="section-kicker">MONTH BY MONTH</div><h2>How your cash could change</h2></div><button className="text-button" onClick={() => setView('Decision simulator')}>Open simulator →</button></div><div className="table-scroll"><table><thead><tr><th>MONTH</th><th>MONEY IN</th><th>NET CHANGE</th><th>CASH LEFT</th><th>MONTHS OF CASH LEFT</th></tr></thead><tbody>{base.slice(0,6).map(row => <tr key={row.month}><td>Month {row.month}</td><td>{money(row.revenue, currency)}</td><td className={row.netCashFlow >= 0 ? 'positive-text' : 'negative-text'}>{money(row.netCashFlow, currency)}</td><td className="strong-cell">{money(row.closingCash, currency)}</td><td>{row.runwayMonths === null ? '—' : `${row.runwayMonths.toFixed(1)} mo.`}</td></tr>)}</tbody></table></div></section><section className="surface decision-card"><div className="surface-heading"><div><div className="section-kicker">YOUR PLANS</div><h2>Decisions you have explored</h2></div><button className="text-button" onClick={() => setView('Decision ledger')}>View all →</button></div>{saved.length === 0 ? <div className="empty-state"><div className="empty-icon">⌁</div><b>No saved decisions yet</b><p>Try a hiring or growth scenario. Save it here to compare options later.</p><button className="button-secondary" onClick={() => setView('Decision simulator')}>Create first scenario</button></div> : saved.slice(0,2).map(item => <DecisionRow key={item.id} item={item} currency={currency}/>)}</section></div>
-          </>}
-        </>}
-
-        {view === 'Decision simulator' && <div className="simulator-layout"><section className="surface simulator-form"><div className="section-kicker">SCENARIO BUILDER</div><h2>Model a hiring decision</h2><p className="form-intro">Change the assumptions below. Avenor recalculates the cash impact instantly without changing your base plan.</p><div className="form-section-title">HIRING PLAN</div><div className="form-grid"><NumberField label="Number of hires" value={headcount} set={setHeadcount} min={1} max={50} step={1}/><NumberField label="Start month" value={startMonth} set={setStartMonth} min={1} max={18} step={1} suffix="month"/><NumberField label="Gross yearly salary per hire" value={salary} set={setSalary} min={0} max={500000} step={1000} prefix={currencySymbol}/><NumberField label="Employer charges on salary" value={employerRate} set={setEmployerRate} min={0} max={100} step={1} suffix="%"/><NumberField label="Benefits / person / month" value={benefits} set={setBenefits} min={0} max={10000} step={50} prefix={currencySymbol}/><NumberField label="Recruitment / person" value={recruiting} set={setRecruiting} min={0} max={50000} step={100} prefix={currencySymbol}/><NumberField label="Equipment / person" value={equipment} set={setEquipment} min={0} max={20000} step={100} prefix={currencySymbol}/></div><div className="assumption-warning"><span>ⓘ</span><p><b>Employer-cost rate is an assumption.</b> The {employerRate}% rate is illustrative, not a verified French payroll calculation. Confirm the loaded cost with a qualified payroll provider.</p></div><button className="button-secondary full-button" onClick={() => {setHeadcount(3);setSalary(55000);setStartMonth(2);setEmployerRate(42);setBenefits(150);setRecruiting(2500);setEquipment(1500);}}>Reset to example scenario</button></section>
-          <div className="simulator-results"><section className="surface result-hero"><div className="result-header"><div><div className="section-kicker">SCENARIO RESULT</div><h2>Hiring impact analysis</h2></div><span className="scenario-badge">Unsaved scenario</span></div><div className="result-metrics"><div><small>Recurring monthly cost</small><b>{money(monthlyHireCost, currency)}</b><span>{headcount} hires · fully loaded estimate</span></div><div><small>One-off costs</small><b>{money(headcount * (recruiting + equipment), currency)}</b><span>Recruitment + equipment</span></div><div><small>18-month cash impact</small><b className="negative-text">−{money(impact, currency)}</b><span>Compared with base case</span></div></div><div className="result-explanation"><div className="explain-icon">i</div><div><b>What this means</b><p>Under the current assumptions, this hiring plan reduces projected month-18 cash by <strong>{money(impact, currency)}</strong>. No additional revenue or productivity benefit from these hires is assumed.</p></div></div><button className="button-primary" disabled={!hasModel} onClick={saveDecision}>Save to Decision Ledger <span>→</span></button></section>
-            <section className="surface"><div className="surface-heading"><div><div className="section-kicker">BASE CASE VS. SCENARIO</div><h2>Cash position comparison</h2></div></div><div className="comparison-bars"><CompareBar label="Base case · month 18" value={baseSummary.endingCash} max={Math.max(baseSummary.endingCash,scenarioSummary.endingCash,1)} currency={currency}/><CompareBar label="Hiring scenario · month 18" value={scenarioSummary.endingCash} max={Math.max(baseSummary.endingCash,scenarioSummary.endingCash,1)} currency={currency}/></div><div className="runway-comparison"><div><small>Base case first-month runway</small><b>{baseRunway === null ? 'Cash positive' : `${baseRunway.toFixed(1)} months`}</b></div><div><small>Scenario first-month runway</small><b>{scenarioRunway === null ? 'Cash positive' : `${scenarioRunway.toFixed(1)} months`}</b></div></div></section>
-            <section className="surface"><div className="surface-heading"><div><div className="section-kicker">DECISION SUPPORT</div><h2>Explore the wider business impact</h2></div><span className="beta-pill">FULL FINANCE ANALYSIS</span></div><p className="form-intro">Ask Avenor to combine this scenario with revenue changes, cost reductions, pricing, marketing investment, fundraising or working-capital decisions.</p><button className="button-primary full-button" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: question }))}>Continue this analysis with Avenor <span>→</span></button></section></div></div>}
-
-        {view === 'Decision ledger' && <section className="surface ledger-surface"><div className="surface-heading"><div><div className="section-kicker">DECISION HISTORY</div><h2>Your decision ledger</h2><p>Scenarios saved for review. Saving a scenario never changes the approved base plan.</p></div><button className="button-primary" onClick={() => setView('Decision simulator')}>＋ New scenario</button></div>{saved.length === 0 ? <div className="empty-state large-empty"><div className="empty-icon">▤</div><b>Your ledger is ready</b><p>Once you save a scenario, it will appear here with its assumptions and projected cash impact.</p><button className="button-primary" onClick={() => setView('Decision simulator')}>Build your first scenario →</button></div> : <div className="ledger-list">{saved.map(item => <DecisionRow key={item.id} item={item} detailed currency={currency}/>)}</div>}</section>}
-
-        {view === 'Company assumptions' && <section className="surface assumptions-surface"><div className="section-kicker">FINANCIAL MODEL INPUTS</div><h2>Company assumptions</h2><label className="number-field"><span>Model name</span><input type="text" maxLength={100} value={modelName} onChange={e=>setModelName(e.target.value)}/></label><p className="form-intro">Enter your company's starting position and recurring monthly economics. Save a draft for review or approve a model version to use as your planning baseline.</p><div className="form-section-title">CASH & REVENUE</div><div className="form-grid"><NumberField label="Opening cash balance" value={cash} set={setCash} min={0} max={100000000} step={10000} prefix={currencySymbol}/><NumberField label="Monthly revenue" value={revenue} set={setRevenue} min={0} max={10000000} step={5000} prefix={currencySymbol}/><NumberField label="Monthly revenue growth" value={growth} set={setGrowth} min={-99} max={100} step={.5} suffix="%"/><NumberField label="Direct costs as % of sales" value={cogs} set={setCogs} min={0} max={100} step={1} suffix="%"/></div><div className="form-section-title">OPERATING COSTS</div><div className="form-grid"><NumberField label="Current monthly team costs" value={payroll} set={setPayroll} min={0} max={10000000} step={5000} prefix={currencySymbol}/><NumberField label="Other monthly running costs" value={opex} set={setOpex} min={0} max={10000000} step={5000} prefix={currencySymbol}/></div><div className="assumption-actions"><button className="button-secondary" disabled={modelBusy || workspaceLoading} onClick={() => saveModel('draft')}>{modelBusy ? 'Saving…' : 'Save as draft'}</button><button className="button-primary" disabled={modelBusy || workspaceLoading} onClick={() => saveModel('approved')}>{modelBusy ? 'Saving…' : 'Approve & save model'}</button><span>Model status: {modelStatus === 'none' ? 'Not saved' : modelStatus}. Approval creates a new version; previous approved versions are archived.</span></div>{workspaceError && <p className="warning-text">{workspaceError}</p>}</section>}
-
-
-        {view === 'Business metrics' && <section className="surface assumptions-surface">
-          <div className="section-kicker">OPERATING PERFORMANCE & UNIT ECONOMICS</div>
-          <h2>Monthly business metrics</h2>
-          <p className="form-intro">Add the operating data Avenor needs to analyze acquisition efficiency, customer economics and retention. Blank fields remain unknown — Avenor will never treat missing values as zero.</p>
-          <label className="number-field">
-            <span>Reporting month</span>
-            <input type="month" value={kpiPeriod} onChange={e => setKpiPeriod(e.target.value)} />
-          </label>
-          {kpiLoading ? <p className="form-intro">Loading metrics for this month…</p> : <p className="form-intro">{kpiHasData ? 'Saved metrics found for this month. Update any value and save again.' : 'No business metrics have been entered for this month yet.'}</p>}
-          <div className="form-section-title">SALES & CUSTOMER BASE</div>
-          <div className="form-grid">
-            <KpiField label={`Monthly recurring revenue (${currency})`} value={businessKpis.mrr} set={value=>setBusinessKpis(current=>({...current,mrr:value}))} min="0" step="100"/>
-            <KpiField label="Active customers (end of month)" value={businessKpis.activeCustomers} set={value=>setBusinessKpis(current=>({...current,activeCustomers:value}))} min="0" step="1"/>
-            <KpiField label="New customers this month" value={businessKpis.newCustomers} set={value=>setBusinessKpis(current=>({...current,newCustomers:value}))} min="0" step="1"/>
-            <KpiField label="Churned customers this month" value={businessKpis.churnedCustomers} set={value=>setBusinessKpis(current=>({...current,churnedCustomers:value}))} min="0" step="1"/>
-          </div>
-          <div className="form-section-title">CUSTOMER GROWTH COSTS</div>
-          <div className="form-grid">
-            <KpiField label={`Marketing spend (${currency})`} value={businessKpis.marketingSpend} set={value=>setBusinessKpis(current=>({...current,marketingSpend:value}))} min="0" step="100"/>
-            <KpiField label={`Sales spend (${currency})`} value={businessKpis.salesSpend} set={value=>setBusinessKpis(current=>({...current,salesSpend:value}))} min="0" step="100"/>
-            <KpiField label="Revenue left after direct costs (%)" value={businessKpis.grossMarginPct} set={value=>setBusinessKpis(current=>({...current,grossMarginPct:value}))} min="0" max="100" step="0.1"/>
-          </div>
-          <div className="assumption-warning">
-            <span>ⓘ</span>
-            <p><b>Use consistent definitions.</b> Active, new and churned customers must refer to the same customer population and month. Marketing and sales spend should use the same acquisition-cost scope. Avenor uses the saved figure as supplied and labels CAC/LTV as estimates.</p>
-          </div>
-          {kpiError && <p className="warning-text">{kpiError}</p>}
-          <div className="assumption-actions">
-            <button className="button-primary" disabled={kpiBusy || kpiLoading || workspaceLoading} onClick={() => void saveBusinessMetrics()}>{kpiBusy ? 'Saving…' : 'Save monthly business metrics'}</button>
-            <span>{kpiHasData ? 'Existing values will be updated for this reporting month.' : 'Only non-empty fields will be saved.'}</span>
-          </div>
-        </section>}
-
-        {view === 'Data import' && <section className="surface assumptions-surface"><div className="section-kicker">FINANCIAL DATA INGESTION</div><h2>Import your transactions</h2><p className="form-intro">{actualsCount} records are currently stored in this workspace. Imported actuals are kept separately and are not yet included in the forecast.</p><p className="form-intro">Upload a bank or accounting CSV export. Required columns: Date, Amount. Optional: Description, Category. Positive amounts are money received; negative amounts are money spent. Use ISO dates (YYYY-MM-DD).</p><label className="number-field"><span>CSV file</span><input type="file" accept=".csv,text/csv" onChange={async e=>{setImportError('');setImportRows([]);const f=e.target.files?.[0];if(!f)return;try{if(f.size>2_000_000)throw new Error('Maximum file size is 2 MB');const {normalizeActuals}=await import('@/lib/csv');setImportRows(normalizeActuals(await f.text(),f.name));}catch(err){setImportError(err instanceof Error?err.message:'Could not parse CSV');}}}/></label>{importError&&<p className="warning-text">{importError}</p>}{importRows.length>0&&<><p><b>{importRows.length}</b> records ready for import · {money(importRows.filter(x=>x.direction==='inflow').reduce((a,x)=>a+x.amount,0), currency)} inflows · {money(importRows.filter(x=>x.direction==='outflow').reduce((a,x)=>a+x.amount,0), currency)} outflows</p><div className="ledger-list">{importRows.slice(0,5).map((r,i)=><div className="decision-row" key={`${r.period}-${i}`}><div className="decision-icon">{r.direction==='inflow'?'↗':'↘'}</div><div className="decision-copy"><b>{r.description||r.category}</b><span>{r.period} · {r.category}</span></div><div className="decision-impact"><b>{money(r.amount, currency)}</b><small>{r.direction}</small></div></div>)}</div><button className="button-primary" disabled={importBusy} onClick={async()=>{setImportBusy(true);try{const organizationId=localStorage.getItem('financeos.organizationId');if(!organizationId)throw new Error('Create or select an authenticated workspace first.');const csvText=await new Promise<string>((resolve,reject)=>{const f=(document.querySelector('input[type=file]') as HTMLInputElement)?.files?.[0];if(!f){reject(new Error('Select a CSV file'));return;}f.text().then(resolve,reject);});const res=await fetch('/api/actuals/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({organizationId,csv:csvText})});const data=await res.json();if(!res.ok)throw new Error(data.error||'Import failed');setToast(`${data.imported} records imported · ${data.skipped} duplicates skipped`);const actualsResponse=await fetch(`/api/actuals?organizationId=${encodeURIComponent(organizationId)}`,{cache:'no-store'});if(actualsResponse.ok){const actualsData=await actualsResponse.json();setActualsCount((actualsData.actuals??[]).length);}setImportRows([]);}catch(err){setImportError(err instanceof Error?err.message:'Import failed');}finally{setImportBusy(false);}}}>{importBusy?'Importing…':'Import records to workspace →'}</button></>}</section>}
-
-        {view === 'Fundraising planner' && <section className="surface assumptions-surface"><div className="section-kicker">FUNDRAISING INTELLIGENCE</div><h2>Model your next round</h2><p className="form-intro">Estimate dilution and cash runway after a hypothetical equity raise. This is a simplified planning calculator, not a valuation opinion.</p><div className="form-grid"><NumberField label="Amount to raise" value={raiseAmount} set={setRaiseAmount} min={0} max={100000000} step={50000} prefix={currencySymbol}/><NumberField label="Company value before investment" value={preMoney} set={setPreMoney} min={1} max={1000000000} step={250000} prefix={currencySymbol}/></div><div className="metric-grid"><Metric label="Estimated company value after investment" value={money(preMoney+raiseAmount, currency)} sub="Value before investment + new capital" trend="neutral" icon="◇"/><Metric label="Share owned by new investors" value={`${(raiseAmount/(preMoney+raiseAmount)*100).toFixed(1)}%`} sub="Before option-pool adjustments" trend="neutral" icon="%"/><Metric label="Cash after funding" value={money(cash+raiseAmount, currency)} sub="Excludes fees and other financing" trend="positive" icon="↗"/><Metric label="How long cash could last" value={base[0].netCashFlow<0?`${((cash+raiseAmount)/Math.abs(base[0].netCashFlow)).toFixed(1)} months`:'Cash positive'} sub="Flat current monthly net burn assumption" trend="neutral" icon="◷"/></div><p className="form-intro">This calculation assumes a simple priced equity round, no convertibles, no option-pool increase, no fees and no other dilution. Validate with legal and finance advisers.</p></section>}
-
-        {view === 'Investor reporting' && <section className="surface ledger-surface"><div className="section-kicker">INVESTOR REPORTING</div><h2>Monthly financial snapshot</h2><p className="form-intro">A simple export from the current model assumptions. Do not share as actual company reporting until connected to verified company data.</p><div className="metric-grid"><Metric label="Monthly revenue" value={money(revenue, currency)} sub="Model assumption" trend="neutral" icon="↗"/><Metric label="Gross margin" value={`${((1-cogs/100)*100).toFixed(1)}%`} sub="Sales less direct costs" trend="neutral" icon="%"/><Metric label="Monthly net cash flow" value={money(base[0].netCashFlow, currency)} sub="Current model month" trend="neutral" icon="⌁"/><Metric label="Month 18 cash" value={money(baseSummary.endingCash, currency)} sub="Base case forecast" trend="neutral" icon="◈"/></div><button className="button-primary" onClick={()=>{const rows=['Month,Revenue,COGS,Payroll,Operating expenses,Net cash flow,Closing cash',...base.map(r=>[r.month,r.revenue,r.cogs,r.payroll,r.nonPayrollOpex,r.netCashFlow,r.closingCash].join(','))];const blob=new Blob([rows.join('\n')],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='financeos-18-month-forecast.csv';a.click();URL.revokeObjectURL(url);}}>Export 18-month forecast CSV ↓</button></section>}
-
-        {view === 'Plan & billing' && <section className="surface billing-surface">
-          <div className="section-kicker">ACCOUNT & SUBSCRIPTION</div>
-          <h2>Plan and billing</h2>
-          <p className="form-intro">Your subscription is linked to this company workspace. Payment details are handled by Stripe; Avenor never stores your card information.</p>
-          {billingLoading ? <p className="form-intro">Checking your subscription…</p> : <>
-            <div className="billing-grid">
-              <div><span>Subscription status</span><b>{billingStatus?.subscriptionStatus ? billingStatus.subscriptionStatus.replaceAll('_', ' ') : 'No subscription linked'}</b></div>
-              <div><span>Next renewal</span><b>{billingStatus?.currentPeriodEnd ? new Date(billingStatus.currentPeriodEnd).toLocaleDateString('en-GB') : 'Not available'}</b></div>
-              <div><span>Payment setup</span><b>{billingStatus?.billingConfigured ? 'Connected' : 'Not configured'}</b></div>
-            </div>
-            <div className="billing-actions">
-              {billingStatus?.canManageBilling && <button className="button-secondary" disabled={billingBusy} onClick={() => void openBillingAction('/api/billing/portal')}>{billingBusy ? 'Opening…' : 'Manage subscription'}</button>}
-              {!billingStatus?.subscriptionStatus && billingStatus?.canStartCheckout && <button className="button-primary" disabled={billingBusy} onClick={() => void openBillingAction('/api/billing/checkout')}>{billingBusy ? 'Opening secure checkout…' : 'Choose a subscription'}</button>}
-              {!billingStatus?.billingConfigured && <p className="billing-note">Online checkout is not connected yet. A Stripe test-mode price and secure server credentials must be configured before payments can be tested.</p>}
-            </div>
-          </>}
-          {billingError && <p className="warning-text" role="alert">{billingError}</p>}
-          <p className="billing-footnote">No payment is taken from this screen. You will be redirected to Stripe to review and confirm any payment.</p>
-        </section>}
-
-        <footer className="app-footer"><span>Avenor <b>·</b> Private beta</span><span>{hasModel ? (modelStatus === 'approved' ? 'Approved financial model' : 'Draft financial model') : 'Financial model not configured'} · Not accounting or tax advice</span></footer>
-      </div>
-    </section>
-    <AvenorCopilot organizationId={organizationId} organizationName={organizationName} currency={currency} />
-    {toast && <div className="toast"><span>✓</span>{toast}</div>}
-  </main>;
+function Brand({ inverse = false }: { inverse?: boolean }) {
+  return <Link className={`marketing-brand ${inverse ? 'marketing-brand-inverse' : ''}`} href="/" aria-label="Avenor home">
+    <span className="marketing-mark">a</span><span>avenor</span>
+  </Link>;
 }
 
-function runway(row: MonthResult): number | null { return row.runwayMonths; }
-function Metric({label,value,sub,trend,icon}:{label:string;value:string;sub:string;trend:string;icon:string}) { return <div className="metric-card"><div className="metric-top"><span>{label}</span><i>{icon}</i></div><b className="metric-value">{value}</b><small className={trend === 'warning' ? 'warning-text' : ''}>{sub}</small></div>; }
-function KpiField({label,value,set,min,max,step}:{label:string;value:string;set:(v:string)=>void;min?:string;max?:string;step?:string}) { return <label className="number-field"><span>{label}</span><div className="number-input"><input type="number" min={min} max={max} step={step} value={value} placeholder="Not provided" onChange={e=>set(e.target.value)}/></div></label>; }
-function NumberField({label,value,set,min,max,step=1,prefix,suffix}:{label:string;value:number;set:(n:number)=>void;min:number;max:number;step?:number;prefix?:string;suffix?:string}) { return <label className="number-field"><span>{label}</span><div className="number-input">{prefix && <i>{prefix}</i>}<input type="number" min={min} max={max} step={step} value={value} onChange={e=>set(Math.max(min,Math.min(max,Number(e.target.value))))}/>{suffix && <i>{suffix}</i>}</div></label>; }
-function CompareBar({label,value,max,currency="EUR"}:{label:string;value:number;max:number;currency?:string}) { return <div className="compare-row"><div><span>{label}</span><b>{money(value,currency)}</b></div><div className="bar-track"><i style={{width:`${Math.max(0,Math.min(100,value/max*100))}%`}}/></div></div>; }
-function DecisionRow({item,detailed=false,currency="EUR"}:{item:SavedDecision;detailed?:boolean;currency?:string}) { return <div className="decision-row"><div className="decision-icon">⌁</div><div className="decision-copy"><b>{item.title}</b><span>{item.detail}</span>{detailed && <small>Saved {item.created} · Scenario preserved independently of base plan</small>}</div><div className="decision-impact"><b className="negative-text">−{money(item.cashImpact,currency)}</b><small>18-month cash impact</small></div></div>; }
-function makeChart(base:MonthResult[],scenario:MonthResult[]) { const all=[...base.map(x=>x.closingCash),...scenario.map(x=>x.closingCash)]; const min=Math.min(0,...all); const max=Math.max(...all,1); const x=(i:number)=>42+i*(702/17); const y=(v:number)=>185-(v-min)/(max-min)*150; const path=(arr:MonthResult[])=>arr.map((r,i)=>`${i===0?'M':'L'} ${x(i).toFixed(1)} ${y(r.closingCash).toFixed(1)}`).join(' '); const bp=path(base); const sp=path(scenario); return {labels:base.map((_,i)=>`M${i+1}`),basePath:bp,scenarioPath:sp,baseArea:`${bp} L 744 185 L 42 185 Z`,baseY:y(base[17].closingCash),scenarioY:y(scenario[17].closingCash)}; }
+function DashboardPreview() {
+  return <div className="marketing-preview-wrap" aria-label="Illustrative Avenor workspace preview">
+    <div className="marketing-preview-glow" />
+    <div className="marketing-preview">
+      <div className="preview-sidebar">
+        <div className="preview-logo"><span>a</span> avenor</div>
+        <div className="preview-company"><i>n</i><span><b>Northstar Studio</b><small>Financial workspace</small></span></div>
+        <small className="preview-nav-label">WORKSPACE</small>
+        <div className="preview-nav-item preview-active"><i>◫</i> Overview</div>
+        <div className="preview-nav-item"><i>↗</i> Decision simulator</div>
+        <div className="preview-nav-item"><i>▤</i> Decision ledger</div>
+        <div className="preview-nav-item"><i>◷</i> Business metrics</div>
+        <div className="preview-nav-item"><i>⇧</i> Data import</div>
+      </div>
+      <div className="preview-main">
+        <div className="preview-topbar"><span>Northstar Studio&nbsp; / &nbsp;Overview</span><span className="preview-status"><i /> MODEL PREVIEW</span></div>
+        <div className="preview-content">
+          <div className="preview-eyebrow">YOUR FINANCIAL POSITION</div>
+          <div className="preview-title-row"><h3>Overview</h3><span>Illustrative data</span></div>
+          <div className="preview-metrics">
+            <div><small>Cash available</small><b>€486,000</b><span>Starting cash</span></div>
+            <div><small>Monthly revenue</small><b>€72,400</b><span>Current month</span></div>
+            <div><small>Cash runway</small><b>14.2 mo</b><span>At current spend</span></div>
+          </div>
+          <div className="preview-decision">
+            <div><small>THE NEXT DECISION</small><b>Can we afford to hire two people?</b><span>Compare the impact on cash and runway before you commit.</span></div>
+            <span className="preview-arrow">↗</span>
+          </div>
+          <div className="preview-chart-card">
+            <div className="preview-chart-head"><span><b>Cash forecast</b><small>18-month outlook · illustrative</small></span><span className="preview-legend"><i /> Base case</span></div>
+            <svg viewBox="0 0 620 150" role="img" aria-label="Illustrative cash forecast line chart">
+              <defs><linearGradient id="previewFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#91ad9a" stopOpacity=".26"/><stop offset="100%" stopColor="#91ad9a" stopOpacity="0"/></linearGradient></defs>
+              {[30,66,102,138].map(y => <line key={y} x1="14" x2="606" y1={y} y2={y} stroke="#edf0ec" strokeDasharray="3 5" />)}
+              <path d="M14 43 C65 45 82 49 116 55 S178 61 214 69 S282 77 316 82 S385 92 416 98 S480 108 514 115 S570 126 606 132 L606 145 L14 145 Z" fill="url(#previewFill)" />
+              <path d="M14 43 C65 45 82 49 116 55 S178 61 214 69 S282 77 316 82 S385 92 416 98 S480 108 514 115 S570 126 606 132" fill="none" stroke="#47785d" strokeWidth="3" strokeLinecap="round" />
+              <circle cx="606" cy="132" r="4" fill="#47785d" />
+            </svg>
+            <div className="preview-chart-axis"><span>NOW</span><span>MONTH 6</span><span>MONTH 12</span><span>MONTH 18</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div className="preview-note"><span>↗</span> A clearer view of what your next decision means.</div>
+  </div>;
+}
+
+export default function MarketingHome() {
+  return <main className="marketing">
+    <header className="marketing-header">
+      <div className="marketing-header-inner">
+        <Brand />
+        <nav className="marketing-nav" aria-label="Main navigation">
+          <a href="#why-avenor">Why Avenor</a><a href="#product">Product</a><a href="#how-it-works">How it works</a>
+        </nav>
+        <div className="marketing-header-actions">
+          <Link className="marketing-login" href="/login">Sign in</Link>
+          <Link className="marketing-nav-cta" href="/login?mode=signup">Get started <span>↗</span></Link>
+        </div>
+      </div>
+    </header>
+
+    <section className="marketing-hero">
+      <div className="marketing-hero-inner">
+        <div className="marketing-copy">
+          <div className="marketing-eyebrow"><span /> FINANCIAL CLARITY FOR FOUNDERS</div>
+          <h1>Make your next move<br />with <em>confidence.</em></h1>
+          <p className="marketing-lede">Avenor turns your company numbers into a clear view of what you can afford, what changes your runway, and what to do next.</p>
+          <div className="marketing-hero-actions">
+            <Link className="marketing-primary" href="/login?mode=signup">Build your financial picture <span>↗</span></Link>
+            <a className="marketing-secondary" href="#product">Explore the platform <span>↓</span></a>
+          </div>
+          <div className="marketing-proof"><span className="proof-check">✓</span> Built around decisions, not just dashboards <i /> <span>Deterministic financial calculations</span></div>
+        </div>
+        <DashboardPreview />
+      </div>
+      <div className="marketing-hero-foot"><span>01 — A BETTER WAY TO RUN THE NUMBERS</span><span>FOR PRE-SEED & SEED TEAMS</span></div>
+    </section>
+
+    <section className="marketing-statement" id="why-avenor">
+      <div className="marketing-section-label">THE FOUNDER'S FINANCE PROBLEM</div>
+      <div className="marketing-statement-grid">
+        <h2>Knowing your numbers<br />is only <em>the beginning.</em></h2>
+        <div><p>Founders rarely need another chart. They need to make a call: hire now or later, invest in growth or preserve cash, raise capital or extend the runway.</p><p>Avenor connects the numbers to those decisions, so the consequences are easier to see before you act.</p></div>
+      </div>
+    </section>
+
+    <section className="marketing-product" id="product">
+      <div className="marketing-section-top">
+        <div><div className="marketing-section-label">A FINANCIAL WORKSPACE THAT THINKS AHEAD</div><h2>From financial data<br />to your <em>next decision.</em></h2></div>
+        <p>One place to understand your position, model the options in front of you and keep track of the choices you make.</p>
+      </div>
+      <div className="marketing-feature-grid">
+        {features.map(feature => <article className="marketing-feature" key={feature.number}>
+          <div className="marketing-feature-number">{feature.number}</div>
+          <div className="marketing-feature-icon">{feature.number === '01' ? '◷' : feature.number === '02' ? '＋' : '↗'}</div>
+          <h3>{feature.title}</h3><p>{feature.copy}</p><span className="marketing-feature-rule" />
+        </article>)}
+      </div>
+    </section>
+
+    <section className="marketing-how" id="how-it-works">
+      <div className="marketing-how-inner">
+        <div className="marketing-how-copy"><div className="marketing-section-label">A MORE USEFUL FINANCE ROUTINE</div><h2>Clarity first.<br /><em>Decisions second.</em></h2><p>Bring together the information you have, make your assumptions explicit, then test the choices that matter.</p></div>
+        <div className="marketing-steps">
+          <div><span>01</span><section><b>Connect your financial picture</b><p>Set your starting cash, revenue, team costs and operating assumptions. Import transaction history when you're ready.</p></section></div>
+          <div><span>02</span><section><b>Explore the consequences</b><p>Model hiring, spending, pricing and fundraising scenarios with consistent financial calculations.</p></section></div>
+          <div><span>03</span><section><b>Keep decisions accountable</b><p>Save scenarios in your Decision Ledger and revisit the assumptions as the business changes.</p></section></div>
+        </div>
+      </div>
+    </section>
+
+    <section className="marketing-principle">
+      <div className="marketing-principle-mark">a</div>
+      <div className="marketing-principle-content"><div className="marketing-section-label">BUILT ON A CLEAR PRINCIPLE</div><h2>Numbers should be<br /><em>earned, not invented.</em></h2><p>Financial calculations are handled by a deterministic engine. Avenor Intelligence helps explain the results and the information behind them — with missing inputs called out rather than quietly filled in.</p></div>
+      <div className="marketing-principle-side"><span>01</span><b>Transparent assumptions</b><i /><span>02</span><b>Traceable calculations</b><i /><span>03</span><b>AI as an explanation layer</b></div>
+    </section>
+
+    <section className="marketing-cta">
+      <div className="marketing-section-label">MAKE THE NEXT DECISION A BETTER ONE</div>
+      <h2>Build a clearer picture<br />of <em>what comes next.</em></h2>
+      <p>Start with the numbers you have. Make the next decision with more context.</p>
+      <Link className="marketing-primary" href="/login?mode=signup">Get started with Avenor <span>↗</span></Link>
+    </section>
+
+    <footer className="marketing-footer"><Brand inverse /><span>Financial decision intelligence for founders.</span><div><Link href="/login">Sign in</Link><a href="#product">Product</a><a href="#how-it-works">How it works</a></div><small>© {new Date().getFullYear()} Avenor</small></footer>
+  </main>;
+}

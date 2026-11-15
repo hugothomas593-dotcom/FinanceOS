@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, type FormEvent } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { getSupabasePublicConfig } from '@/lib/supabase/config';
 
@@ -10,6 +10,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    const requestedMode = new URLSearchParams(window.location.search).get('mode');
+    if (requestedMode === 'signup') setMode('signup');
+  }, []);
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -25,7 +30,7 @@ export default function LoginPage() {
       if (mode === 'login') {
         const { error } = await supabase.auth.signInWithPassword({ email, password });
         if (error) throw error;
-        window.location.assign('/');
+        window.location.assign('/app');
         return;
       }
 
@@ -55,6 +60,7 @@ export default function LoginPage() {
   return (
     <main className="login-shell">
       <form className="login-card" onSubmit={submit}>
+        <a className="auth-home-link" href="/" aria-label="Back to Avenor home">← Back to Avenor</a>
         <div className="brand">
           <span className="brand-mark">A</span>
           <span>avenor</span>
@@ -89,11 +95,7 @@ export default function LoginPage() {
         </label>
 
         <button className="button-primary" disabled={busy}>
-          {busy
-            ? 'Please wait...'
-            : mode === 'login'
-              ? 'Sign in'
-              : 'Create account'}
+          {busy ? 'Please wait...' : mode === 'login' ? 'Sign in' : 'Create account'}
         </button>
 
         {message && <p role="status">{message}</p>}
