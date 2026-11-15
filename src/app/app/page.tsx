@@ -4,8 +4,19 @@ import { useEffect, useMemo, useState } from 'react';
 import { forecast, summarize, type ModelInputs, type HireInput, type MonthResult } from '@/lib/finance';
 import { AvenorCopilot } from '@/components/avenor-copilot';
 
-type View = 'Overview' | 'Decision simulator' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
-const money = (v: number, currency = 'EUR') => new Intl.NumberFormat('en-GB', { style: 'currency', currency, maximumFractionDigits: 0 }).format(v);
+match => match.trimEnd() + `
+const viewTitles: Record<View, string> = {
+  Overview: 'Company overview',
+  'Decision simulator': 'Plan a decision',
+  'Decision ledger': 'Saved decisions',
+  'Company assumptions': 'Company setup',
+  'Business metrics': 'Growth metrics',
+  'Data import': 'Import data',
+  'Fundraising planner': 'Fundraising',
+  'Investor reporting': 'Investor update',
+  'Plan & billing': 'Billing',
+};`
+match => match.trimEnd() + "\nconst compactMoney = (v: number, currency = 'EUR') => new Intl.NumberFormat('en-GB', { style: 'currency', currency, notation: 'compact', maximumFractionDigits: 1 }).format(v);"
 const compact = (v: number) => new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
 const initial: ModelInputs = { openingCash: 0, monthlyRevenue: 0, monthlyRevenueGrowth: 0, monthlyOpexExPayroll: 0, monthlyOpexGrowth: 0, cogsRatio: 0, existingMonthlyPayroll: 0, existingOtherNetCashAdjustments: 0 };
 const months = 18;
@@ -256,7 +267,9 @@ export default function Home() {
   const monthlyHireCost = headcount * (salary * (1 + employerRate / 100) / 12 + benefits);
   const baseRunway = runway(base[0]);
   const scenarioRunway = runway(scenario[0]);
-  const chart = makeChart(base, scenario);
+  const chart = makeChart(base);
+  const monthlyOperatingCosts = base[0].cogs + base[0].payroll + base[0].nonPayrollOpex;
+  const flowMaximum = Math.max(base[0].revenue, monthlyOperatingCosts, 1);
 
   function analyze() {
     window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: question }));
@@ -396,8 +409,16 @@ export default function Home() {
     }
   }
 
-  const nav: { label: View; icon: string }[] = [
-    { label: 'Overview', icon: '◫' }, { label: 'Decision simulator', icon: '⌁' }, { label: 'Decision ledger', icon: '▤' }, { label: 'Business metrics', icon: '↗' }, { label: 'Data import', icon: '⇧' }, { label: 'Fundraising planner', icon: '◇' }, { label: 'Investor reporting', icon: '▧' }, { label: 'Company assumptions', icon: '⚙' }, { label: 'Plan & billing', icon: '€' },
+  const nav: { label: View; title: string; icon: string }[] = [
+    { label: 'Overview', title: 'Overview', icon: '◫' },
+    { label: 'Decision simulator', title: 'Plan a decision', icon: '⌁' },
+    { label: 'Decision ledger', title: 'Saved decisions', icon: '▤' },
+    { label: 'Business metrics', title: 'Growth metrics', icon: '↗' },
+    { label: 'Data import', title: 'Import data', icon: '⇧' },
+    { label: 'Fundraising planner', title: 'Fundraising', icon: '◇' },
+    { label: 'Investor reporting', title: 'Investor update', icon: '▧' },
+    { label: 'Company assumptions', title: 'Company setup', icon: '⚙' },
+    { label: 'Plan & billing', title: 'Billing', icon: '€' },
   ];
 
   return <main className="app-shell">
@@ -405,28 +426,27 @@ export default function Home() {
       <div className="brand"><span className="brand-mark">A</span><span>avenor</span></div>
       <div className="workspace-switch"><div className="workspace-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div><div><b>{organizationName || 'Your company'}</b><small>Financial workspace</small></div><span className="chevron">⌄</span></div>
       <div className="nav-caption">WORKSPACE</div>
-      <nav>{nav.map(item => <button key={item.label} className={`nav-item ${view === item.label ? 'selected' : ''}`} onClick={() => setView(item.label)}><span className="nav-icon">{item.icon}</span>{item.label}{item.label === 'Decision ledger' && saved.length > 0 && <span className="nav-count">{saved.length}</span>}</button>)}</nav>
+      <nav>{nav.map(item => <button key={item.label} className={`nav-item ${view === item.label ? 'selected' : ''}`} onClick={() => setView(item.label)}><span className="nav-icon">{item.icon}</span>{item.title}{item.label === 'Decision ledger' && saved.length > 0 && <span className="nav-count">{saved.length}</span>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="help-card"><div className="help-icon">?</div><b>Need a second look?</b><p>Review a decision against your company numbers.</p><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Ask Avenor <span>→</span></button></div><div className="profile"><div className="profile-avatar">A</div><div><b>Workspace account</b><small>Signed-in user</small></div><span className="more">···</span></div></div>
     </aside>
 
     <section className="main-area">
-      <header className="topbar"><div className="breadcrumb">{organizationName || 'Your company'} <span>/</span> {view}</div><div className="top-actions"><span className="sync-status"><i/> {workspaceLoading ? 'Loading workspace' : hasModel ? (modelStatus === 'approved' ? 'Approved model' : 'Draft model · review required') : 'Setup required'}</span><button className="button-secondary" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Ask Avenor</button><div className="top-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div></div></header>
+      <header className="topbar"><div className="breadcrumb">{organizationName || 'Your company'} <span>/</span> {viewTitles[view]}</div><div className="top-actions"><span className="sync-status"><i/> {workspaceLoading ? 'Loading workspace' : hasModel ? (modelStatus === 'approved' ? 'Plan approved' : 'Plan needs review') : 'Add company numbers'}</span><button className="button-secondary" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Ask Avenor</button><div className="top-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div></div></header>
       <div className="page-content">
-        <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{view === 'Overview' ? 'Overview' : view}</h1><p>{view === 'Overview' ? 'Cash position, operating performance and the assumptions behind your forecast.' : view === 'Decision simulator' ? 'Compare the financial impact of a decision before you make it.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit assumptions <span>↗</span></button></div></div>
+        <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{viewTitles[view]}</h1><p>{view === 'Overview' ? 'See how long your cash may last, what drives your spending and what your next decision could change.' : view === 'Decision simulator' ? 'Compare the financial impact of a decision before you make it.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit company setup <span>↗</span></button></div></div>
 
         {view === 'Overview' && <>
           {workspaceLoading ? <section className="surface empty-state large-empty"><b>Loading your financial workspace…</b></section>
             : workspaceError ? <section className="surface empty-state large-empty"><b>Workspace could not be loaded</b><p>{workspaceError}</p><button className="button-secondary" onClick={() => window.location.reload()}>Retry</button></section>
-            : !hasModel ? <section className="surface empty-state large-empty"><div className="empty-icon">◈</div><b>Set up your company's first financial model</b><p>Your workspace is connected. Add your opening cash, monthly revenue, payroll and operating expenses before using forecasts or decision scenarios. Avenor will save these assumptions to your private workspace.</p><button className="button-primary" onClick={() => setView('Company assumptions')}>Set up company assumptions →</button></section>
+            : !hasModel ? <section className="surface empty-state large-empty"><div className="empty-icon">◈</div><b>Add your company's starting numbers</b><p>Your workspace is ready. Add your starting cash, monthly revenue, team costs and other expenses. Avenor will use these figures to show how long your cash may last and help you compare decisions.</p><button className="button-primary" onClick={() => setView('Company assumptions')}>Set up company assumptions →</button></section>
             : <>
-          <div className="notice"><span className="notice-icon">ⓘ</span><div><b>{modelStatus === 'approved' ? 'Approved company financial model.' : 'Draft financial model — review before relying on projections.'}</b><span>{actualsCount > 0 ? `${actualsCount} actual records are stored in this workspace; they are not yet reconciled into the forecast.` : 'Forecasts are calculated from the saved assumptions shown in Company assumptions.'}</span></div><button onClick={() => setView('Company assumptions')}>Review assumptions <span>→</span></button></div>
+          <div className="notice"><span className="notice-icon">ⓘ</span><div><b>{modelStatus === 'approved' ? 'Your company plan is approved.' : 'Your company plan is a draft — review it before relying on the forecast.'}</b><span>{actualsCount > 0 ? `${actualsCount} actual records are stored in this workspace; they are not yet reconciled into the forecast.` : 'Forecasts are calculated from the saved assumptions shown in Company assumptions.'}</span></div><button onClick={() => setView('Company assumptions')}>Review assumptions <span>→</span></button></div>
           <div className="metric-grid">
-            <Metric label="Cash available" value={money(cash, currency)} sub="Starting cash in saved model" trend="neutral" icon="◈" />
-            <Metric label="Revenue this month" value={money(revenue, currency)} sub={`${growth.toFixed(1)}% assumed monthly growth`} trend="positive" icon="↗" />
-            <Metric label="Cash used this month" value={money(Math.max(0, -base[0].netCashFlow), currency)} sub="After money coming in" trend="neutral" icon="⌁" />
-            <Metric label="Time until cash runs out" value={baseRunway === null ? 'Cash positive' : `${baseRunway.toFixed(1)} months`} sub="At today’s level of income and spending" trend={baseRunway !== null && baseRunway < 9 ? 'warning' : 'positive'} icon="◷" />
-          </div>
-          <section className="decision-intro">
+             <Metric label="Starting cash" value={money(cash, currency)} sub="Cash entered in your company setup" trend="neutral" icon="◈" />
+             <Metric label="Monthly revenue" value={money(base[0].revenue, currency)} sub={`${growth.toFixed(1)}% assumed monthly growth`} trend="positive" icon="↗" />
+             <Metric label="Monthly spending" value={money(monthlyOperatingCosts, currency)} sub="Direct costs, team and other running costs" trend="neutral" icon="⌁" />
+             <Metric label="How long cash may last" value={baseRunway === null ? 'Cash-flow positive' : `${baseRunway.toFixed(1)} months`} sub={baseRunway === null ? 'The current plan is not using cash each month' : 'Estimated at the current monthly cash burn'} trend={baseRunway !== null && baseRunway < 6 ? 'warning' : 'positive'} icon="◷" />
+           </div><section className="decision-intro">
             <div className="decision-intro-copy">
               <div className="section-kicker">THE AVENOR DIFFERENCE</div>
               <h2>Know what a decision will cost before you commit.</h2>
@@ -439,10 +459,29 @@ export default function Home() {
             </div>
           </section>
           <div className="dashboard-grid">
-            <section className="surface chart-panel"><div className="surface-heading"><div><div className="section-kicker">LOOKING AHEAD</div><h2>Will we have enough cash?</h2><p>Estimated cash balance over the next 18 months</p></div><div className="legend"><span><i className="legend-base"/>Base case</span><span><i className="legend-scenario"/>Hiring scenario</span></div></div><div className="chart-summary"><b>{money(baseSummary.endingCash, currency)}</b><span>Projected cash at month 18</span><span className={`delta ${impact >= 0 ? 'negative' : 'positive'}`}>{impact >= 0 ? '−' : '+'}{money(Math.abs(impact), currency)} <small>hiring impact</small></span></div><div className="chart-wrap"><svg viewBox="0 0 760 230" role="img" aria-label="18 month cash forecast chart"><defs><linearGradient id="areaFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#6a9b88" stopOpacity=".18"/><stop offset="100%" stopColor="#6a9b88" stopOpacity="0"/></linearGradient></defs>{[35,85,135,185].map(y=><line key={y} x1="42" x2="744" y1={y} y2={y} className="grid-line"/>)}{chart.labels.map((m,i)=><text key={m} x={42+i*(702/17)} y="218" className="axis-label" textAnchor="middle">{i % 3 === 0 ? m : ''}</text>)}<path d={chart.baseArea} fill="url(#areaFill)"/><path d={chart.basePath} className="base-line"/><path d={chart.scenarioPath} className="scenario-line"/><circle cx="744" cy={chart.baseY} r="4" className="base-point"/><circle cx="744" cy={chart.scenarioY} r="4" className="scenario-point"/></svg><div className="chart-foot"><span>Forecast starts today</span><span>Workspace base currency · {currency}</span></div></div></section>
-            <section className="surface copilot-panel"><div className="copilot-top"><div className="copilot-symbol">A</div><span className="beta-pill">DECISION SUPPORT</span></div><div className="section-kicker">ASK AVENOR</div><h2>Need to work through a decision?</h2><p className="copilot-description">Ask about your numbers, compare options or understand a change to your plan.</p><div className="prompt-chips"><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'Can we afford to hire three engineers in January?' }))}>Can we afford to hire?</button><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'Explain our current runway and the main cash risks.' }))}>Explain our runway</button></div><div className="copilot-input"><textarea value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => {if (e.key === 'Enter' && !e.shiftKey) {e.preventDefault();setView('Decision simulator');analyze();}}} placeholder="Ask about cash, costs, growth or a business decision..."/><button aria-label="Analyse question" onClick={() => {setView('Decision simulator');analyze();}}>↑</button></div><small className="copilot-footnote">Answers use your saved model and available workspace data.</small><button className="button-primary full-button" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Open Avenor chat <span>→</span></button></section>
+            <section className="surface chart-panel"><div className="surface-heading"><div><div className="section-kicker">YOUR CASH FORECAST</div><h2>How your cash may change</h2><p>One clear view of your expected cash balance over the next 18 months</p></div><span className="beta-pill">CURRENT PLAN</span></div><div className="chart-summary"><b>{money(baseSummary.endingCash, currency)}</b><span>Estimated cash after 18 months</span><span className="delta"><small>Based on your saved company plan</small></span></div><div className="chart-wrap">
+              <svg viewBox="0 0 820 250" role="img" aria-label={`18-month cash forecast. Expected cash after 18 months: ${money(baseSummary.endingCash, currency)}.`}>
+                <defs><linearGradient id="areaFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#6a9b88" stopOpacity=".2"/><stop offset="100%" stopColor="#6a9b88" stopOpacity="0"/></linearGradient></defs>
+                {chart.yTicks.map((tick, index) => <g key={index}><line x1="82" x2="796" y1={tick.y} y2={tick.y} className={Math.abs(tick.value) < 0.000001 ? 'zero-line' : 'grid-line'}/><text x="70" y={tick.y + 4} className="axis-label y-axis-label" textAnchor="end">{compactMoney(tick.value, currency)}</text></g>)}
+                {chart.monthTicks.map(tick => <text key={tick.label} x={tick.x} y="230" className="axis-label" textAnchor="middle">{tick.label}</text>)}
+                <path d={chart.baseArea} fill="url(#areaFill)"/><path d={chart.basePath} className="base-line"/>
+                <circle cx={chart.baseX} cy={chart.baseY} r="5" className="base-point"/>
+              </svg>
+              <div className="chart-foot"><span>Forecast based on your saved assumptions</span><span>Not a live bank balance</span></div>
+            </div></section><section className="surface copilot-panel"><div className="copilot-top"><div className="copilot-symbol">A</div><span className="beta-pill">DECISION SUPPORT</span></div><div className="section-kicker">ASK AVENOR</div><h2>Need to work through a decision?</h2><p className="copilot-description">Ask about your numbers, compare options or understand a change to your plan.</p><div className="prompt-chips"><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'Can we afford to hire three engineers in January?' }))}>Can we afford to hire?</button><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'Explain our current runway and the main cash risks.' }))}>Explain our runway</button></div><div className="copilot-input"><textarea value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => {if (e.key === 'Enter' && !e.shiftKey) {e.preventDefault();setView('Decision simulator');analyze();}}} placeholder="Ask about cash, costs, growth or a business decision..."/><button aria-label="Analyse question" onClick={() => {setView('Decision simulator');analyze();}}>↑</button></div><small className="copilot-footnote">Answers use your saved model and available workspace data.</small><button className="button-primary full-button" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Open Avenor chat <span>→</span></button></section>
           </div>
-          <div className="lower-grid"><section className="surface table-panel"><div className="surface-heading"><div><div className="section-kicker">MONTH BY MONTH</div><h2>How your cash could change</h2></div><button className="text-button" onClick={() => setView('Decision simulator')}>Open simulator →</button></div><div className="table-scroll"><table><thead><tr><th>MONTH</th><th>MONEY IN</th><th>NET CHANGE</th><th>CASH LEFT</th><th>MONTHS OF CASH LEFT</th></tr></thead><tbody>{base.slice(0,6).map(row => <tr key={row.month}><td>Month {row.month}</td><td>{money(row.revenue, currency)}</td><td className={row.netCashFlow >= 0 ? 'positive-text' : 'negative-text'}>{money(row.netCashFlow, currency)}</td><td className="strong-cell">{money(row.closingCash, currency)}</td><td>{row.runwayMonths === null ? '—' : `${row.runwayMonths.toFixed(1)} mo.`}</td></tr>)}</tbody></table></div></section><section className="surface decision-card"><div className="surface-heading"><div><div className="section-kicker">YOUR PLANS</div><h2>Decisions you have explored</h2></div><button className="text-button" onClick={() => setView('Decision ledger')}>View all →</button></div>{saved.length === 0 ? <div className="empty-state"><div className="empty-icon">⌁</div><b>No saved decisions yet</b><p>Try a hiring or growth scenario. Save it here to compare options later.</p><button className="button-secondary" onClick={() => setView('Decision simulator')}>Create first scenario</button></div> : saved.slice(0,2).map(item => <DecisionRow key={item.id} item={item} currency={currency}/>)}</section></div>
+          <div className="lower-grid">
+            <section className="surface flow-panel">
+              <div className="surface-heading"><div><div className="section-kicker">MONTHLY MONEY FLOW</div><h2>Is the business earning more than it spends?</h2><p>Compare the money coming in with your regular operating costs</p></div></div>
+              <div className="flow-bars">
+                <div className="flow-item"><div className="flow-label"><span>Money coming in · revenue</span><b>{money(base[0].revenue, currency)}</b></div><div className="flow-track"><i className="flow-income" style={{width: `${Math.max(0, Math.min(100, base[0].revenue / flowMaximum * 100))}%`}}/></div></div>
+                <div className="flow-item"><div className="flow-label"><span>Money going out · total costs</span><b>{money(monthlyOperatingCosts, currency)}</b></div><div className="flow-track"><i className="flow-costs" style={{width: `${Math.max(0, Math.min(100, monthlyOperatingCosts / flowMaximum * 100))}%`}}/></div><small>Direct costs + team + other running costs</small></div>
+              </div>
+              <div className="flow-result"><span>Estimated cash change this month</span><b className={base[0].netCashFlow >= 0 ? 'positive-text' : 'negative-text'}>{base[0].netCashFlow > 0 ? '+' : ''}{money(base[0].netCashFlow, currency)}</b></div>
+            </section>
+            <section className="surface decision-card"><div className="surface-heading"><div><div className="section-kicker">YOUR NEXT MOVES</div><h2>Decisions you have explored</h2></div><button className="text-button" onClick={() => setView('Decision ledger')}>View all →</button></div>{saved.length === 0 ? <div className="empty-state"><div className="empty-icon">⌁</div><b>No saved decisions yet</b><p>Try a hiring or growth decision. Save it here to compare options later.</p><button className="button-secondary" onClick={() => setView('Decision simulator')}>Plan your first decision</button></div> : saved.slice(0,2).map(item => <DecisionRow key={item.id} item={item} currency={currency}/>)}</section>
+          </div>
+          <section className="surface table-panel cash-table-panel"><div className="surface-heading"><div><div className="section-kicker">THE NEXT SIX MONTHS</div><h2>How your cash could move month by month</h2><p>Use this breakdown to see the steps behind the forecast</p></div><button className="text-button" onClick={() => setView('Decision simulator')}>Try a decision →</button></div><div className="table-scroll"><table><thead><tr><th>MONTH</th><th>REVENUE</th><th>NET CASH CHANGE</th><th>CASH LEFT</th><th>RUNWAY</th></tr></thead><tbody>{base.slice(0,6).map(row => <tr key={row.month}><td>Month {row.month}</td><td>{money(row.revenue, currency)}</td><td className={row.netCashFlow >= 0 ? 'positive-text' : 'negative-text'}>{row.netCashFlow > 0 ? '+' : ''}{money(row.netCashFlow, currency)}</td><td className="strong-cell">{money(row.closingCash, currency)}</td><td>{row.runwayMonths === null ? 'Cash-flow positive' : `${row.runwayMonths.toFixed(1)} mo.`}</td></tr>)}</tbody></table></div></section>
           </>}
         </>}
 
@@ -529,4 +568,23 @@ function KpiField({label,value,set,min,max,step}:{label:string;value:string;set:
 function NumberField({label,value,set,min,max,step=1,prefix,suffix}:{label:string;value:number;set:(n:number)=>void;min:number;max:number;step?:number;prefix?:string;suffix?:string}) { return <label className="number-field"><span>{label}</span><div className="number-input">{prefix && <i>{prefix}</i>}<input type="number" min={min} max={max} step={step} value={value} onChange={e=>set(Math.max(min,Math.min(max,Number(e.target.value))))}/>{suffix && <i>{suffix}</i>}</div></label>; }
 function CompareBar({label,value,max,currency="EUR"}:{label:string;value:number;max:number;currency?:string}) { return <div className="compare-row"><div><span>{label}</span><b>{money(value,currency)}</b></div><div className="bar-track"><i style={{width:`${Math.max(0,Math.min(100,value/max*100))}%`}}/></div></div>; }
 function DecisionRow({item,detailed=false,currency="EUR"}:{item:SavedDecision;detailed?:boolean;currency?:string}) { return <div className="decision-row"><div className="decision-icon">⌁</div><div className="decision-copy"><b>{item.title}</b><span>{item.detail}</span>{detailed && <small>Saved {item.created} · Scenario preserved independently of base plan</small>}</div><div className="decision-impact"><b className="negative-text">−{money(item.cashImpact,currency)}</b><small>18-month cash impact</small></div></div>; }
-function makeChart(base:MonthResult[],scenario:MonthResult[]) { const all=[...base.map(x=>x.closingCash),...scenario.map(x=>x.closingCash)]; const min=Math.min(0,...all); const max=Math.max(...all,1); const x=(i:number)=>42+i*(702/17); const y=(v:number)=>185-(v-min)/(max-min)*150; const path=(arr:MonthResult[])=>arr.map((r,i)=>`${i===0?'M':'L'} ${x(i).toFixed(1)} ${y(r.closingCash).toFixed(1)}`).join(' '); const bp=path(base); const sp=path(scenario); return {labels:base.map((_,i)=>`M${i+1}`),basePath:bp,scenarioPath:sp,baseArea:`${bp} L 744 185 L 42 185 Z`,baseY:y(base[17].closingCash),scenarioY:y(scenario[17].closingCash)}; }
+function makeChart(base: MonthResult[]) {
+  const all = base.map(row => row.closingCash);
+  const min = Math.min(0, ...all);
+  const max = Math.max(...all, 1);
+  const width = 820, left = 82, right = 24, top = 26, plotHeight = 174;
+  const x = (index: number) => left + index * ((width - left - right) / Math.max(1, base.length - 1));
+  const y = (value: number) => top + ((max - value) / (max - min || 1)) * plotHeight;
+  const path = base.map((row, index) => `${index === 0 ? 'M' : 'L'} ${x(index).toFixed(1)} ${y(row.closingCash).toFixed(1)}`).join(' ');
+  const zeroY = y(0);
+  const last = base[base.length - 1];
+  const monthIndices = [...new Set([0, Math.round((base.length - 1) / 3), Math.round((base.length - 1) * 2 / 3), base.length - 1])];
+  return {
+    basePath: path,
+    baseArea: `${path} L ${x(base.length - 1).toFixed(1)} ${zeroY.toFixed(1)} L ${x(0).toFixed(1)} ${zeroY.toFixed(1)} Z`,
+    baseX: x(base.length - 1),
+    baseY: y(last.closingCash),
+    yTicks: [0, 1, 2, 3].map(index => ({ value: max - ((max - min) * index / 3), y: top + (plotHeight * index / 3) })),
+    monthTicks: monthIndices.map(index => ({ x: x(index), label: `Month ${base[index].month}` })),
+  };
+} ${x(i).toFixed(1)} ${y(r.closingCash).toFixed(1)}`).join(' '); const bp=path(base); const sp=path(scenario); return {labels:base.map((_,i)=>`M${i+1}`),basePath:bp,scenarioPath:sp,baseArea:`${bp} L 744 185 L 42 185 Z`,baseY:y(base[17].closingCash),scenarioY:y(scenario[17].closingCash)}; }
