@@ -17,7 +17,7 @@ export async function POST(req: Request) {
     let origin: URL;
     try { origin = new URL(appUrl); } catch { return NextResponse.json({ error: 'Invalid application URL configuration' }, { status: 503 }); }
     if (origin.protocol !== 'https:' && origin.hostname !== 'localhost') return NextResponse.json({ error: 'Application URL must use HTTPS' }, { status: 503 });
-    const params = new URLSearchParams({ mode: 'subscription', 'line_items[0][price]': price, 'line_items[0][quantity]': '1', success_url: new URL('/billing/success?session_id={CHECKOUT_SESSION_ID}', origin).toString(), cancel_url: new URL('/billing', origin).toString(), client_reference_id: parsed.data.organizationId, customer_email: user.email ?? '' });
+    const params = new URLSearchParams({ mode: 'subscription', 'line_items[0][price]': price, 'line_items[0][quantity]': '1', success_url: new URL('/?billing=success', origin).toString(), cancel_url: new URL('/?billing=cancelled', origin).toString(), client_reference_id: parsed.data.organizationId, customer_email: user.email ?? '', 'subscription_data[metadata][organization_id]': parsed.data.organizationId });
     const response = await fetch('https://api.stripe.com/v1/checkout/sessions', { method: 'POST', headers: { Authorization: `Bearer ${secret}`, 'Content-Type': 'application/x-www-form-urlencoded' }, body: params, signal: AbortSignal.timeout(15_000) });
     const session = await response.json().catch(() => null);
     if (!response.ok || typeof session?.url !== 'string') return NextResponse.json({ error: 'Stripe could not create checkout session' }, { status: 502 });
