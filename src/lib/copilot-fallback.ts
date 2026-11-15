@@ -1,4 +1,4 @@
-import { forecast, summarize, type HireInput, type ModelInputs } from '@/lib/finance';
+import { forecast, summarize, type HireInput, type ModelInputs } from './finance';
 import {
   analyzeHistoricalActuals,
   calculateAffordableInvestment,
@@ -8,7 +8,7 @@ import {
   calculateUnitEconomics,
   simulateFinancialDecision,
   simulateHiringDecision,
-} from '@/lib/finance-intelligence';
+} from './finance-intelligence';
 
 type Historical = ReturnType<typeof analyzeHistoricalActuals>;
 type UnitEconomics = ReturnType<typeof calculateUnitEconomics>;
