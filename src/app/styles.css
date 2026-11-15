@@ -982,12 +982,12 @@ button, input, textarea, select { font-family: inherit; }
 .marketing-hero-foot { display: flex; justify-content: space-between; width: min(1320px, calc(100% - 72px)); margin: 12px auto 0; padding-top: 17px; border-top: 1px solid #e6e9e1; color: #97a198; font-size: 8px; font-weight: 700; letter-spacing: .13em; }
 .marketing-statement { padding: 117px max(36px, calc((100% - 1120px)/2)) 120px; background: #fff; }
 .marketing-section-label { color: #7f8e82; }
-.marketing-statement-grid { display: grid; grid-template-columns: 1fr .78fr; gap: 70px; align-items: end; margin-top: 31px; }
+.marketing-statement-grid { display: grid; grid-template-columns: 1fr .78fr; gap: 70px; align-items: flex-end; margin-top: 31px; }
 .marketing-statement h2, .marketing-section-top h2, .marketing-how h2, .marketing-principle h2, .marketing-cta h2 { margin: 0; color: #1d3529; font-family: Georgia,"Times New Roman",serif; font-size: clamp(39px,4vw,55px); line-height: 1.08; letter-spacing: -1.8px; font-weight: 400; }
 .marketing-statement-grid>div { padding-bottom: 5px; }
 .marketing-statement-grid p { color: #6b786f; font-size: 13px; line-height: 1.85; margin: 0 0 13px; }
 .marketing-product { padding: 113px max(36px, calc((100% - 1120px)/2)) 121px; background: #f4f5ef; }
-.marketing-section-top { display: flex; justify-content: space-between; align-items: end; gap: 60px; }
+.marketing-section-top { display: flex; justify-content: space-between; align-items: flex-end; gap: 60px; }
 .marketing-section-top h2 { margin-top: 23px; }
 .marketing-section-top>p { max-width: 350px; margin: 0 0 5px; color: #68766d; font-size: 13px; line-height: 1.8; }
 .marketing-feature-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 18px; margin-top: 66px; }
