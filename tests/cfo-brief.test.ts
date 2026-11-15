@@ -30,6 +30,52 @@ describe('Weekly CFO Brief', () => {
     expect(brief.priorities).toContain('Add and save company financial assumptions');
   });
 
+  it('uses founder runway and unit-economics watch thresholds for proactive alerts', () => {
+    const context = {
+      industry: 'Software',
+      businessModel: 'saas' as const,
+      stage: 'seed' as const,
+      productDescription: 'Workflow software',
+      targetCustomer: 'SMBs',
+      geography: 'Europe',
+      pricingModel: 'Monthly subscription',
+      mainGoal: 'Reach sustainable growth',
+      nextMilestone: 'Series A readiness',
+      targetRunwayMonths: 12,
+      churnWatchThresholdPct: 10,
+      cacPaybackWatchMonths: 3,
+      founderNotes: '',
+    };
+    const inputs: ModelInputs = {
+      ...stableInputs,
+      openingCash: 10_000,
+      monthlyRevenue: 5_000,
+      monthlyOpexExPayroll: 4_000,
+      existingMonthlyPayroll: 4_000,
+      cogsRatio: 0.2,
+    };
+    const brief = buildCfoBrief({
+      inputs,
+      modelStatus: 'approved',
+      actuals: [],
+      currency: 'EUR',
+      context,
+      kpis: {
+        mrr: 9_500,
+        activeCustomers: 95,
+        newCustomers: 10,
+        churnedCustomers: 15,
+        marketingSpend: 2_000,
+        salesSpend: 1_000,
+        grossMarginPct: 80,
+      },
+    });
+    expect(brief.forecast?.targetRunwayMonths).toBe(12);
+    expect(brief.alerts.some((alert) => alert.id === 'runway-below-founder-target')).toBe(true);
+    expect(brief.alerts.some((alert) => alert.id === 'churn-above-founder-threshold')).toBe(true);
+    expect(brief.alerts.some((alert) => alert.id === 'cac-payback-above-founder-threshold')).toBe(true);
+  });
+
   it('flags worsening cash trends and excludes foreign-currency records from totals', () => {
     const actuals: ActualRecord[] = [];
     for (let month = 1; month <= 6; month += 1) {
