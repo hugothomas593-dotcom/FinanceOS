@@ -156,6 +156,12 @@ export default function Home() {
   } | null>(null);
 
   useEffect(() => {
+    const navigateToCopilot = () => setView('Overview');
+    window.addEventListener('avenor:open-copilot', navigateToCopilot);
+    return () => window.removeEventListener('avenor:open-copilot', navigateToCopilot);
+  }, []);
+
+  useEffect(() => {
     const billingReturn = new URLSearchParams(window.location.search).get('billing');
     if (!billingReturn) return;
     setView('Plan & billing');
@@ -425,7 +431,9 @@ export default function Home() {
       <div className={`page-content ${view === 'Overview' ? 'copilot-page' : ''}`}>
         {view !== 'Overview' && <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{viewTitles[view]}</h1><p>{view === 'CFO Brief' ? 'A clear management review of cash, performance, risks and recommended actions.' : view === 'Financial overview' ? 'Explore your cash position, operating forecast and the main signals in your financial plan.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit company setup <span>↗</span></button></div></div>}
 
-        {view === 'Overview' && <AvenorCopilot organizationId={organizationId} organizationName={organizationName} currency={currency} embedded />}
+        <div className={`copilot-host ${view === 'Overview' ? 'active' : 'inactive'}`}>
+          <AvenorCopilot organizationId={organizationId} organizationName={organizationName} currency={currency} embedded />
+        </div>
 
         {view === 'CFO Brief' && organizationId && <CfoBrief organizationId={organizationId} />}
         
