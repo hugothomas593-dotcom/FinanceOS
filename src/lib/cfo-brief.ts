@@ -1,3 +1,4 @@
+import type { CompanyContext } from './company-context';
 import { forecast, summarize, validateModelInputs, type ModelInputs } from './finance';
 import {
   analyzeHistoricalActuals,
@@ -16,6 +17,7 @@ export type CfoBriefInput = {
   currency: string;
   kpis?: CompanyKpis;
   metricsPeriod?: string | null;
+  context?: CompanyContext;
   generatedAt?: string;
 };
 
@@ -31,10 +33,16 @@ export function buildCfoBrief(input: CfoBriefInput) {
   );
 
   let forecastSummary: ReturnType<typeof summarize> | null = null;
+  let forecastRows: ReturnType<typeof forecast> = [];
   if (input.inputs) {
     validateModelInputs(input.inputs);
-    forecastSummary = summarize(forecast(input.inputs, [], 18));
+    forecastRows = forecast(input.inputs, [], 18);
+    forecastSummary = summarize(forecastRows);
   }
+  const targetRunwayMonths = input.context?.targetRunwayMonths ?? 12;
+  const firstMonthBelowTargetRunway = forecastRows.find(
+    (row) => row.runwayMonths !== null && row.runwayMonths < targetRunwayMonths,
+  )?.month ?? null;
 
   const alerts: CfoBriefAlert[] = [];
   if (!input.inputs || !forecastSummary) {
@@ -79,6 +87,35 @@ export function buildCfoBrief(input: CfoBriefInput) {
       description: 'Outflows across the latest three available months are ' + history.outflowTrendPct.toFixed(1) + '% above the previous three available months. Review the largest spending categories and identify any one-off items.',
     });
   }
+  if (input.inputs && targetRunwayMonths !== 6 && firstMonthBelowTargetRunway !== null) {
+    alerts.push({
+      id: 'runway-below-founder-target',
+      severity: 'warning',
+      title: 'Forecast falls below your runway target',
+      description: 'The current forecast first drops below your chosen ' + targetRunwayMonths + '-month runway target in month ' + firstMonthBelowTargetRunway + '. This is your planning threshold, not a universal risk rating.',
+    });
+  }
+
+  const churnThreshold = input.context?.churnWatchThresholdPct ?? null;
+  if (churnThreshold !== null && unitEconomics.monthlyLogoChurnPct !== null && unitEconomics.monthlyLogoChurnPct > churnThreshold) {
+    alerts.push({
+      id: 'churn-above-founder-threshold',
+      severity: 'warning',
+      title: 'Monthly customer churn is above your watch threshold',
+      description: 'The latest supplied metrics show ' + unitEconomics.monthlyLogoChurnPct.toFixed(1) + '% monthly logo churn, above your chosen ' + churnThreshold.toFixed(1) + '% threshold. Validate the customer counts and investigate the cohorts behind the movement.',
+    });
+  }
+
+  const cacPaybackThreshold = input.context?.cacPaybackWatchMonths ?? null;
+  if (cacPaybackThreshold !== null && unitEconomics.cacPaybackMonths !== null && unitEconomics.cacPaybackMonths > cacPaybackThreshold) {
+    alerts.push({
+      id: 'cac-payback-above-founder-threshold',
+      severity: 'warning',
+      title: 'CAC payback is above your watch threshold',
+      description: 'The latest one-period estimate is ' + unitEconomics.cacPaybackMonths.toFixed(1) + ' months, above your chosen ' + cacPaybackThreshold.toFixed(1) + '-month threshold. This is a blended estimate, not cohort-attributed CAC.',
+    });
+  }
+
   if (input.modelStatus === 'draft') {
     alerts.push({
       id: 'draft-model',
@@ -139,6 +176,8 @@ export function buildCfoBrief(input: CfoBriefInput) {
       lowestCashMonth: forecastSummary.lowestCashMonth,
       firstMonthCashNegative: forecastSummary.firstMonthCashNegative,
       firstMonthBelowSixMonthsRunway: forecastSummary.firstMonthBelowSixMonthsRunway,
+      targetRunwayMonths,
+      firstMonthBelowTargetRunway,
     } : null,
     historical: {
       records: history.records,
@@ -159,6 +198,7 @@ export function buildCfoBrief(input: CfoBriefInput) {
       currencyMismatchedRecords,
       notes: [
         ...(input.modelStatus === 'draft' ? ['Forecast uses a draft model.'] : []),
+        ...(input.context ? ['Founder-provided company context and watch thresholds are user-supplied and have not been independently verified.'] : []),
         ...(history.records === 0 ? ['No compatible imported transaction records are available.'] : []),
         ...(currencyMismatchedRecords > 0 ? ['Foreign-currency records were excluded from historical totals; no FX conversion was applied.'] : []),
         'Imported transaction history is not reconciled into the operating forecast.',
