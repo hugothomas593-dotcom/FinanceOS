@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { buildCopilotFallback } from '@/lib/copilot-fallback';
-import { analyzeHistoricalActuals, calculateUnitEconomics } from '@/lib/finance-intelligence';
-import type { ModelInputs } from '@/lib/finance';
+import { buildCopilotFallback } from '../src/lib/copilot-fallback';
+import { analyzeHistoricalActuals, calculateUnitEconomics } from '../src/lib/finance-intelligence';
+import type { ModelInputs } from '../src/lib/finance';
 
 const model: ModelInputs = {
   openingCash: 1_000_000,
