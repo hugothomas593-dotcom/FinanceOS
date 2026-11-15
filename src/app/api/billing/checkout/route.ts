@@ -13,7 +13,9 @@ export async function POST(req: Request) {
     const secret = process.env.STRIPE_SECRET_KEY;
     const price = process.env.STRIPE_PRICE_ID;
     const appUrl = process.env.NEXT_PUBLIC_APP_URL;
-    if (!secret || !price || !appUrl) return NextResponse.json({ error: 'Billing is not configured' }, { status: 503 });
+    if (!secret || !price || !appUrl || !process.env.STRIPE_WEBHOOK_SECRET || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      return NextResponse.json({ error: 'Billing is not fully configured. Stripe Checkout, webhooks and the server-side Supabase key are required.' }, { status: 503 });
+    }
     let origin: URL;
     try { origin = new URL(appUrl); } catch { return NextResponse.json({ error: 'Invalid application URL configuration' }, { status: 503 }); }
     if (origin.protocol !== 'https:' && origin.hostname !== 'localhost') return NextResponse.json({ error: 'Application URL must use HTTPS' }, { status: 503 });
