@@ -109,6 +109,7 @@ export default function Home() {
   const [modelBusy, setModelBusy] = useState(false);
   const [modelUpdatedAt, setModelUpdatedAt] = useState('');
   const [actualsCount, setActualsCount] = useState(0);
+  const [insightCount, setInsightCount] = useState(0);
   const [cash, setCash] = useState(initial.openingCash);
   const [revenue, setRevenue] = useState(initial.monthlyRevenue);
   const [payroll, setPayroll] = useState(initial.existingMonthlyPayroll);
@@ -165,15 +166,18 @@ export default function Home() {
     const openCompanySetup = () => setView('Company assumptions');
     const openDataImport = () => setView('Data import');
     const openFinancialOverview = () => setView('Financial overview');
+    const openCfoBrief = () => setView('CFO Brief');
     window.addEventListener('avenor:open-copilot', navigateToCopilot);
     window.addEventListener('avenor:open-company-setup', openCompanySetup);
     window.addEventListener('avenor:open-data-import', openDataImport);
     window.addEventListener('avenor:open-financial-overview', openFinancialOverview);
+    window.addEventListener('avenor:open-cfo-brief', openCfoBrief);
     return () => {
       window.removeEventListener('avenor:open-copilot', navigateToCopilot);
       window.removeEventListener('avenor:open-company-setup', openCompanySetup);
       window.removeEventListener('avenor:open-data-import', openDataImport);
       window.removeEventListener('avenor:open-financial-overview', openFinancialOverview);
+      window.removeEventListener('avenor:open-cfo-brief', openCfoBrief);
     };
   }, []);
 
@@ -272,6 +276,21 @@ export default function Home() {
   }, []);
 
 
+
+  useEffect(() => {
+    if (!organizationId) return;
+    let active = true;
+    fetch(`/api/brief?organizationId=${encodeURIComponent(organizationId)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not load proactive insights');
+        if (!active) return;
+        const alerts = (data.brief?.alerts ?? []) as { severity?: string }[];
+        setInsightCount(alerts.filter((alert) => alert.severity === 'critical' || alert.severity === 'warning').length);
+      })
+      .catch(() => { if (active) setInsightCount(0); });
+    return () => { active = false; };
+  }, [organizationId, contextUpdatedAt, hasModel, actualsCount, kpiHasData]);
 
   useEffect(() => {
     if (!organizationId) return;
@@ -469,7 +488,7 @@ export default function Home() {
     <aside className="sidebar">
       <div className="brand"><span className="brand-mark">A</span><span>avenor</span></div>
       <div className="workspace-switch"><div className="workspace-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div><div><b>{organizationName || 'Your company'}</b><small>Financial workspace</small></div><span className="chevron">⌄</span></div>
-      <nav className="nav-groups">{navGroups.map(group => <div className="nav-group" key={group.title}><div className="nav-group-label">{group.title}</div><div className="nav-group-items">{group.items.map(item => <button key={item.label} className={`nav-item ${view === item.label ? 'selected' : ''}`} onClick={() => setView(item.label)}><span className="nav-icon">{item.icon}</span>{item.title}{item.label === 'Decision ledger' && saved.length > 0 && <span className="nav-count">{saved.length}</span>}</button>)}</div></div>)}</nav>
+      <nav className="nav-groups">{navGroups.map(group => <div className="nav-group" key={group.title}><div className="nav-group-label">{group.title}</div><div className="nav-group-items">{group.items.map(item => <button key={item.label} className={`nav-item ${view === item.label ? 'selected' : ''}`} onClick={() => setView(item.label)}><span className="nav-icon">{item.icon}</span>{item.title}{item.label === 'Decision ledger' && saved.length > 0 && <span className="nav-count">{saved.length}</span>}{item.label === 'CFO Brief' && insightCount > 0 && <span className="nav-count">{insightCount}</span>}</button>)}</div></div>)}</nav>
       <div className="sidebar-bottom"><div className="profile"><div className="profile-avatar">A</div><div><b>Workspace account</b><small>Signed-in user</small></div><span className="more">···</span></div></div>
     </aside>
 
@@ -487,6 +506,7 @@ export default function Home() {
             contextCompletion={companyContextCompletion(companyContext)}
             hasFinancialModel={hasModel}
             hasImportedActuals={actualsCount > 0}
+            insightCount={insightCount}
           />
         </div>
 
