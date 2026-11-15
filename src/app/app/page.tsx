@@ -22,7 +22,7 @@ const compact = (v: number) => new Intl.NumberFormat('en-GB', { notation: 'compa
 const initial: ModelInputs = { openingCash: 0, monthlyRevenue: 0, monthlyRevenueGrowth: 0, monthlyOpexExPayroll: 0, monthlyOpexGrowth: 0, cogsRatio: 0, existingMonthlyPayroll: 0, existingOtherNetCashAdjustments: 0 };
 const months = 18;
 
-type SavedDecision = { id: string; title: string; detail: string; cashImpact: number; runwayImpact: number; created: string };
+type SavedDecision = { id: string; title: string; detail: string; cashImpact: number | null; cashImpactLabel: string; created: string };
 type WorkspaceMembership = {
   organization_id: string;
   role: string;
@@ -44,6 +44,43 @@ type ScenarioRow = {
   outputs: Record<string, unknown>;
   created_at: string;
 };
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function scenarioCashImpact(outputs: Record<string, unknown>) {
+  const directImpact = asRecord(outputs.impact);
+  const nestedScenario = asRecord(outputs.scenario);
+  const nestedImpact = asRecord(nestedScenario?.impact);
+  const candidates: Array<{ value: unknown; label: string }> = [
+    { value: directImpact?.endingCash, label: '18-month closing-cash difference' },
+    { value: directImpact?.endingCashDelta, label: '18-month closing-cash difference' },
+    { value: nestedImpact?.endingCash, label: '18-month closing-cash difference' },
+    { value: outputs.totalEstimatedCashImpact, label: 'Estimated one-off cash impact' },
+  ];
+
+  for (const candidate of candidates) {
+    if (typeof candidate.value === 'number' && Number.isFinite(candidate.value)) {
+      return { value: candidate.value, label: candidate.label };
+    }
+  }
+  return { value: null, label: 'Cash impact unavailable' };
+}
+
+function toSavedDecision(scenario: ScenarioRow): SavedDecision {
+  const impact = scenarioCashImpact(scenario.outputs);
+  return {
+    id: scenario.id,
+    title: scenario.name,
+    detail: `${scenario.scenario_type} scenario · saved to this workspace`,
+    cashImpact: impact.value,
+    cashImpactLabel: impact.label,
+    created: new Date(scenario.created_at).toLocaleDateString('en-GB'),
+  };
+}
 
 export default function Home() {
   const [view, setView] = useState<View>('Overview');
@@ -76,6 +113,18 @@ export default function Home() {
   const [question, setQuestion] = useState('Can we hire three engineers in January?');
   const [saved, setSaved] = useState<SavedDecision[]>([]);
   const [toast, setToast] = useState('');
+
+  useEffect(() => {
+    const handleDecisionSaved = (event: Event) => {
+      const scenario = (event as CustomEvent<ScenarioRow>).detail;
+      if (!scenario?.id || !scenario.outputs) return;
+      const item = toSavedDecision(scenario);
+      setSaved((current) => [item, ...current.filter((existing) => existing.id !== item.id)].slice(0, 100));
+    };
+
+    window.addEventListener('avenor:decision-saved', handleDecisionSaved);
+    return () => window.removeEventListener('avenor:decision-saved', handleDecisionSaved);
+  }, []);
   const [importRows, setImportRows] = useState<{period:string;category:string;description:string;amount:number;direction:'inflow'|'outflow';source:string}[]>([]);
   const [importError, setImportError] = useState('');
   const [importBusy, setImportBusy] = useState(false);
@@ -176,14 +225,7 @@ export default function Home() {
 
         if (scenariosResponse.ok) {
           const scenarios = (scenariosData.scenarios ?? []) as ScenarioRow[];
-          setSaved(scenarios.map((scenario) => ({
-            id: scenario.id,
-            title: scenario.name,
-            detail: `${scenario.scenario_type} scenario · saved to this workspace`,
-            cashImpact: Number(scenario.outputs.cashImpact ?? 0),
-            runwayImpact: Number(scenario.outputs.runwayImpact ?? 0),
-            created: new Date(scenario.created_at).toLocaleDateString('en-GB'),
-          })));
+          setSaved(scenarios.map(toSavedDecision));
         }
 
         if (actualsResponse.ok) {
@@ -568,7 +610,23 @@ function Metric({label,value,sub,trend,icon}:{label:string;value:string;sub:stri
 function KpiField({label,value,set,min,max,step}:{label:string;value:string;set:(v:string)=>void;min?:string;max?:string;step?:string}) { return <label className="number-field"><span>{label}</span><div className="number-input"><input type="number" min={min} max={max} step={step} value={value} placeholder="Not provided" onChange={e=>set(e.target.value)}/></div></label>; }
 function NumberField({label,value,set,min,max,step=1,prefix,suffix}:{label:string;value:number;set:(n:number)=>void;min:number;max:number;step?:number;prefix?:string;suffix?:string}) { return <label className="number-field"><span>{label}</span><div className="number-input">{prefix && <i>{prefix}</i>}<input type="number" min={min} max={max} step={step} value={value} onChange={e=>set(Math.max(min,Math.min(max,Number(e.target.value))))}/>{suffix && <i>{suffix}</i>}</div></label>; }
 function CompareBar({label,value,max,currency="EUR"}:{label:string;value:number;max:number;currency?:string}) { return <div className="compare-row"><div><span>{label}</span><b>{money(value,currency)}</b></div><div className="bar-track"><i style={{width:`${Math.max(0,Math.min(100,value/max*100))}%`}}/></div></div>; }
-function DecisionRow({item,detailed=false,currency="EUR"}:{item:SavedDecision;detailed?:boolean;currency?:string}) { return <div className="decision-row"><div className="decision-icon">⌁</div><div className="decision-copy"><b>{item.title}</b><span>{item.detail}</span>{detailed && <small>Saved {item.created} · Scenario preserved independently of base plan</small>}</div><div className="decision-impact"><b className="negative-text">−{money(item.cashImpact,currency)}</b><small>18-month cash impact</small></div></div>; }
+function DecisionRow({item,detailed=false,currency="EUR"}:{item:SavedDecision;detailed?:boolean;currency?:string}) {
+  const amount = item.cashImpact;
+  return <div className="decision-row">
+    <div className="decision-icon">⌁</div>
+    <div className="decision-copy">
+      <b>{item.title}</b><span>{item.detail}</span>
+      {detailed && <small>Saved {item.created} · Scenario preserved independently of base plan</small>}
+    </div>
+    <div className="decision-impact">
+      {amount === null ? (
+        <><b>—</b><small>{item.cashImpactLabel}</small></>
+      ) : (
+        <><b className={amount < 0 ? 'negative-text' : amount > 0 ? 'positive-text' : ''}>{amount > 0 ? '+' : amount < 0 ? '−' : ''}{money(Math.abs(amount), currency)}</b><small>{item.cashImpactLabel}</small></>
+      )}
+    </div>
+  </div>;
+}
 function makeChart(base: MonthResult[]) {
   const all = base.map(row => row.closingCash);
   const min = Math.min(0, ...all);
