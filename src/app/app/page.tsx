@@ -580,12 +580,13 @@ function makeChart(base: MonthResult[]) {
   const zeroY = y(0);
   const last = base[base.length - 1];
   const monthIndices = [...new Set([0, Math.round((base.length - 1) / 3), Math.round((base.length - 1) * 2 / 3), base.length - 1])];
+  const tickValues = [...new Set([max, max - ((max - min) / 3), max - (2 * (max - min) / 3), min, 0])].filter(value => value >= min && value <= max).sort((a, b) => b - a);
   return {
     basePath: path,
     baseArea: `${path} L ${x(base.length - 1).toFixed(1)} ${zeroY.toFixed(1)} L ${x(0).toFixed(1)} ${zeroY.toFixed(1)} Z`,
     baseX: x(base.length - 1),
     baseY: y(last.closingCash),
-    yTicks: [0, 1, 2, 3].map(index => ({ value: max - ((max - min) * index / 3), y: top + (plotHeight * index / 3) })),
+    yTicks: tickValues.map(value => ({ value, y: y(value) })),
     monthTicks: monthIndices.map(index => ({ x: x(index), label: `Month ${base[index].month}` })),
   };
 }
