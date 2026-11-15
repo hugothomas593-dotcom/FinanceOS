@@ -120,7 +120,8 @@ export function buildCfoBrief(input: CfoBriefInput) {
   }
 
   const priorities = alerts.filter((alert) => alert.severity !== 'info').slice(0, 3).map((alert) => alert.title);
-  if (input.modelStatus !== 'approved' && priorities.length < 3) priorities.push('Review and approve the company model');
+  if (input.modelStatus === 'none' && priorities.length < 3) priorities.push('Add and save company financial assumptions');
+  else if (input.modelStatus === 'draft' && priorities.length < 3) priorities.push('Review and approve the company model');
   if (history.records === 0 && priorities.length < 3) priorities.push('Import transaction history');
   if (priorities.length === 0) priorities.push('Refresh company actuals and revisit the forecast');
 
