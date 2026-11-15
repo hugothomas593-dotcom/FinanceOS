@@ -105,6 +105,7 @@ export function AvenorCopilot({
   contextCompletion = 0,
   hasFinancialModel = false,
   hasImportedActuals = false,
+  insightCount = 0,
 }: {
   organizationId: string;
   organizationName: string;
@@ -113,6 +114,7 @@ export function AvenorCopilot({
   contextCompletion?: number;
   hasFinancialModel?: boolean;
   hasImportedActuals?: boolean;
+  insightCount?: number;
 }) {
   const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
   const [open, setOpen] = useState(false);
@@ -365,6 +367,17 @@ export function AvenorCopilot({
                             <div><span className={hasImportedActuals ? styles.setupDone : styles.setupTodo}>{hasImportedActuals ? '✓' : '3'}</span><section><b>Actual transactions</b><small>{hasImportedActuals ? 'History available' : 'Optional CSV for historical analysis'}</small></section><button type="button" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-data-import'))}>{hasImportedActuals ? 'Review' : 'Import'} →</button></div>
                           </div>
                         </section>
+                      )}
+                      {embedded && insightCount > 0 && (
+                        <button
+                          type="button"
+                          className={styles.proactiveNudge}
+                          onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-cfo-brief'))}
+                        >
+                          <span className={styles.proactiveIcon}>!</span>
+                          <span><b>{insightCount} financial signal{insightCount > 1 ? 's' : ''} to review</b><small>Avenor found watchpoints in your latest saved data.</small></span>
+                          <strong>Review →</strong>
+                        </button>
                       )}
                       <div className={styles.suggestionHeading}>COMMON QUESTIONS</div>
                       <div className={styles.suggestions}>
