@@ -95,6 +95,16 @@ export default function Home() {
   } | null>(null);
 
   useEffect(() => {
+    const billingReturn = new URLSearchParams(window.location.search).get('billing');
+    if (!billingReturn) return;
+    setView('Plan & billing');
+    if (billingReturn === 'success') setToast('Checkout completed. Confirming your subscription…');
+    if (billingReturn === 'cancelled') setToast('Checkout cancelled. No payment was taken.');
+    window.history.replaceState({}, '', window.location.pathname);
+    window.setTimeout(() => setToast(''), 4200);
+  }, []);
+
+  useEffect(() => {
     let cancelled = false;
 
     async function loadWorkspace() {
