@@ -3,10 +3,10 @@ import './styles.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Avenor — Financial decision intelligence for founders',
+    default: 'Avenor — Your AI finance partner for founders',
     template: '%s — Avenor',
   },
-  description: 'Understand your runway, model the decisions ahead and build with a clearer view of your company finances.',
+  description: 'Ask your AI finance Copilot what you can afford, understand your cash position and model the decisions ahead using your company data.',
   applicationName: 'Avenor',
 };
 
