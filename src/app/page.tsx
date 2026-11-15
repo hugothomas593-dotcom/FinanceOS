@@ -38,7 +38,7 @@ export default function Home() {
   const [organizationId, setOrganizationId] = useState('');
   const [organizationName, setOrganizationName] = useState('');
   const [currency, setCurrency] = useState('EUR');
-  const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? ' '
+  const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
   const [workspaceLoading, setWorkspaceLoading] = useState(true);
   const [workspaceError, setWorkspaceError] = useState('');
   const [hasModel, setHasModel] = useState(false);
