@@ -33,6 +33,7 @@ Avenor has one subscription only: **Avenor Founder — €59/month**. There are 
 - Avenor Intelligence uses a side-panel chat with persistent, creator-private conversation history. It reads the latest approved model (or latest draft with an explicit warning) and imported actuals, uses deterministic financial tools for scenarios and metrics, and uses the LLM to interpret and explain the outputs. The LLM does not calculate authoritative numbers.
 - Stripe Checkout API with server-controlled return URLs and webhook signature verification/idempotency scaffold.
 - Health/configuration endpoint.
+- Deterministic Weekly CFO Brief generated on demand from the latest approved/draft model, compatible-currency transaction history and latest monthly business metrics. It flags cash/runway risks, material inflow/outflow trends, limited data and currency mismatches, and suggests next actions without relying on the LLM.
 
 ## API outline
 - `POST /api/organizations` — create organization + owner membership.
@@ -44,6 +45,7 @@ Avenor has one subscription only: **Avenor Founder — €59/month**. There are 
 - `POST /api/billing/checkout` — creates a Stripe subscription checkout session.
 - `POST /api/billing/webhook` — verifies Stripe signature and records subscription state.
 - `GET /api/health` — reports whether key services are configured; not a security audit.
+- `GET /api/brief?organizationId=...` — authenticated, deterministic Weekly CFO Brief for the selected workspace; on-demand, not a scheduled email or push alert.
 
 ## CSV format
 Minimum columns: `Date,Amount`. Optional columns: `Description,Category`. Positive amounts are treated as inflows; negative amounts as outflows. Use ISO dates (`YYYY-MM-DD`). Dot-decimal and common European decimal-comma amounts are supported. Maximum 10,000 rows / 2 MB per import.
@@ -91,3 +93,6 @@ Supabase is for database/authentication; it does not host the Next.js website. A
 - Product copy focuses on the financial tasks and decisions rather than describing AI as the product.
 
 - Vercel Functions are pinned to `dub1` (Dublin, EU West) in `vercel.json` to run close to the Supabase EU West project. This configuration requires a fresh deployment to verify the effective function region; the last inspected Preview predates the setting.
+
+## Weekly CFO Brief — current scope
+The Brief is generated on demand when the workspace loads and can be manually refreshed. It computes the current 18-month model outlook, summarizes imported transaction history and latest monthly unit-economics inputs, then highlights negative-cash/runway thresholds, significant historical cash-flow trends, missing data and foreign-currency records. Foreign-currency rows are excluded from local-currency totals; no FX rates are inferred. It does not reconcile historical actuals into the forecast, run automatically each Monday, or send emails/push notifications. The Copilot discussion button requires a working Vercel AI Gateway configuration; the Brief's underlying calculations do not.
