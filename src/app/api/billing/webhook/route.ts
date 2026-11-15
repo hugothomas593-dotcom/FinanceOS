@@ -22,6 +22,7 @@ export async function POST(req: Request) {
 
   try {
     const syncSubscription = async (sub: any, orgId?: string | null) => {
+      if (typeof sub?.id !== 'string' || !sub.id.startsWith('sub_')) throw new Error('Invalid Stripe subscription payload');
       let organizationId = orgId || (typeof sub?.metadata?.organization_id === 'string' ? sub.metadata.organization_id : null);
       if (!organizationId && typeof sub?.id === 'string') {
         const { data: existing, error: lookupError } = await supabase
