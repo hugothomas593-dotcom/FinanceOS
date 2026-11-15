@@ -70,9 +70,9 @@ export function CfoBrief({ organizationId }: { organizationId: string }) {
     <section className={styles.panel} aria-labelledby="cfo-brief-title">
       <div className={styles.header}>
         <div>
-          <div className={styles.eyebrow}>FINANCIAL CHECK-IN</div>
-          <h2 id="cfo-brief-title">Weekly CFO Brief</h2>
-          <p>On-demand snapshot from your latest saved plan, imported transactions and business metrics.</p>
+          <div className={styles.eyebrow}>MANAGEMENT REVIEW</div>
+          <h2 id="cfo-brief-title">Your CFO Brief</h2>
+          <p>A decision-ready review of cash, operating performance, emerging risks and recommended actions. Generated from your latest saved data when you open or refresh this page.</p>
         </div>
         <button className={styles.refresh} type="button" onClick={() => void loadBrief(true)} disabled={loading || refreshing}>
           {refreshing ? 'Refreshing…' : 'Refresh'}
