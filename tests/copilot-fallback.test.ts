@@ -86,4 +86,27 @@ describe('deterministic Copilot fallback', () => {
     expect(result.answer).toContain('no valid financial model');
     expect(result.calculation).toBeNull();
   });
+
+  it('models a French revenue downside with accented apostrophes', () => {
+    const result = fallback('Que se passe-t-il si notre chiffre d’affaires baisse de 20 % ?');
+    expect(result.calculation?.title).toBe('Revenue sensitivity');
+    expect((result.calculation?.detail as { assumptionsApplied: { revenueChangePct: number } }).assumptionsApplied.revenueChangePct).toBe(-20);
+    expect(result.saveableScenario?.scenarioType).toBe('revenue');
+  });
+
+  it('parses a French fundraising amount and pre-money valuation in euros', () => {
+    const result = fallback('Peut-on lever 1,5 M€ sur une valorisation pre-money de 6 M€ ?');
+    expect(result.calculation?.title).toBe('Fundraising and dilution scenario');
+    expect((result.calculation?.detail as { raiseAmount: number }).raiseAmount).toBe(1_500_000);
+    expect((result.calculation?.detail as { preMoneyValuation: number }).preMoneyValuation).toBe(6_000_000);
+    expect(result.saveableScenario?.scenarioType).toBe('fundraising');
+  });
+
+  it('parses a French hiring plan with gross salary and employer charges', () => {
+    const result = fallback('Peut-on embaucher 2 personnes avec un salaire brut annuel de 60 k€ et 35 % de charges patronales ?');
+    expect(result.calculation?.title).toBe('Hiring plan simulation');
+    expect((result.calculation?.detail as { impact: { monthlyLoadedPayrollFromStart: number } }).impact.monthlyLoadedPayrollFromStart).toBe(13_500);
+    expect(result.saveableScenario?.scenarioType).toBe('hiring');
+  });
+
 });
