@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/supabase/server';
 import { validateModelInputs, type ModelInputs } from '@/lib/finance';
 import { buildCfoBrief } from '@/lib/cfo-brief';
 import type { ActualRecord, CompanyKpis } from '@/lib/finance-intelligence';
+import { CompanyContextSchema, EMPTY_COMPANY_CONTEXT } from '@/lib/company-context';
 
 const QuerySchema = z.object({ organizationId: z.string().uuid() });
 
@@ -53,13 +54,23 @@ export async function GET(request: Request) {
       .maybeSingle();
     if (modelResult.error) return NextResponse.json({ error: 'Could not load the latest financial model' }, { status: 500 });
 
-    const { data: actualRows, error: actualsError } = await supabase
-      .from('financial_actuals')
+    const [{ data: contextRow, error: contextError }, { data: actualRows, error: actualsError }] = await Promise.all([
+      supabase
+        .from('organization_contexts')
+        .select('context')
+        .eq('organization_id', organizationId)
+        .maybeSingle(),
+      supabase
+        .from('financial_actuals')
       .select('period,metric_key,amount,currency,source')
       .eq('organization_id', organizationId)
-      .order('period', { ascending: false })
-      .limit(5_000);
+        .order('period', { ascending: false })
+        .limit(5_000),
+    ]);
+    if (contextError) return NextResponse.json({ error: 'Could not load saved company context' }, { status: 500 });
     if (actualsError) return NextResponse.json({ error: 'Could not load imported financial actuals' }, { status: 500 });
+    const parsedContext = CompanyContextSchema.safeParse(contextRow?.context ?? EMPTY_COMPANY_CONTEXT);
+    const companyContext = parsedContext.success ? parsedContext.data : EMPTY_COMPANY_CONTEXT;
 
     const organization = Array.isArray(membership.organizations) ? membership.organizations[0] : membership.organizations;
     const currency = organization?.base_currency?.trim().toUpperCase() || 'EUR';
@@ -88,7 +99,7 @@ export async function GET(request: Request) {
     const inputs = model ? safeModelInputs(model.assumptions) : null;
     const modelStatus = inputs ? (model?.status === 'approved' ? 'approved' : 'draft') : 'none';
 
-    const brief = buildCfoBrief({ inputs, modelStatus, actuals, currency, kpis, metricsPeriod });
+    const brief = buildCfoBrief({ inputs, modelStatus, actuals, currency, kpis, metricsPeriod, context: companyContext });
     return NextResponse.json(
       { organization: { id: organizationId, name: organization?.name ?? 'Your company' }, brief },
       { headers: { 'Cache-Control': 'no-store, max-age=0' } },
