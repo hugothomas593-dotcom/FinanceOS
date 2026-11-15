@@ -56,9 +56,28 @@ export function CfoBrief({ organizationId }: { organizationId: string }) {
   const askCopilot = () => {
     window.dispatchEvent(new CustomEvent('avenor:open-copilot', {
       detail: {
-        message: 'Review the latest Weekly CFO Brief. Explain the most important cash and operating signals, challenge the assumptions, and give me the three most useful actions. Do not invent missing data.',
+        message: 'Review the latest CFO Brief. Explain the most important cash and operating signals, challenge the assumptions, and give me the three most useful actions. Do not invent missing data.',
         newConversation: true,
       },
+    }));
+  };
+
+  const askAboutAlert = (alert: Alert) => {
+    const prompts: Record<string, string> = {
+      'model-missing': 'Guide me through creating the smallest useful financial model for my company. Ask for missing inputs one at a time and do not invent numbers.',
+      'cash-negative': 'My CFO Brief flags that cash is projected to go below zero. Analyze the key drivers and help me compare realistic options such as delaying spend, reducing costs or raising funding. Ask for missing assumptions rather than guessing.',
+      'runway-low': 'My CFO Brief flags runway below six months. Identify the main drivers and model practical options to extend runway using only supplied assumptions.',
+      'runway-below-founder-target': 'My forecast falls below my chosen runway target. Help me understand when and why, then model options to preserve that target.',
+      'inflows-declining': 'My CFO Brief flags declining historical cash inflows. Break down what the imported records actually show, distinguish revenue from collection timing, and suggest what I should validate next.',
+      'outflows-rising': 'My CFO Brief flags rising historical outflows. Review the largest spend categories and help me identify which costs could be controlled without assuming savings that have not been supplied.',
+      'churn-above-founder-threshold': 'My supplied monthly churn is above my watch threshold. Explain the unit-economics impact and what customer/cohort data I should inspect next.',
+      'cac-payback-above-founder-threshold': 'My CAC payback is above my watch threshold. Explain the blended estimate, identify which inputs drive it, and model what would need to improve.',
+      'draft-model': 'Review my draft financial model and tell me which assumptions need checking before I approve it.',
+      'no-actuals': 'Help me import transaction history and explain which CSV columns and periods would improve the quality of my financial review.',
+    };
+    const prompt = prompts[alert.id] ?? `Review this CFO Brief signal: ${alert.title}. ${alert.description} Explain the implications and recommend practical next steps without inventing missing figures.`;
+    window.dispatchEvent(new CustomEvent('avenor:open-copilot', {
+      detail: { message: prompt, newConversation: true },
     }));
   };
 
@@ -112,7 +131,11 @@ export function CfoBrief({ organizationId }: { organizationId: string }) {
               {brief.alerts.map((alert) => (
                 <article className={styles.alert + ' ' + styles[alert.severity]} key={alert.id}>
                   <span className={styles.marker} aria-hidden="true" />
-                  <div><b>{alert.title}</b><p>{alert.description}</p></div>
+                  <div className={styles.alertContent}>
+                    <b>{alert.title}</b>
+                    <p>{alert.description}</p>
+                    <button className={styles.alertAction} type="button" onClick={() => askAboutAlert(alert)}>Analyze with Copilot <span>→</span></button>
+                  </div>
                 </article>
               ))}
             </div>
