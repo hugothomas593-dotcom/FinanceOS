@@ -27,7 +27,7 @@ describe('Weekly CFO Brief', () => {
     const brief = buildCfoBrief({ inputs: null, modelStatus: 'none', actuals: [], currency: 'EUR' });
     expect(brief.forecast).toBeNull();
     expect(brief.alerts[0].id).toBe('model-missing');
-    expect(brief.priorities).toContain('Review and approve the company model');
+    expect(brief.priorities).toContain('Add and save company financial assumptions');
   });
 
   it('flags worsening cash trends and excludes foreign-currency records from totals', () => {
