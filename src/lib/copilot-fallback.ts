@@ -53,6 +53,12 @@ function signedMoney(value: number, currency: string): string {
   return value > 0 ? `+${money(value, currency)}` : value < 0 ? `−${money(Math.abs(value), currency)}` : money(0, currency);
 }
 
+function normalizeQuestion(message: string): string {
+  return message.toLocaleLowerCase('fr-FR').normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '').replace(/[’‘]/g, "'")
+    .replace(/\s+/g, ' ').trim();
+}
+
 function percentages(message: string): number[] {
   return [...message.matchAll(/(-?\d+(?:[.,]\d+)?)\s*%/g)]
     .map((match) => Number(match[1].replace(',', '.')))
@@ -60,9 +66,9 @@ function percentages(message: string): number[] {
 }
 
 function parseAmount(raw: string): number | null {
-  const cleaned = raw.toLowerCase().replace(/[€£$\s,]/g, '');
+  const cleaned = raw.toLowerCase().replace(/[€£$\s]/g, '');
   const suffix = cleaned.match(/(million|thousand|m|k)$/)?.[1];
-  const numeric = cleaned.replace(/(million|thousand|m|k)$/, '');
+  const numeric = cleaned.replace(/(million|thousand|m|k)$/, '').replace(',', '.');
   const value = Number(numeric);
   if (!Number.isFinite(value) || value <= 0) return null;
   const multiplier = suffix === 'm' || suffix === 'million' ? 1_000_000
@@ -93,14 +99,15 @@ function unavailableInput(question: string, reason: string): CopilotFallbackResu
 }
 
 export function buildCopilotFallback(input: Input): CopilotFallbackResult {
-  const q = input.message.toLowerCase();
+  const q = normalizeQuestion(input.message);
+  const french = /\b(combien|pouvons|peut on|notre|votre|tresorerie|chiffre|affaires|baisse|hausse|levee|lever|valorisation|depenses|charges|embaucher|recruter|prix|tarif|seuil|rentabilite|mois|salaire|couts|cout|financement|point mort)\b/.test(q);
   const model = input.inputs;
   const company = input.companyName || 'the company';
   const currency = input.currency;
   const historical = input.historical;
   const unit = input.unitEconomics;
 
-  if (/\b(cac|ltv|arpa|unit economics|churn|retention|customer acquisition)\b/.test(q)) {
+  if (/\b(cac|ltv|arpa|unit economics|churn|retention|customer acquisition|cout d'acquisition|fidelisation|economie unitaire)\b/.test(q)) {
     const fields = [
       ['MRR', unit.mrr, 'money'],
       ['ARR', unit.arr, 'money'],
@@ -133,7 +140,7 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
     };
   }
 
-  if (/\b(spend|spending|expenses?|outflows?|transactions?|cash in|cash out)\b/.test(q) && historical.records > 0 && (!model || /historical|last month|last quarter|category|categories|trend|actual/.test(q))) {
+  if (/\b(spend|spending|expenses?|outflows?|transactions?|cash in|cash out|depenses|charges|couts|historique|tendance|sorties)\b/.test(q) && historical.records > 0 && (!model || /historical|last month|last quarter|category|categories|trend|actual|historique|mois dernier|tendance|categorie/.test(q))) {
     const categories = historical.topSpendingCategories.slice(0, 5);
     const categoryText = categories.length
       ? categories.map((item) => `- ${item.category}: ${money(item.amount, currency)}`).join('\n')
@@ -160,7 +167,7 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
   const runway = rows[0].runwayMonths;
   const pct = percentages(input.message);
 
-  if (/\b(break[ -]?even|cover our costs|cover costs)\b/.test(q)) {
+  if (/\b(break[ -]?even|cover our costs|cover costs|seuil de rentabilite|point mort|couvrir les couts)\b/.test(q)) {
     const result = calculateBreakEven(model);
     if (!result.possible) {
       return {
@@ -176,8 +183,8 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
     };
   }
 
-  if (/\b(raise|fundrais|funding round|dilution|pre[ -]?money|post[ -]?money)\b/.test(q)) {
-    const suppliedAmounts = [...input.message.matchAll(/(?:€|£|\$)\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?/gi)]
+  if (/\b(raise|fundrais|funding round|dilution|pre[ -]?money|post[ -]?money|levee|lever|financement|valorisation)\b/.test(q)) {
+    const suppliedAmounts = [...q.matchAll(/\d[\d.,]*(?:\s*(?:k|m|million|thousand))?\s*(?:€|£|\$)/gi)]
       .map((match) => parseAmount(match[0]))
       .filter((value): value is number => value !== null);
     const raise = namedAmount(input.message, /(?:raise|raising|funding|round of)\D{0,28}((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)/i)
@@ -206,7 +213,7 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
     };
   }
 
-  if (/\b(pric(e|ing)|discount)\b/.test(q)) {
+  if (/\b(pric(e|ing)|discount|prix|tarif|tarification|remise)\b/.test(q)) {
     if (pct.length === 0) {
       return unavailableInput('the proposed price change in percent', 'Also tell me any expected volume or customer change. I will not infer price elasticity.');
     }
@@ -225,11 +232,11 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
     };
   }
 
-  if (/\b(revenue|sales|pipeline)\b/.test(q) && /\b(lower|drop|fall|declin|down|slower|slowdown|decrease|increase|grow|growth|higher|up)\b/.test(q)) {
+  if (/\b(revenue|sales|pipeline|chiffre d'affaires|ventes)\b/.test(q) && /\b(lower|drop|fall|declin|down|slower|slowdown|decrease|increase|grow|growth|higher|up|baisse|baisser|chute|chuter|diminu\w*|recul|hausse|augment\w*)\b/.test(q)) {
     if (pct.length === 0) {
       return unavailableInput('the expected percentage change in revenue', 'For example: “What happens if revenue is 20% lower for six months?” The current fallback models a sustained 18-month change, not a temporary six-month shock.');
     }
-    const directionDown = /\b(lower|drop|fall|declin|down|slower|slowdown|decrease)\b/.test(q);
+    const directionDown = /\b(lower|drop|fall|declin|down|slower|slowdown|decrease|baisse|baisser|chute|chuter|diminu\w*|recul)\b/.test(q);
     const magnitude = Math.abs(pct[0]);
     const revenueChangePct = directionDown ? -magnitude : magnitude;
     const result = simulateFinancialDecision(model, {
@@ -249,7 +256,7 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
     };
   }
 
-  if (/\b(afford|spend|invest|budget|headroom)\b/.test(q) && !/\b(hire|hiring|salary|headcount)\b/.test(q)) {
+  if (/\b(afford|spend|invest|budget|headroom|se permettre|depense|depenser|investir|capacite)\b/.test(q) && !/\b(hire|hiring|salary|headcount|embaucher|recruter|salaire|effectif)\b/.test(q)) {
     const result = calculateAffordableInvestment(model, input.targetRunwayMonths);
     const scenario = simulateFinancialDecision(model, {
       name: 'Maximum upfront spend at target runway',
@@ -269,16 +276,18 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
     };
   }
 
-  if (/\b(working capital|dso|dpo|receivables|payables|inventory days|payment terms)\b/.test(q)) {
+  if (/\b(working capital|dso|dpo|receivables|payables|inventory days|payment terms|bfr|besoin en fonds de roulement|creances|fournisseurs|stocks)\b/.test(q)) {
     return unavailableInput('the change in customer collection days (DSO), supplier payment days (DPO) and inventory days, where relevant', 'For example: “Model DSO +15 days, DPO unchanged, inventory days unchanged.” I will not assume payment-term changes.');
   }
 
-  if (/\b(hire|hiring|recruit|employee|engineer|headcount|team size)\b/.test(q)) {
-    const countMatch = input.message.match(/\b(\d+)\s*(?:new\s*)?(?:hires?|people|employees|engineers|staff|heads?)\b/i);
+  if (/\b(hire|hiring|recruit|employee|engineer|headcount|team size|embaucher|recruter|recrutement|personnes|salaries|ingenieur|effectif|equipe)\b/.test(q)) {
+    const countMatch = q.match(/\b(\d+)\s*(?:new\s*)?(?:hires?|people|employees|engineers|staff|heads?|personnes?|salaries?|ingenieurs?)\b/i);
     const count = countMatch ? Number(countMatch[1]) : null;
-    const salary = namedAmount(input.message, /((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)\s*(?:gross(?: annual)? salary|annual salary|per hire|per person)/i)
+    const salary = namedAmount(q, /((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?\s*(?:€|£|\$)?)\s*(?:gross(?: annual)? salary|annual salary|per hire|per person|brut(?: annuel)?|par personne|par embauche)/i)
+      ?? namedAmount(q, /(?:gross(?: annual)? salary|annual salary|salary per hire|salary per person|salary of|salary:|brut annuel|salaire annuel|salaire de)\s*((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?\s*(?:€|£|\$)?)/i);
       ?? namedAmount(input.message, /(?:gross(?: annual)? salary|annual salary|salary per hire|salary per person|salary of|salary:)\s*((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)/i);
-    const rateMatch = input.message.match(/(\d+(?:[.,]\d+)?)\s*%\s*(?:employer|payroll|charges|on-cost|loaded)/i)
+    const rateMatch = q.match(/(\d+(?:[.,]\d+)?)\s*%\s*(?:employer|payroll|charges|on-cost|loaded|patronales?)/i)
+      ?? q.match(/(?:employer|payroll|charges|on-cost|loaded|patronales?)[^\d%]{0,20}(\d+(?:[.,]\d+)?)\s*%/i);
       ?? input.message.match(/(?:employer|payroll|charges|on-cost|loaded)[^\d%]{0,20}(\d+(?:[.,]\d+)?)\s*%/i);
     const rate = rateMatch ? Number(rateMatch[1].replace(',', '.')) / 100 : null;
     if (!count || salary === null || rate === null) {
@@ -308,7 +317,7 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
     };
   }
 
-  if (/\b(runway|cash burn|cash position|how long will cash|cash left|cash last)\b/.test(q)) {
+  if (/\b(runway|cash burn|cash position|how long will cash|cash left|cash last|tresorerie|liquidites|combien de temps|consommation de cash)\b/.test(q)) {
     const futureText = base.firstMonthCashNegative === null
       ? 'The current 18-month forecast does not show a negative closing-cash month.'
       : `The first negative closing-cash month is month ${base.firstMonthCashNegative}.`;
@@ -319,7 +328,7 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
     };
   }
 
-  if (/\b(spend|expenses?|costs?|outflows?)\b/.test(q) && historical.records > 0) {
+  if (/\b(spend|expenses?|costs?|outflows?|depenses|charges|couts)\b/.test(q) && historical.records > 0) {
     return {
       answer: `**Historical spending review**\n\n- Average monthly outflows: ${money(historical.averageMonthlyOutflows, currency)}\n- Average monthly inflows: ${money(historical.averageMonthlyInflows, currency)}\n- Net cash movement: ${signedMoney(historical.netCashMovement, currency)}\n- Top categories: ${historical.topSpendingCategories.slice(0, 4).map((item) => `${item.category} (${money(item.amount, currency)})`).join(', ') || 'No categorized spend found'}.\n\nThese are imported actuals, not forecast inputs.`,
       calculation: { title: 'Historical cash movement', summary: `${historical.records} records across ${historical.monthsCovered} months.`, detail: historical },
