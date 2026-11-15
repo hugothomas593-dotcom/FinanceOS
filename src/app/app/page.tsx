@@ -661,7 +661,7 @@ export default function Home() {
             <div className="billing-actions">
               {billingStatus?.canManageBilling && <button className="button-secondary" disabled={billingBusy} onClick={() => void openBillingAction('/api/billing/portal')}>{billingBusy ? 'Opening…' : 'Manage subscription'}</button>}
               {!billingStatus?.subscriptionStatus && billingStatus?.canStartCheckout && <button className="button-primary" disabled={billingBusy} onClick={() => void openBillingAction('/api/billing/checkout')}>{billingBusy ? 'Opening secure checkout…' : 'Subscribe — €59/month'}</button>}
-              {!billingStatus?.billingConfigured && <p className="billing-note">Online checkout is not connected yet. A Stripe test-mode price and secure server credentials must be configured before payments can be tested.</p>}
+              {!billingStatus?.billingConfigured && <p className="billing-note">Checkout is not connected yet. Configure the single recurring EUR 59/month Avenor Founder price in Stripe, plus secure server credentials, before testing payments.</p>}
             </div>
           </>}
           {billingError && <p className="warning-text" role="alert">{billingError}</p>}
