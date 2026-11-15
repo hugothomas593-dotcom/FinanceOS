@@ -102,11 +102,17 @@ export function AvenorCopilot({
   organizationName,
   currency = 'EUR',
   embedded = false,
+  contextCompletion = 0,
+  hasFinancialModel = false,
+  hasImportedActuals = false,
 }: {
   organizationId: string;
   organizationName: string;
   currency?: string;
   embedded?: boolean;
+  contextCompletion?: number;
+  hasFinancialModel?: boolean;
+  hasImportedActuals?: boolean;
 }) {
   const currencySymbol = currency === 'GBP' ? '£' : currency === 'USD' ? '$' : '€';
   const [open, setOpen] = useState(false);
@@ -347,6 +353,19 @@ export function AvenorCopilot({
                         Ask about your cash position, costs, revenue or a business decision. Avenor uses the information in
                         this workspace and shows the assumptions behind its analysis.
                       </p>
+                      {embedded && (!hasFinancialModel || !hasImportedActuals || contextCompletion < 80) && (
+                        <section className={styles.setupChecklist} aria-label="Workspace setup progress">
+                          <div className={styles.setupTop}>
+                            <div><b>Make Avenor useful from day one</b><span>Three quick steps improve the quality of every analysis.</span></div>
+                            <strong>{[contextCompletion >= 80, hasFinancialModel, hasImportedActuals].filter(Boolean).length}/3</strong>
+                          </div>
+                          <div className={styles.setupRows}>
+                            <div><span className={contextCompletion >= 80 ? styles.setupDone : styles.setupTodo}>{contextCompletion >= 80 ? '✓' : '1'}</span><section><b>Company context</b><small>{contextCompletion >= 80 ? 'Business profile saved' : 'Product, customers and goals'}</small></section><button type="button" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-company-setup'))}>{contextCompletion >= 80 ? 'Edit' : 'Complete'} →</button></div>
+                            <div><span className={hasFinancialModel ? styles.setupDone : styles.setupTodo}>{hasFinancialModel ? '✓' : '2'}</span><section><b>Financial model</b><small>{hasFinancialModel ? 'Starting numbers saved' : 'Cash, revenue and monthly costs'}</small></section><button type="button" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-company-setup'))}>{hasFinancialModel ? 'Review' : 'Add'} →</button></div>
+                            <div><span className={hasImportedActuals ? styles.setupDone : styles.setupTodo}>{hasImportedActuals ? '✓' : '3'}</span><section><b>Actual transactions</b><small>{hasImportedActuals ? 'History available' : 'Optional CSV for historical analysis'}</small></section><button type="button" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-data-import'))}>{hasImportedActuals ? 'Review' : 'Import'} →</button></div>
+                          </div>
+                        </section>
+                      )}
                       <div className={styles.suggestionHeading}>COMMON QUESTIONS</div>
                       <div className={styles.suggestions}>
                         {suggestions.map((suggestion) => (
