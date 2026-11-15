@@ -17,6 +17,7 @@ import {
   type ActualRecord,
 } from '@/lib/finance-intelligence';
 import { validateModelInputs, type HireInput, type ModelInputs } from '@/lib/finance';
+import { buildCopilotFallback } from '@/lib/copilot-fallback';
 import { CompanyContextSchema, EMPTY_COMPANY_CONTEXT, type CompanyContext } from '@/lib/company-context';
 
 export const maxDuration = 60;
@@ -485,10 +486,28 @@ export async function POST(request: Request) {
       if (!answer) throw new Error('The AI model returned an empty response');
     } catch (error) {
       aiUnavailable = true;
-      answer = inputs
-        ? `Avenor's AI analysis service is temporarily unavailable, so I haven't generated a full decision brief. The saved model currently shows monthly revenue of ${Math.round(inputs.monthlyRevenue).toLocaleString('en-GB')} ${currency}, monthly payroll of ${Math.round(inputs.existingMonthlyPayroll).toLocaleString('en-GB')} ${currency}, monthly operating expenses of ${Math.round(inputs.monthlyOpexExPayroll).toLocaleString('en-GB')} ${currency}, and an 18-month projected closing cash of ${Math.round((snapshot as { forecast: { endingCash: number } }).forecast.endingCash).toLocaleString('en-GB')} ${currency}. Please retry the question; no unverified recommendation has been generated.`
-        : `I can help analyze this, but this workspace does not yet have a valid saved financial model. Please add and approve your company assumptions first. I will not invent company numbers. The AI analysis service is also temporarily unavailable.`;
-      console.error('Avenor Copilot generation failed', error);
+      const fallback = buildCopilotFallback({
+        message,
+        companyName: organizationName,
+        currency,
+        modelStatus: latestModel?.status ?? null,
+        inputs,
+        targetRunwayMonths: companyContext.targetRunwayMonths,
+        historical,
+        unitEconomics,
+      });
+      answer = fallback.answer;
+      if (fallback.calculation) toolEvidence.push(fallback.calculation);
+      if (fallback.saveableScenario) {
+        saveableScenario = {
+          ...fallback.saveableScenario,
+          assumptions: {
+            ...fallback.saveableScenario.assumptions,
+            modelVersionId: latestModel?.id ?? null,
+          },
+        };
+      }
+      console.error('Avenor Copilot generation failed; deterministic local analysis used', error);
     }
 
     const evidence = {
