@@ -1802,3 +1802,26 @@ body {
   .nav-item { padding: 7px 8px; font-size: 9px; }
   .copilot-host.active > aside { min-height: 0; }
 }
+
+/* Company-context editor controls */
+.company-context-surface .number-field>input,
+.company-context-surface .number-field>select,
+.company-context-surface .number-field>textarea {
+  width:100%;
+  min-width:0;
+  border:1px solid #dfe6f0;
+  border-radius:7px;
+  padding:10px 11px;
+  background:#fff;
+  color:#2d4059;
+  outline:none;
+  font:inherit;
+  font-size:11px;
+}
+.company-context-surface .number-field>textarea { resize:vertical; line-height:1.55; }
+.company-context-surface .number-field>input:focus,
+.company-context-surface .number-field>select:focus,
+.company-context-surface .number-field>textarea:focus {
+  border-color:#94a9ed;
+  box-shadow:0 0 0 3px rgba(49,91,214,.08);
+}
