@@ -177,8 +177,15 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
   }
 
   if (/\b(raise|fundrais|funding round|dilution|pre[ -]?money|post[ -]?money)\b/.test(q)) {
-    const raise = namedAmount(input.message, /(?:raise|raising|funding|round of)\D{0,28}((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)/i);
-    const valuation = namedAmount(input.message, /(?:pre[ -]?money|valuation)\D{0,28}((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)/i);
+    const suppliedAmounts = [...input.message.matchAll(/(?:€|£|\$)\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?/gi)]
+      .map((match) => parseAmount(match[0]))
+      .filter((value): value is number => value !== null);
+    const raise = namedAmount(input.message, /(?:raise|raising|funding|round of)\D{0,28}((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)/i)
+      ?? suppliedAmounts[0]
+      ?? null;
+    const valuation = namedAmount(input.message, /(?:pre[ -]?money|valuation)\D{0,28}((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)/i)
+      ?? suppliedAmounts[1]
+      ?? null;
     if (raise === null || valuation === null) {
       return unavailableInput(
         'the amount you want to raise and the pre-money valuation',
@@ -269,8 +276,8 @@ export function buildCopilotFallback(input: Input): CopilotFallbackResult {
   if (/\b(hire|hiring|recruit|employee|engineer|headcount|team size)\b/.test(q)) {
     const countMatch = input.message.match(/\b(\d+)\s*(?:new\s*)?(?:hires?|people|employees|engineers|staff|heads?)\b/i);
     const count = countMatch ? Number(countMatch[1]) : null;
-    const salary = namedAmount(input.message, /(?:salary|gross|per person|per hire|annual pay|per year)\D{0,24}((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)/i)
-      ?? namedAmount(input.message, /((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)\s*(?:gross annual salary|annual salary|per hire|per person|salary)/i);
+    const salary = namedAmount(input.message, /((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)\s*(?:gross(?: annual)? salary|annual salary|per hire|per person)/i)
+      ?? namedAmount(input.message, /(?:gross(?: annual)? salary|annual salary|salary per hire|salary per person|salary of|salary:)\s*((?:€|£|\$)?\s*\d[\d.,]*(?:\s*(?:k|m|million|thousand))?)/i);
     const rateMatch = input.message.match(/(\d+(?:[.,]\d+)?)\s*%\s*(?:employer|payroll|charges|on-cost|loaded)/i)
       ?? input.message.match(/(?:employer|payroll|charges|on-cost|loaded)[^\d%]{0,20}(\d+(?:[.,]\d+)?)\s*%/i);
     const rate = rateMatch ? Number(rateMatch[1].replace(',', '.')) / 100 : null;
