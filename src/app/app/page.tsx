@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { forecast, summarize, type ModelInputs, type HireInput, type MonthResult } from '@/lib/finance';
 import { AvenorCopilot } from '@/components/avenor-copilot';
+import { CfoBrief } from '@/components/cfo-brief';
 
 type View = 'Overview' | 'Decision simulator' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
 const viewTitles: Record<View, string> = {
@@ -516,6 +517,7 @@ export default function Home() {
             <div className="copilot-home-value"><i>✓</i><div><b>Keep the reasoning</b><p>Review assumptions and save decisions to your ledger.</p></div></div>
           </aside>
         </section>}
+        {view === 'Overview' && organizationId && <CfoBrief organizationId={organizationId} />}
         
         {view === 'Overview' && <>
           {workspaceLoading ? <section className="surface empty-state large-empty"><b>Loading your financial workspace…</b></section>
