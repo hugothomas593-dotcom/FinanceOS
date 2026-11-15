@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { forecast, summarize, type ModelInputs, type HireInput, type MonthResult } from '@/lib/finance';
 import { AvenorCopilot } from '@/components/avenor-copilot';
 
-type View = 'Overview' | 'Decision simulator' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting';
+type View = 'Overview' | 'Decision simulator' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
 const money = (v: number) => new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(v);
 const compact = (v: number) => new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(v);
 const initial: ModelInputs = { openingCash: 0, monthlyRevenue: 0, monthlyRevenueGrowth: 0, monthlyOpexExPayroll: 0, monthlyOpexGrowth: 0, cogsRatio: 0, existingMonthlyPayroll: 0, existingOtherNetCashAdjustments: 0 };
@@ -83,6 +83,16 @@ export default function Home() {
   const [kpiBusy, setKpiBusy] = useState(false);
   const [kpiHasData, setKpiHasData] = useState(false);
   const [kpiError, setKpiError] = useState('');
+  const [billingLoading, setBillingLoading] = useState(false);
+  const [billingBusy, setBillingBusy] = useState(false);
+  const [billingError, setBillingError] = useState('');
+  const [billingStatus, setBillingStatus] = useState<{
+    billingConfigured: boolean;
+    subscriptionStatus: string | null;
+    currentPeriodEnd: string | null;
+    canStartCheckout: boolean;
+    canManageBilling: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -206,6 +216,24 @@ export default function Home() {
     void loadBusinessMetrics();
     return () => { cancelled = true; };
   }, [organizationId, kpiPeriod]);
+
+  useEffect(() => {
+    if (!organizationId || view !== 'Plan & billing') return;
+    let cancelled = false;
+    setBillingLoading(true);
+    setBillingError('');
+    fetch(`/api/billing/status?organizationId=${encodeURIComponent(organizationId)}`, { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not load billing status');
+        if (!cancelled) setBillingStatus(data);
+      })
+      .catch((error) => {
+        if (!cancelled) setBillingError(error instanceof Error ? error.message : 'Could not load billing status');
+      })
+      .finally(() => { if (!cancelled) setBillingLoading(false); });
+    return () => { cancelled = true; };
+  }, [organizationId, view]);
 
   const inputs: ModelInputs = { ...initial, openingCash: cash, monthlyRevenue: revenue, existingMonthlyPayroll: payroll, monthlyOpexExPayroll: opex, monthlyRevenueGrowth: growth / 100, cogsRatio: cogs / 100 };
   const hire: HireInput = { headcount, startMonth: startMonth - 1, grossAnnualSalary: salary, employerCostRate: employerRate / 100, benefitsMonthlyPerPerson: benefits, recruitingCostPerPerson: recruiting, equipmentCostPerPerson: equipment, productivityRampMonths: 6 };
@@ -336,8 +364,29 @@ export default function Home() {
     }
   }
 
+  async function openBillingAction(endpoint: '/api/billing/checkout' | '/api/billing/portal') {
+    if (!organizationId) return;
+    setBillingBusy(true);
+    setBillingError('');
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Billing request failed');
+      if (typeof data.url !== 'string') throw new Error('The billing provider did not return a secure link');
+      window.location.assign(data.url);
+    } catch (error) {
+      setBillingError(error instanceof Error ? error.message : 'Billing request failed');
+    } finally {
+      setBillingBusy(false);
+    }
+  }
+
   const nav: { label: View; icon: string }[] = [
-    { label: 'Overview', icon: '◫' }, { label: 'Decision simulator', icon: '⌁' }, { label: 'Decision ledger', icon: '▤' }, { label: 'Business metrics', icon: '↗' }, { label: 'Data import', icon: '⇧' }, { label: 'Fundraising planner', icon: '◇' }, { label: 'Investor reporting', icon: '▧' }, { label: 'Company assumptions', icon: '⚙' },
+    { label: 'Overview', icon: '◫' }, { label: 'Decision simulator', icon: '⌁' }, { label: 'Decision ledger', icon: '▤' }, { label: 'Business metrics', icon: '↗' }, { label: 'Data import', icon: '⇧' }, { label: 'Fundraising planner', icon: '◇' }, { label: 'Investor reporting', icon: '▧' }, { label: 'Company assumptions', icon: '⚙' }, { label: 'Plan & billing', icon: '€' },
   ];
 
   return <main className="app-shell">
@@ -352,7 +401,7 @@ export default function Home() {
     <section className="main-area">
       <header className="topbar"><div className="breadcrumb">{organizationName || 'Your company'} <span>/</span> {view}</div><div className="top-actions"><span className="sync-status"><i/> {workspaceLoading ? 'Loading workspace' : hasModel ? (modelStatus === 'approved' ? 'Approved model' : 'Draft model · review required') : 'Setup required'}</span><button className="button-secondary" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Ask Avenor</button><div className="top-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div></div></header>
       <div className="page-content">
-        <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{view === 'Overview' ? 'Overview' : view}</h1><p>{view === 'Overview' ? 'Cash position, operating performance and the assumptions behind your forecast.' : view === 'Decision simulator' ? 'Compare the financial impact of a decision before you make it.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit assumptions <span>↗</span></button></div></div>
+        <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{view === 'Overview' ? 'Overview' : view}</h1><p>{view === 'Overview' ? 'Cash position, operating performance and the assumptions behind your forecast.' : view === 'Decision simulator' ? 'Compare the financial impact of a decision before you make it.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit assumptions <span>↗</span></button></div></div>
 
         {view === 'Overview' && <>
           {workspaceLoading ? <section className="surface empty-state large-empty"><b>Loading your financial workspace…</b></section>
@@ -366,6 +415,18 @@ export default function Home() {
             <Metric label="Cash used this month" value={money(Math.max(0, -base[0].netCashFlow))} sub="After money coming in" trend="neutral" icon="⌁" />
             <Metric label="Time until cash runs out" value={baseRunway === null ? 'Cash positive' : `${baseRunway.toFixed(1)} months`} sub="Estimated at the current pace" trend={baseRunway !== null && baseRunway < 9 ? 'warning' : 'positive'} icon="◷" />
           </div>
+          <section className="decision-intro">
+            <div className="decision-intro-copy">
+              <div className="section-kicker">THE AVENOR DIFFERENCE</div>
+              <h2>Know what a decision will cost before you commit.</h2>
+              <p>Avenor connects your company numbers to the choices in front of you — how much you can spend, how hiring changes your runway, and what to do next.</p>
+            </div>
+            <div className="decision-intro-actions">
+              <button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'What can we afford to spend while keeping at least 12 months of runway?' }))}>What can we afford?</button>
+              <button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'Can we afford another hire, and what happens to our runway?' }))}>Can we afford to hire?</button>
+              <button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'What happens if revenue is 20% lower than forecast for the next six months?' }))}>What if revenue slows?</button>
+            </div>
+          </section>
           <div className="dashboard-grid">
             <section className="surface chart-panel"><div className="surface-heading"><div><div className="section-kicker">LOOKING AHEAD</div><h2>Will we have enough cash?</h2><p>Estimated cash balance over the next 18 months</p></div><div className="legend"><span><i className="legend-base"/>Base case</span><span><i className="legend-scenario"/>Hiring scenario</span></div></div><div className="chart-summary"><b>{money(baseSummary.endingCash)}</b><span>Projected cash at month 18</span><span className={`delta ${impact >= 0 ? 'negative' : 'positive'}`}>{impact >= 0 ? '−' : '+'}{money(Math.abs(impact))} <small>hiring impact</small></span></div><div className="chart-wrap"><svg viewBox="0 0 760 230" role="img" aria-label="18 month cash forecast chart"><defs><linearGradient id="areaFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor="#6a9b88" stopOpacity=".18"/><stop offset="100%" stopColor="#6a9b88" stopOpacity="0"/></linearGradient></defs>{[35,85,135,185].map(y=><line key={y} x1="42" x2="744" y1={y} y2={y} className="grid-line"/>)}{chart.labels.map((m,i)=><text key={m} x={42+i*(702/17)} y="218" className="axis-label" textAnchor="middle">{i % 3 === 0 ? m : ''}</text>)}<path d={chart.baseArea} fill="url(#areaFill)"/><path d={chart.basePath} className="base-line"/><path d={chart.scenarioPath} className="scenario-line"/><circle cx="744" cy={chart.baseY} r="4" className="base-point"/><circle cx="744" cy={chart.scenarioY} r="4" className="scenario-point"/></svg><div className="chart-foot"><span>Forecast starts today</span><span>Workspace base currency · {currency}</span></div></div></section>
             <section className="surface copilot-panel"><div className="copilot-top"><div className="copilot-symbol">A</div><span className="beta-pill">DECISION SUPPORT</span></div><div className="section-kicker">ASK AVENOR</div><h2>Need to work through a decision?</h2><p className="copilot-description">Ask about your numbers, compare options or understand a change to your plan.</p><div className="prompt-chips"><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'Can we afford to hire three engineers in January?' }))}>Can we afford to hire?</button><button onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', { detail: 'Explain our current runway and the main cash risks.' }))}>Explain our runway</button></div><div className="copilot-input"><textarea value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => {if (e.key === 'Enter' && !e.shiftKey) {e.preventDefault();setView('Decision simulator');analyze();}}} placeholder="Ask about cash, costs, growth or a business decision..."/><button aria-label="Analyse question" onClick={() => {setView('Decision simulator');analyze();}}>↑</button></div><small className="copilot-footnote">Answers use your saved model and available workspace data.</small><button className="button-primary full-button" onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot'))}>Open Avenor chat <span>→</span></button></section>
@@ -422,6 +483,26 @@ export default function Home() {
         {view === 'Fundraising planner' && <section className="surface assumptions-surface"><div className="section-kicker">FUNDRAISING INTELLIGENCE</div><h2>Model your next round</h2><p className="form-intro">Estimate dilution and cash runway after a hypothetical equity raise. This is a simplified planning calculator, not a valuation opinion.</p><div className="form-grid"><NumberField label="Target raise" value={raiseAmount} set={setRaiseAmount} min={0} max={100000000} step={50000} prefix="€"/><NumberField label="Pre-money valuation" value={preMoney} set={setPreMoney} min={1} max={1000000000} step={250000} prefix="€"/></div><div className="metric-grid"><Metric label="Post-money valuation" value={money(preMoney+raiseAmount)} sub="Pre-money + new capital" trend="neutral" icon="◇"/><Metric label="New investor ownership" value={`${(raiseAmount/(preMoney+raiseAmount)*100).toFixed(1)}%`} sub="Before option-pool adjustments" trend="neutral" icon="%"/><Metric label="Cash after raise" value={money(cash+raiseAmount)} sub="Excludes fees and other financing" trend="positive" icon="↗"/><Metric label="Estimated runway" value={base[0].netCashFlow<0?`${((cash+raiseAmount)/Math.abs(base[0].netCashFlow)).toFixed(1)} months`:'Cash positive'} sub="Flat current monthly net burn assumption" trend="neutral" icon="◷"/></div><p className="form-intro">This calculation assumes a simple priced equity round, no convertibles, no option-pool increase, no fees and no other dilution. Validate with legal and finance advisers.</p></section>}
 
         {view === 'Investor reporting' && <section className="surface ledger-surface"><div className="section-kicker">INVESTOR REPORTING</div><h2>Monthly financial snapshot</h2><p className="form-intro">A simple export from the current model assumptions. Do not share as actual company reporting until connected to verified company data.</p><div className="metric-grid"><Metric label="Monthly revenue" value={money(revenue)} sub="Model assumption" trend="neutral" icon="↗"/><Metric label="Gross margin" value={`${((1-cogs/100)*100).toFixed(1)}%`} sub="Revenue less COGS" trend="neutral" icon="%"/><Metric label="Monthly net cash flow" value={money(base[0].netCashFlow)} sub="Current model month" trend="neutral" icon="⌁"/><Metric label="Month 18 cash" value={money(baseSummary.endingCash)} sub="Base case forecast" trend="neutral" icon="◈"/></div><button className="button-primary" onClick={()=>{const rows=['Month,Revenue,COGS,Payroll,Operating expenses,Net cash flow,Closing cash',...base.map(r=>[r.month,r.revenue,r.cogs,r.payroll,r.nonPayrollOpex,r.netCashFlow,r.closingCash].join(','))];const blob=new Blob([rows.join('\n')],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='financeos-18-month-forecast.csv';a.click();URL.revokeObjectURL(url);}}>Export 18-month forecast CSV ↓</button></section>}
+
+        {view === 'Plan & billing' && <section className="surface billing-surface">
+          <div className="section-kicker">ACCOUNT & SUBSCRIPTION</div>
+          <h2>Plan and billing</h2>
+          <p className="form-intro">Your subscription is linked to this company workspace. Payment details are handled by Stripe; Avenor never stores your card information.</p>
+          {billingLoading ? <p className="form-intro">Checking your subscription…</p> : <>
+            <div className="billing-grid">
+              <div><span>Subscription status</span><b>{billingStatus?.subscriptionStatus ? billingStatus.subscriptionStatus.replaceAll('_', ' ') : 'No subscription linked'}</b></div>
+              <div><span>Next renewal</span><b>{billingStatus?.currentPeriodEnd ? new Date(billingStatus.currentPeriodEnd).toLocaleDateString('en-GB') : 'Not available'}</b></div>
+              <div><span>Payment setup</span><b>{billingStatus?.billingConfigured ? 'Connected' : 'Not configured'}</b></div>
+            </div>
+            <div className="billing-actions">
+              {billingStatus?.canManageBilling && <button className="button-secondary" disabled={billingBusy} onClick={() => void openBillingAction('/api/billing/portal')}>{billingBusy ? 'Opening…' : 'Manage subscription'}</button>}
+              {!billingStatus?.subscriptionStatus && billingStatus?.canStartCheckout && <button className="button-primary" disabled={billingBusy} onClick={() => void openBillingAction('/api/billing/checkout')}>{billingBusy ? 'Opening secure checkout…' : 'Choose a subscription'}</button>}
+              {!billingStatus?.billingConfigured && <p className="billing-note">Online checkout is not connected yet. A Stripe test-mode price and secure server credentials must be configured before payments can be tested.</p>}
+            </div>
+          </>}
+          {billingError && <p className="warning-text" role="alert">{billingError}</p>}
+          <p className="billing-footnote">No payment is taken from this screen. You will be redirected to Stripe to review and confirm any payment.</p>
+        </section>}
 
         <footer className="app-footer"><span>Avenor <b>·</b> Private beta</span><span>{hasModel ? (modelStatus === 'approved' ? 'Approved financial model' : 'Draft financial model') : 'Financial model not configured'} · Not accounting or tax advice</span></footer>
       </div>
