@@ -151,14 +151,14 @@ export function AvenorCopilot({
   }, [messages, busy, open]);
 
   const suggestions = useMemo(() => [
-    'Can we afford a €30k investment and keep 12 months of runway?',
-    'What is driving our cash burn and what should we reduce?',
-    'What happens if revenue falls by 20% next quarter?',
-    'How much monthly revenue do we need to break even?',
-    'Model a 10% price increase with a 5% volume decline.',
-    'What working-capital risk do slower customer payments create?',
-    'What are our CAC, LTV and CAC payback from this month’s metrics?',
-    'Are we losing customers faster than we are acquiring them?',
+    'Could we spend €30k on this and still cover the next 12 months?',
+    'Why are we spending more than we bring in, and what could we reduce?',
+    'What happens if sales are 20% lower for the next six months?',
+    'How much do we need to sell each month to cover our costs?',
+    'Would a 10% price increase offset a 5% drop in customers?',
+    'What if customers start paying us 30 days later?',
+    'Are we spending too much to win new customers?',
+    'Are we losing customers faster than we are replacing them?',
   ], []);
 
   async function loadThread(id: string) {
