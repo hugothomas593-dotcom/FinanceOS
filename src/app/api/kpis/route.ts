@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/supabase/server';
+import { monthDateRange } from '@/lib/period';
 
 const Period = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Period must use YYYY-MM');
 
@@ -56,12 +57,13 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: 'Could not load workspace currency' }, { status: 404 });
     }
 
-    const periodStart = `${period.data}-01`;
+    const { start, endExclusive } = monthDateRange(period.data);
     const { data, error } = await supabase
       .from('financial_actuals')
       .select('metric_key,amount,source,imported_at')
       .eq('organization_id', orgId.data)
-      .eq('period', periodStart)
+      .gte('period', start)
+      .lt('period', endExclusive)
       .like('metric_key', 'kpi:%')
       .order('imported_at', { ascending: false });
 
