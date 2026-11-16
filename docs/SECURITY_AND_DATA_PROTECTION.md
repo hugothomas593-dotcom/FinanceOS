@@ -75,7 +75,7 @@ Additional staging-only entitlement simulations were run with all writes rolled 
 5. **Production configuration:** The Production database, deployment region, environment variables, firewall/rate limits and webhook settings must be audited separately. Staging results do not transfer automatically.
 6. **AI provider:** Successful AI Gateway inference was not evidenced in the previous seven-day usage query. Confirm provider routing, data retention, data-use terms, region and subprocessors before sending real customer data.
 7. **Legal documents:** `/privacy` and `/terms` are not live. There is no customer-ready Avenor DPA, subprocessor register or published retention/deletion policy yet.
-8. **Data lifecycle:** Customer self-service export and deletion, support-assisted erasure, retention limits for Copilot conversations and a documented backup-deletion schedule are not complete.
+8. **Data lifecycle:** The correction branch now includes owner/admin workspace export and owner-only workspace erasure from the active database. Erasure requires exact workspace-name and phrase confirmation, blocks pending Checkout and cancels any linked Stripe subscription first. It does not delete the individual Supabase Auth account, provider backups or statutory Stripe billing records. Backup expiry/retention, account-level erasure and a support-assisted request process remain to be defined and verified.
 9. **Operational security:** Incident response, breach notification, access reviews, privileged-account MFA, security alert ownership, support escalation and periodic restore exercises need documented owners and rehearsals.
 
 ## How to prove data protection to a prospective customer
