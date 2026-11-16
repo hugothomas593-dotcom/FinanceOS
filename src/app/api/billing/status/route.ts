@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/supabase/server';
+import { canStartCheckout } from '@/lib/stripe-billing';
 
 export async function GET(request: Request) {
   try {
@@ -40,7 +41,7 @@ export async function GET(request: Request) {
       billingConfigured,
       subscriptionStatus: subscription?.status ?? null,
       currentPeriodEnd: subscription?.current_period_end ?? null,
-      canStartCheckout: billingRole && billingConfigured && (!subscription?.stripe_subscription_id || ['canceled', 'incomplete_expired'].includes(subscription.status)),
+      canStartCheckout: billingRole && billingConfigured && canStartCheckout(subscription?.status, subscription?.stripe_subscription_id),
       canManageBilling: billingRole && Boolean(
         process.env.STRIPE_SECRET_KEY &&
         process.env.NEXT_PUBLIC_APP_URL &&
