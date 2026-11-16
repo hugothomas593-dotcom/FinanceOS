@@ -1,6 +1,8 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { createBrowserClient } from '@supabase/ssr';
+import { getSupabasePublicConfig } from '@/lib/supabase/config';
 import { forecast, summarize, type ModelInputs, type MonthResult } from '@/lib/finance';
 import { AvenorCopilot } from '@/components/avenor-copilot';
 import { CfoBrief } from '@/components/cfo-brief';
@@ -119,6 +121,8 @@ export default function Home() {
   const [cogs, setCogs] = useState(initial.cogsRatio * 100);
   const [saved, setSaved] = useState<SavedDecision[]>([]);
   const [toast, setToast] = useState('');
+  const [signOutBusy, setSignOutBusy] = useState(false);
+  const [signOutError, setSignOutError] = useState('');
 
   useEffect(() => {
     const handleDecisionSaved = (event: Event) => {
@@ -447,6 +451,25 @@ export default function Home() {
     }
   }
 
+  async function signOut() {
+    setSignOutBusy(true);
+    setSignOutError('');
+    try {
+      const config = getSupabasePublicConfig();
+      if (!config) throw new Error('Authentication is not configured.');
+
+      const supabase = createBrowserClient(config.url, config.key);
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+
+      window.localStorage.removeItem('financeos.organizationId');
+      window.location.replace('/login');
+    } catch (error) {
+      setSignOutError(error instanceof Error ? error.message : 'Could not sign out. Please try again.');
+      setSignOutBusy(false);
+    }
+  }
+
   async function openBillingAction(endpoint: '/api/billing/checkout' | '/api/billing/portal') {
     if (!organizationId) return;
     setBillingBusy(true);
@@ -513,7 +536,16 @@ export default function Home() {
         </select>
       </label>
       <nav className="nav-groups">{navGroups.map(group => <div className="nav-group" key={group.title}><div className="nav-group-label">{group.title}</div><div className="nav-group-items">{group.items.map(item => <button key={item.label} className={`nav-item ${view === item.label ? 'selected' : ''}`} onClick={() => setView(item.label)}><span className="nav-icon">{item.icon}</span>{item.title}{item.label === 'Decision ledger' && saved.length > 0 && <span className="nav-count">{saved.length}</span>}{item.label === 'CFO Brief' && insightCount > 0 && <span className="nav-count">{insightCount}</span>}</button>)}</div></div>)}</nav>
-      <div className="sidebar-bottom"><div className="profile"><div className="profile-avatar">A</div><div><b>Workspace account</b><small>Signed-in user</small></div><span className="more">···</span></div></div>
+      <div className="sidebar-bottom">
+        <div className="profile">
+          <div className="profile-avatar">A</div>
+          <div><b>Workspace account</b><small>Signed-in user</small></div>
+        </div>
+        <button className="signout-button" type="button" onClick={() => void signOut()} disabled={signOutBusy}>
+          {signOutBusy ? 'Signing out…' : 'Sign out'}
+        </button>
+        {signOutError && <p className="signout-error" role="alert">{signOutError}</p>}
+      </div>
     </aside>
 
     <section className="main-area">
