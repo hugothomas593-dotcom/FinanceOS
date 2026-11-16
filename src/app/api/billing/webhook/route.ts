@@ -5,7 +5,6 @@ import { verifyStripeSignature } from '@/lib/stripe-webhook';
 export async function POST(req: Request) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const stripeSecret = process.env.STRIPE_SECRET_KEY;
   if (!secret || !serviceKey || !supabaseUrl || !stripeSecret) {
