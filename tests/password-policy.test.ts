@@ -1,12 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { meetsMinimumPasswordPolicy } from '../src/lib/password-policy';
 
-describe('Avenor sign-up password guidance', () => {
-  it('accepts a 12+ character password with lower, upper, numeric and symbol characters', () => {
+describe('Avenor account password policy', () => {
+  it('accepts the 12-character minimum with lowercase, uppercase, a number and a symbol', () => {
+    expect(meetsMinimumPasswordPolicy('Abcdefghij1!')).toBe(true);
+  });
+
+  it('accepts a longer password with lowercase, uppercase, a number and a symbol', () => {
     expect(meetsMinimumPasswordPolicy('StrongPassw0rd!')).toBe(true);
   });
 
   it.each([
+    'Abcdefghi1!',
     'Short1!',
     'alllowercase123!',
     'ALLUPPERCASE123!',
