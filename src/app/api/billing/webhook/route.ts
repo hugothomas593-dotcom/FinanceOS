@@ -92,6 +92,20 @@ export async function POST(request: Request) {
     }
     if (!organizationId) throw new Error('Subscription is missing its Avenor workspace reference');
 
+    const { data: workspace, error: workspaceError } = await admin
+      .from('organizations')
+      .select('id')
+      .eq('id', organizationId)
+      .maybeSingle();
+    if (workspaceError) throw workspaceError;
+    // A workspace owner may delete a workspace immediately after canceling its
+    // Stripe subscription. A delayed signed cancellation webhook should still
+    // be acknowledged rather than retried forever against a deleted FK target.
+    if (!workspace) {
+      if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired') return;
+      throw new Error('The referenced Avenor workspace no longer exists');
+    }
+
     const customerId = typeof subscription.customer === 'string'
       ? subscription.customer
       : subscription.customer?.id ?? null;
