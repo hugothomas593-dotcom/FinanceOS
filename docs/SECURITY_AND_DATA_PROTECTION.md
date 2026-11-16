@@ -7,7 +7,7 @@
 
 Avenor has meaningful access controls in its application and staging database. In particular, customer workspaces are scoped by organization membership, sensitive financial tables use PostgreSQL Row Level Security (RLS), and paid product data is now additionally gated on a live, unexpired Stripe trial or subscription.
 
-This is not a guarantee of perfect security. No independent penetration test, full two-customer isolation test, production backup-restore exercise or complete incident-response exercise has been completed. Supabase's certifications apply to Supabase's service boundary, not automatically to Avenor.
+This is not a guarantee of perfect security. No independent penetration test, full two-customer CRUD isolation test, production backup-restore exercise or complete incident-response exercise has been completed. Supabase's certifications apply to Supabase's service boundary, not automatically to Avenor.
 
 Do not tell customers that Avenor is SOC 2 certified, ISO 27001 certified, penetration-tested or “100% secure”. The accurate description today is that Avenor uses Supabase Auth and PostgreSQL RLS, enforces organization-level data access and has passed a limited staging paywall test.
 
@@ -64,11 +64,11 @@ The following checks were run against the isolated Avenor staging project, not P
 - The authenticated role had no SELECT privilege on `public.billing_trial_claims`.
 - The public entitlement RPC cannot be executed by the `anon` role; it is granted to `authenticated` only.
 
-These checks prove the tested no-subscription path in staging. They do not prove every API, every role combination, every two-customer isolation scenario or the Production configuration.
+Additional staging-only entitlement simulations were run with all writes rolled back: an unentitled user saw zero actuals/models/scenarios/context; a trialing/active subscription exposed only its own workspace data; a `past_due` subscription and a non-member user saw zero rows. These are read-path simulations, not a full CRUD or two-customer acceptance suite.\n\nThe Preview correction branch also adds an origin/Fetch Metadata check to mutating API routes (Stripe webhooks are exempt and instead verify Stripe signatures) and Postgres-backed per-user rate limits for Copilot, CSV import, Checkout, Billing Portal and CFO Brief. Migration 012 was applied to staging. The rate-limit table has RLS enabled and no privileges for `anon` or `authenticated`; a permission check confirmed the authenticated role cannot read the table or execute its RPC. The rate-limit SQL still requires end-to-end route tests under real traffic.\n\nThese checks prove only the described paths in staging. They do not prove every API, write operation, role combination, every two-customer isolation scenario or the Production configuration.
 
 ## Known gaps — do not claim these are complete
 
-1. **Leaked-password protection:** Supabase Security Advisor still reports this control disabled in staging. Enable it in Supabase Auth settings (subject to plan availability) before public registration.
+1. **Leaked-password protection:** Supabase Security Advisor reports this control disabled. The connected Supabase organization is on the Free plan; Supabase lists leaked-password protection as Pro and above. It cannot be enabled on the current plan. Upgrade is a paid account decision; after upgrade, enable it in Auth → Sign In / Providers → Email and verify the advisor is clear. Until then, keep registration limited to invited test users and enforce a strong minimum password policy as a partial mitigation.
 2. **Independent security assessment:** No independent penetration test or vulnerability assessment of the Avenor application has been commissioned or completed.
 3. **Cross-customer isolation:** A complete test with two separate authenticated users in two separate organizations, including attempted cross-tenant reads and writes across every table and API, remains to be completed.
 4. **Backups and recovery:** The actual plan-level backup settings for each Avenor project, retention period, point-in-time recovery eligibility and a restore test have not been verified. Do not promise a recovery time or recovery point until measured.
