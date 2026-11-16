@@ -22,4 +22,8 @@ describe('server-side API rate limit policy', () => {
   it('allows only three destructive workspace deletion attempts per day', () => {
     expect(API_RATE_LIMITS.workspaceDeletion).toEqual({ maxRequests: 3, windowSeconds: 86_400 });
   });
+
+  it('limits workspace export to three archives per hour', () => {
+    expect(API_RATE_LIMITS.workspaceExport).toEqual({ maxRequests: 3, windowSeconds: 3600 });
+  });
 });
