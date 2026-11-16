@@ -40,6 +40,7 @@ export default function OnboardingPage() {
         if (!active || !data?.organizations?.length) return;
         const organization = data.organizations[0];
         localStorage.setItem('financeos.organizationId', organization.organization_id);
+        document.cookie = `avenor_organization_id=${encodeURIComponent(organization.organization_id)}; Path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
         window.location.replace('/app');
       })
       .catch(() => {});
@@ -114,6 +115,7 @@ export default function OnboardingPage() {
         organizationId = organizationData.organizationId as string;
         setCreatedOrganizationId(organizationId);
         localStorage.setItem('financeos.organizationId', organizationId);
+        document.cookie = `avenor_organization_id=${encodeURIComponent(organizationId)}; Path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
       }
 
       const contextResponse = await fetch('/api/context', {
