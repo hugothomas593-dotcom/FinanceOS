@@ -55,3 +55,41 @@ export function isAvenorFounderPrice(price: StripePriceShape | null | undefined)
     price.recurring.interval_count === 1,
   );
 }
+
+export type CheckoutSessionInput = {
+  organizationId: string;
+  ownerUserId: string;
+  priceId: string;
+  successUrl: string;
+  cancelUrl: string;
+  trialEligible: boolean;
+  customerId?: string | null;
+  customerEmail?: string | null;
+};
+
+/** Hosted subscription Checkout. Collect a card now, but defer the first charge
+ * until the 30-day trial ends for eligible first-time customers. */
+export function buildCheckoutSessionParams(input: CheckoutSessionInput): URLSearchParams {
+  const params = new URLSearchParams({
+    mode: 'subscription',
+    payment_method_collection: 'always',
+    'line_items[0][price]': input.priceId,
+    'line_items[0][quantity]': '1',
+    success_url: input.successUrl,
+    cancel_url: input.cancelUrl,
+    client_reference_id: input.organizationId,
+    'metadata[organization_id]': input.organizationId,
+    'metadata[owner_user_id]': input.ownerUserId,
+    'subscription_data[metadata][organization_id]': input.organizationId,
+    'subscription_data[metadata][owner_user_id]': input.ownerUserId,
+  });
+
+  if (input.trialEligible) {
+    params.set('subscription_data[trial_period_days]', String(AVENOR_TRIAL_DAYS));
+    params.set('subscription_data[trial_settings][end_behavior][missing_payment_method]', 'cancel');
+  }
+
+  if (input.customerId) params.set('customer', input.customerId);
+  else if (input.customerEmail) params.set('customer_email', input.customerEmail);
+  return params;
+}
