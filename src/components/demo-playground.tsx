@@ -88,18 +88,15 @@ const scenarios: Array<{
   },
 ];
 
-const eur = (value: number) => new Intl.NumberFormat('en-IE', {
-  style: 'currency',
-  currency: 'EUR',
-  maximumFractionDigits: 0,
-}).format(value);
-
-const compactEur = (value: number) => new Intl.NumberFormat('en-IE', {
-  style: 'currency',
-  currency: 'EUR',
-  notation: 'compact',
-  maximumFractionDigits: 1,
-}).format(value);
+// Keep server and browser output identical; locale/ICU compact-currency
+// formatting can differ across the Node and browser runtimes during hydration.
+const compactEur = (value: number) => {
+  const absolute = Math.abs(value);
+  const sign = value < 0 ? '−' : '';
+  if (absolute >= 1_000_000) return `${sign}€${(absolute / 1_000_000).toFixed(1)}M`;
+  if (absolute >= 1_000) return `${sign}€${(absolute / 1_000).toFixed(1)}K`;
+  return `${sign}€${Math.round(absolute).toLocaleString('en-GB')}`;
+};
 
 function Brand() {
   return (
