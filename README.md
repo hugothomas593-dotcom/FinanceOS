@@ -5,7 +5,7 @@ Avenor is an early SaaS codebase for European Seed-stage startups. It combines a
 > **Honest release status:** this repository is not certified production-ready and must not be used with paying customers or sensitive live financial data until the deployment checklist below is completed. The dashboard still contains illustrative demo assumptions. External integrations require credentials and account setup.
 
 ## Commercial offer
-Avenor has one subscription only: **Avenor Founder — €59/month**. Eligible first-time users receive a 30-day trial after entering a payment method; the first €59 monthly charge is due after the trial unless canceled. A returning user cannot claim another trial by creating another workspace. The current Stripe product/price and webhook are configured in test mode only; Production billing is not enabled.
+Avenor has one subscription only: **Avenor Founder — €59/month**. Eligible first-time users receive a 30-day trial after entering a payment method; the first €59 monthly charge is due after the trial unless canceled. A returning user cannot claim another trial by creating another workspace. The current Stripe product/price and webhook are configured in test mode only; Production billing is not enabled. A synthetic 30-day test subscription exercised signed subscription-created, updated and deleted webhooks; it was canceled and removed from the staging workspace. This did not exercise the authenticated browser Checkout or Customer Portal.
 
 ## Stack
 - Next.js 15 App Router, React 19, TypeScript
@@ -18,7 +18,7 @@ Avenor has one subscription only: **Avenor Founder — €59/month**. Eligible f
 1. Use Node.js 22 or later (the current AI SDK tool-loop runtime is validated with Node 22).
 2. Create a Supabase project.
 3. Copy `.env.example` to `.env.local` and configure Supabase URL and anon key.
-4. On a fresh Supabase project, run `supabase/FINANCEOS_SETUP_ALL.sql` once (baseline through migration 011), then apply `supabase/migrations/012_api_rate_limits.sql` and `supabase/migrations/013_preserve_trial_claim_after_workspace_deletion.sql` in order. For an existing project already migrated through 011, apply only 012 and 013. Do not rerun the setup-all script on an existing database.
+4. On a fresh Supabase project, run `supabase/FINANCEOS_SETUP_ALL.sql` once (baseline through migration 011), then apply migrations `012_api_rate_limits.sql` through `015_one_approved_model_per_workspace.sql` in numerical order. For an existing project already migrated through 011, apply only migrations 012–015. Do not rerun the setup-all script on an existing database.
 5. Run `npm install`, then `npm run dev`.
 6. Open `/login`, create an account, confirm the email, and create a company at `/onboarding`.
 
@@ -37,7 +37,7 @@ Avenor has one subscription only: **Avenor Founder — €59/month**. Eligible f
 
 ## API outline
 - `POST /api/organizations` — create organization + owner membership.
-- `GET|POST /api/models` — list and save model versions; approval archives previous approved version.
+- `GET|POST /api/models` — list and save model versions; approval archives the previous approved version atomically, with one approved model per workspace enforced by Postgres.
 - `GET|POST /api/scenarios` — list and save scenarios.
 - `GET /api/actuals` — list actuals for a member organization.
 - `POST /api/actuals/import` — import CSV with Date and Amount columns; requires owner/admin/finance role.
