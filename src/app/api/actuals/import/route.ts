@@ -41,8 +41,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Could not load workspace currency' }, { status: 404 });
     }
 
-    const actuals = normalizeActuals(body.data.csv);
     const currency = String(organization.base_currency || 'EUR').trim().toUpperCase();
+    const actuals = normalizeActuals(body.data.csv);
     const sourceReferences = createStableActualReferences(
       body.data.organizationId,
       currency,
@@ -54,7 +54,7 @@ export async function POST(req: Request) {
       period: actual.period,
       metric_key: `${actual.direction}:${actual.category.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`,
       amount: actual.direction === 'inflow' ? actual.amount : -actual.amount,
-      currency,
+      currency: actual.currency ?? currency,
       source: actual.source,
       source_reference: sourceReferences[index],
     }));
@@ -80,7 +80,12 @@ export async function POST(req: Request) {
       actor_id: user.id,
       event_type: 'financial_actuals.imported',
       entity_type: 'financial_actuals',
-      after_state: { row_count: imported, skipped_duplicates: skipped, currency },
+      after_state: {
+        row_count: imported,
+        skipped_duplicates: skipped,
+        base_currency: currency,
+        imported_currencies: [...new Set(records.map((record) => record.currency))],
+      },
     });
 
     return NextResponse.json({ imported, skipped, currency });
