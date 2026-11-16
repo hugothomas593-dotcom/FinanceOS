@@ -46,7 +46,7 @@ Avenor has one subscription only: **Avenor Founder — €59/month**. Eligible f
 - `POST /api/billing/webhook` — verifies Stripe signature and configured server credentials, synchronizes subscription state and records event receipts.
 - `GET /api/health` — reports whether key services are configured; not a security audit.
 - `GET /api/brief?organizationId=...` — authenticated, deterministic Weekly CFO Brief for the selected workspace; on-demand, not a scheduled email or push alert.
-- `GET|POST /api/kpis` — reads and saves KPI records by full calendar month, including month-end dates.\n- `GET /api/privacy/export?organizationId=...` — owner/admin-only JSON archive of workspace members, financial actuals, models, scenarios, company context, Copilot history, audit events and non-sensitive subscription status. The response flags any row limit reached.
+- `GET|POST /api/kpis` — reads and saves KPI records by full calendar month, including month-end dates.\n- `GET /api/privacy/export?organizationId=...` — owner/admin-only JSON archive of workspace members, financial actuals, models, scenarios, company context, Copilot history, audit events and non-sensitive subscription status. The response flags any row limit reached.\n- `POST /api/privacy/delete-workspace` — owner-only destructive action. Requires the exact workspace name and `DELETE WORKSPACE`, blocks pending Checkout, cancels any linked Stripe subscription, then deletes workspace records from the active database. Provider backups and statutory billing records follow separate retention periods.
 - `GET /demo` — public interactive decision demo using fictional, synthetic financial data; no account or database write required.
 
 ## CSV format
