@@ -31,3 +31,25 @@ export function billingPortalReturnUrl(appUrl: string): string {
   }
   return new URL('/app?billing=returned', origin).toString();
 }
+
+
+export type StripePriceShape = {
+  active?: boolean;
+  currency?: string;
+  unit_amount?: number | null;
+  recurring?: {
+    interval?: string;
+    interval_count?: number;
+  } | null;
+};
+
+/** Avenor Founder is intentionally one active EUR 59 monthly subscription. */
+export function isAvenorFounderPrice(price: StripePriceShape | null | undefined): boolean {
+  return Boolean(
+    price?.active === true &&
+    price.currency?.toLowerCase() === 'eur' &&
+    price.unit_amount === 5_900 &&
+    price.recurring?.interval === 'month' &&
+    price.recurring.interval_count === 1,
+  );
+}
