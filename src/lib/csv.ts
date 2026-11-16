@@ -73,31 +73,33 @@ export function parseCsv(text: string): string[][] {
 }
 
 function parseAmount(raw: string, rowNumber: number): number {
-  let value = raw.trim().replace(/[€$£\\s]/g, '');
-  if (!value) throw new Error(`Missing amount on CSV row ${rowNumber}`);
+  let value = raw.trim().replace(/[€$£\s]/g, '');
+  if (!value) throw new Error('Missing amount on CSV row ' + rowNumber);
   // Accept standard decimal-dot values and common European decimal-comma values.
-  if (/^-?\\d{1,3}(\\.\\d{3})+,\\d{1,2}$/.test(value)) value = value.replace(/\\./g, '').replace(',', '.');
-  else if (/^-?\\d{1,3}(,\\d{3})+(\\.\\d{1,2})?$/.test(value)) value = value.replace(/,/g, '');
-  else if (/^-?\\d+,\\d{1,2}$/.test(value)) value = value.replace(',', '.');
+  if (/^-?\d{1,3}(\.\d{3})+,\d{1,2}$/.test(value)) value = value.replace(/\./g, '').replace(',', '.');
+  else if (/^-?\d{1,3}(,\d{3})+(\.\d{1,2})?$/.test(value)) value = value.replace(/,/g, '');
+  else if (/^-?\d+,\d{1,2}$/.test(value)) value = value.replace(',', '.');
   const amount = Number(value);
-  if (!Number.isFinite(amount)) throw new Error(`Invalid amount on CSV row ${rowNumber}`);
+  if (!Number.isFinite(amount)) throw new Error('Invalid amount on CSV row ' + rowNumber);
   return amount;
 }
 
 function normalizeDate(raw: string, rowNumber: number): string {
-  const value = raw.trim().replace(/^\\uFEFF/, '');
+  const value = raw.trim().replace(/^\uFEFF/, '');
   let year: number;
   let month: number;
   let day: number;
 
-  const iso = /^(\\d{4})-(\\d{2})-(\\d{2})$/.exec(value);
+  const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value);
   if (iso) {
-    [, year, month, day] = [iso[0], Number(iso[1]), Number(iso[2]), Number(iso[3])];
+    year = Number(iso[1]);
+    month = Number(iso[2]);
+    day = Number(iso[3]);
   } else {
     // Ambiguous numeric dates are interpreted day-first for French/European bank exports.
-    const european = /^(\\d{1,2})[\\/.\\-](\\d{1,2})[\\/.\\-](\\d{4})$/.exec(value);
+    const european = /^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/.exec(value);
     if (!european) {
-      throw new Error(`Date on CSV row ${rowNumber} must use YYYY-MM-DD or DD/MM/YYYY`);
+      throw new Error('Date on CSV row ' + rowNumber + ' must use YYYY-MM-DD or DD/MM/YYYY');
     }
     day = Number(european[1]);
     month = Number(european[2]);
@@ -106,9 +108,9 @@ function normalizeDate(raw: string, rowNumber: number): string {
 
   const date = new Date(Date.UTC(year, month - 1, day));
   if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
-    throw new Error(`Invalid date on CSV row ${rowNumber}`);
+    throw new Error('Invalid date on CSV row ' + rowNumber);
   }
-  return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+  return year + '-' + String(month).padStart(2, '0') + '-' + String(day).padStart(2, '0');
 }
 
 export function normalizeActuals(text: string, source = 'CSV import'): ImportedActual[] {
@@ -117,7 +119,7 @@ export function normalizeActuals(text: string, source = 'CSV import'): ImportedA
   if (rows.length < 2) throw new Error('CSV must contain a header and at least one data row');
 
   const headers = rows[0].map((header) =>
-    header.trim().replace(/^\\uFEFF/, '').toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g, '').replace(/[ _-]+/g, ''),
+    header.trim().replace(/^\uFEFF/, '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[ _-]+/g, ''),
   );
   const find = (...names: string[]) => headers.findIndex((header) => names.includes(header));
   const dateIdx = find('date', 'period', 'transactiondate', 'dateoperation', 'datevaleur');
