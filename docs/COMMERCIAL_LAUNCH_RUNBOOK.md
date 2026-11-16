@@ -92,7 +92,7 @@ A release candidate must pass each step using a browser with a real authenticate
 2. Complete onboarding; optional fields can be skipped, required model inputs cannot be silently invented.
 3. Save and approve a financial model; reload and confirm the same assumptions persist.
 4. Import a representative CSV. Preview, row count, category, sign conventions and currency must be clear.
-5. Re-import the same file and confirm duplicate rows are skipped. Import two genuinely identical transactions in one file and confirm both are preserved.
+5. Test a comma CSV and a French semicolon CSV with `Date opération;Débit;Crédit;Libellé;Catégorie;Devise`, day-first dates and decimal commas. Confirm each row's currency is preserved and preview totals are grouped by currency. Re-import the same file and confirm duplicate rows are skipped. Import two genuinely identical transactions in one file and confirm both are preserved.
 6. Add a KPI period at the first and last day of a month and confirm the Growth Metrics screen and Copilot read the same period.
 7. Generate the CFO Brief and compare every displayed result with a known test case.
 8. Ask Copilot about runway, hiring, pricing, revenue downside, fundraising, break-even, affordable investment and unit economics. Check calculations against the deterministic engine.
