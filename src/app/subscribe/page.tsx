@@ -57,12 +57,16 @@ export default function SubscribePage() {
           return;
         }
 
+        const requestedId = new URLSearchParams(window.location.search).get('organizationId');
         const rememberedId = window.localStorage.getItem('financeos.organizationId');
-        const selected = organizations.find((item) => item.organization_id === rememberedId) ?? organizations[0];
+        const selected = organizations.find((item) => item.organization_id === requestedId) ??
+          organizations.find((item) => item.organization_id === rememberedId) ??
+          organizations[0];
         if (!selected.organizations) throw new Error('Could not load your company workspace');
         if (cancelled) return;
         setWorkspace(selected);
         window.localStorage.setItem('financeos.organizationId', selected.organization_id);
+        document.cookie = `avenor_organization_id=${encodeURIComponent(selected.organization_id)}; Path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
 
         const checkout = new URLSearchParams(window.location.search).get('checkout');
         if (checkout === 'cancelled') {
