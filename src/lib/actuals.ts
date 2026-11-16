@@ -16,9 +16,10 @@ export function createStableActualReferences(
 
   return actuals.map((actual) => {
     const metricKey = `${actual.direction}:${actual.category.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`;
+    const actualCurrency = actual.currency?.trim().toUpperCase() || normalizedCurrency;
     const identity = JSON.stringify({
       organizationId,
-      currency: normalizedCurrency,
+      currency: actualCurrency,
       period: actual.period,
       metricKey,
       amount: actual.direction === 'inflow' ? actual.amount : -actual.amount,
