@@ -48,7 +48,7 @@ describe('Stripe return URLs', () => {
 
   it('permits localhost for local development', () => {
     expect(billingReturnUrls('http://localhost:3000').successUrl)
-      .toBe('http://localhost:3000/app?billing=success');
+      .toBe('http://localhost:3000/subscribe?checkout=success');
   });
 });
 
