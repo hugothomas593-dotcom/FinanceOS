@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/supabase/server';
-import { billingReturnUrls, canStartCheckout } from '@/lib/stripe-billing';
+import { billingReturnUrls, canStartCheckout, isAvenorFounderPrice } from '@/lib/stripe-billing';
 
 const Schema = z.object({ organizationId: z.string().uuid() });
 export async function POST(req: Request) {
@@ -33,6 +33,22 @@ export async function POST(req: Request) {
     let origin: URL;
     try { origin = new URL(appUrl); } catch { return NextResponse.json({ error: 'Invalid application URL configuration' }, { status: 503 }); }
     if (origin.protocol !== 'https:' && origin.hostname !== 'localhost') return NextResponse.json({ error: 'Application URL must use HTTPS' }, { status: 503 });
+
+    const priceResponse = await fetch(
+      `https://api.stripe.com/v1/prices/${encodeURIComponent(price)}`,
+      {
+        headers: { Authorization: `Bearer ${secret}` },
+        signal: AbortSignal.timeout(10_000),
+      },
+    );
+    const stripePrice = await priceResponse.json().catch(() => null);
+    if (!priceResponse.ok || !isAvenorFounderPrice(stripePrice)) {
+      return NextResponse.json(
+        { error: 'The configured Stripe price must be active, EUR 59, and billed monthly.' },
+        { status: 503 },
+      );
+    }
+
     const { successUrl, cancelUrl } = billingReturnUrls(appUrl);
     const params = new URLSearchParams({
       mode: 'subscription',
@@ -54,6 +70,7 @@ export async function POST(req: Request) {
       headers: {
         Authorization: `Bearer ${secret}`,
         'Content-Type': 'application/x-www-form-urlencoded',
+        'Idempotency-Key': `avenor-checkout-${parsed.data.organizationId}-${user.id}-${Math.floor(Date.now() / 30_000)}`,
       },
       body: params,
       signal: AbortSignal.timeout(15_000),
