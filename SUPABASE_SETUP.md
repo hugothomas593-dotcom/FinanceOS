@@ -7,8 +7,9 @@ Supabase hosts the PostgreSQL database and authentication. It does **not** host 
 1. Open the Supabase project and SQL Editor.
 2. Create a new query.
 3. Paste the full contents of `supabase/FINANCEOS_SETUP_ALL.sql`.
-4. Run it once on a fresh project. If it errors, stop and inspect the exact error; do not repeatedly run partial SQL.
-5. Verify the tables and policies in Table Editor / Authentication.
+4. Run it once on a fresh project. It provides the baseline through migration 011. If it errors, stop and inspect the exact error; do not repeatedly run partial SQL.
+5. Then apply `supabase/migrations/012_api_rate_limits.sql` and `supabase/migrations/013_preserve_trial_claim_after_workspace_deletion.sql` in order. On an existing project already through migration 011, apply only those two new migrations.
+6. Verify the tables, RLS policies and service-role-only permissions in Table Editor / Authentication.
 
 ## Application environment variables
 Set these in the hosting provider's environment-variable settings (and in a local `.env.local` only for local development):
