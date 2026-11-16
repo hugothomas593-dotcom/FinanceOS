@@ -7,6 +7,7 @@ export const API_RATE_LIMITS = {
   billingPortal: { maxRequests: 10, windowSeconds: 3_600 },
   cfoBrief: { maxRequests: 5, windowSeconds: 300 },
   workspaceDeletion: { maxRequests: 3, windowSeconds: 86_400 },
+  workspaceExport: { maxRequests: 3, windowSeconds: 3_600 },
 } as const;
 
 export type ApiRateLimitScope = keyof typeof API_RATE_LIMITS;
