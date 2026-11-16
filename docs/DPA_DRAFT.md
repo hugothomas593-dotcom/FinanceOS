@@ -53,7 +53,7 @@ No blanket EU-only statement is made. Verify the production Supabase region, Ver
 
 ## 7. Return and deletion
 
-Define the export format, request authentication, completion period, deletion from primary systems, backup expiration, legal-retention exceptions and downstream provider deletion process. The service does not yet have a fully verified end-to-end customer deletion workflow; do not sign a commitment that the technical process cannot meet.
+Define the export format, request authentication, completion period, deletion from primary systems, backup expiration, legal-retention exceptions and downstream provider deletion process. The application now has an owner-controlled workspace export and active-database erasure action. It removes workspace-linked application tables after any Stripe subscription is canceled, but does not immediately purge provider backups, statutory billing records, the user's Supabase Auth identity or downstream logs. Exact backup expiry and provider deletion procedures remain to be documented and tested. Do not sign a broader erasure promise until these controls and legal retention exceptions are confirmed.
 
 ## 8. Audit and evidence
 
