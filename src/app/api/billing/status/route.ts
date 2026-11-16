@@ -6,23 +6,31 @@ import { canStartCheckout } from '@/lib/stripe-billing';
 export async function GET(request: Request) {
   try {
     const { supabase, user } = await requireUser();
-    const organizationId = z.string().uuid().safeParse(new URL(request.url).searchParams.get('organizationId'));
-    if (!organizationId.success) return NextResponse.json({ error: 'A valid organizationId is required' }, { status: 400 });
+    const organizationId = z.string().uuid().safeParse(
+      new URL(request.url).searchParams.get('organizationId'),
+    );
+    if (!organizationId.success) {
+      return NextResponse.json({ error: 'A valid organizationId is required' }, { status: 400 });
+    }
 
-    const { data: member } = await supabase
+    const { data: member, error: membershipError } = await supabase
       .from('organization_members')
       .select('role')
       .eq('organization_id', organizationId.data)
       .eq('user_id', user.id)
       .maybeSingle();
+    if (membershipError) {
+      return NextResponse.json({ error: 'Could not verify workspace access' }, { status: 500 });
+    }
     if (!member) return NextResponse.json({ error: 'Workspace access denied' }, { status: 403 });
 
-    const { data: subscription, error } = await supabase
-      .from('subscriptions')
-      .select('status,current_period_end,stripe_customer_id,stripe_subscription_id')
-      .eq('organization_id', organizationId.data)
-      .maybeSingle();
-    if (error) return NextResponse.json({ error: 'Could not load subscription status' }, { status: 500 });
+    const { data: hasAccess, error: entitlementError } = await supabase.rpc(
+      'has_organization_access',
+      { org_id: organizationId.data },
+    );
+    if (entitlementError) {
+      return NextResponse.json({ error: 'Could not verify subscription access' }, { status: 503 });
+    }
 
     const billingRole = ['owner', 'admin'].includes(member.role);
     const checkoutConfigured = Boolean(
@@ -37,17 +45,48 @@ export async function GET(request: Request) {
     );
     const billingConfigured = checkoutConfigured && webhookConfigured;
 
+    // Ordinary workspace members receive only the entitlement result. Stripe
+    // customer/subscription details remain visible to owners and admins only.
+    if (!billingRole) {
+      return NextResponse.json({
+        hasAccess: hasAccess === true,
+        billingConfigured,
+        canStartCheckout: false,
+        canManageBilling: false,
+        subscriptionStatus: null,
+        currentPeriodEnd: null,
+        trialDays: null,
+      }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
+    }
+
+    const { data: subscription, error } = await supabase
+      .from('subscriptions')
+      .select('status,current_period_end,stripe_customer_id,stripe_subscription_id')
+      .eq('organization_id', organizationId.data)
+      .maybeSingle();
+    if (error) {
+      return NextResponse.json({ error: 'Could not load subscription status' }, { status: 500 });
+    }
+
+    const currentPeriodEnd = subscription?.current_period_end ?? null;
+    const trialDays = subscription?.status === 'trialing' && currentPeriodEnd
+      ? Math.max(0, Math.ceil((Date.parse(currentPeriodEnd) - Date.now()) / 86_400_000))
+      : null;
+
     return NextResponse.json({
+      hasAccess: hasAccess === true,
       billingConfigured,
       subscriptionStatus: subscription?.status ?? null,
-      currentPeriodEnd: subscription?.current_period_end ?? null,
-      canStartCheckout: billingRole && billingConfigured && canStartCheckout(subscription?.status, subscription?.stripe_subscription_id),
+      currentPeriodEnd,
+      trialDays,
+      canStartCheckout: billingRole && billingConfigured &&
+        canStartCheckout(subscription?.status, subscription?.stripe_subscription_id),
       canManageBilling: billingRole && Boolean(
         process.env.STRIPE_SECRET_KEY &&
         process.env.NEXT_PUBLIC_APP_URL &&
         subscription?.stripe_customer_id,
       ),
-    });
+    }, { headers: { 'Cache-Control': 'no-store, max-age=0' } });
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     const unauthenticated = message === 'UNAUTHENTICATED';
