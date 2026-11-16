@@ -2,7 +2,8 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { simulateFinancialDecision, type ModelInputs } from '@/lib/finance-intelligence';
+import type { ModelInputs } from '@/lib/finance';
+import { simulateFinancialDecision } from '@/lib/finance-intelligence';
 
 const demoModel: ModelInputs = {
   openingCash: 650_000,
