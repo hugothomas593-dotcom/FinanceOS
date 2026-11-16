@@ -123,6 +123,8 @@ export default function Home() {
   const [toast, setToast] = useState('');
   const [signOutBusy, setSignOutBusy] = useState(false);
   const [signOutError, setSignOutError] = useState('');
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState('');
 
   useEffect(() => {
     const handleDecisionSaved = (event: Event) => {
@@ -484,6 +486,32 @@ export default function Home() {
     }
   }
 
+  async function exportWorkspaceData() {
+    if (!organizationId || exportBusy) return;
+    setExportBusy(true);
+    setExportError('');
+    try {
+      const response = await fetch(`/api/privacy/export?organizationId=${encodeURIComponent(organizationId)}`, { cache: 'no-store' });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || 'Could not export workspace data');
+      }
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `avenor-workspace-${organizationId}-export.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Could not export workspace data');
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
   async function openBillingAction(endpoint: '/api/billing/checkout' | '/api/billing/portal') {
     if (!organizationId) return;
     setBillingBusy(true);
@@ -556,6 +584,10 @@ export default function Home() {
           <div className="profile-avatar">A</div>
           <div><b>Workspace account</b><small>Signed-in user</small></div>
         </div>
+        {['owner', 'admin'].includes(workspaceMemberships.find((item) => item.organization_id === organizationId)?.role ?? '') && <button className="signout-button" type="button" onClick={() => void exportWorkspaceData()} disabled={exportBusy || workspaceLoading}>
+          {exportBusy ? 'Preparing export…' : 'Export workspace data'}
+        </button>}
+        {exportError && <p className="signout-error" role="alert">{exportError}</p>}
         <button className="signout-button" type="button" onClick={() => void signOut()} disabled={signOutBusy}>
           {signOutBusy ? 'Signing out…' : 'Sign out'}
         </button>
