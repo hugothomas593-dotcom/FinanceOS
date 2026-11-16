@@ -7,7 +7,7 @@ This section supersedes older point-in-time release notes below. The repository 
 ### Source and deployment
 - Correction branch: `fix/avenor-commercial-readiness`.
 - Latest branch HEAD: `2c1952a1ef2392fc403f255ce9cab69520822692`; PR #2 is OPEN and DRAFT.
-- GitHub Actions run #43963968845 completed successfully on this HEAD: Vitest, Next.js production build and TypeScript check all passed.
+- GitHub Actions run #43963968845 completed successfully on this HEAD: Vitest, Next.js production build and TypeScript check all passed. A separate clean install using a temporary generated npm lockfile also passed `npm ci`, all 129 tests, TypeScript and the production build. The generated lockfile was not committed; CI still uses `npm install`, so dependency resolution is not yet fully reproducible.
 - Latest READY Vercel application deployment is `dpl_D9PBbwYx5eU8Xb5x16bcv1YEYBFy`, source commit `765cb7b00412ec97b0176ff12931b20e69b6b6b7`, region `dub1`. Subsequent commits to the branch change tests/documentation only; the deployed application code is the same.
 - Preview is protected by Vercel Authentication/SSO. It is not an anonymous customer-facing production URL.
 - The only attached Production domain is `financeosss.vercel.app`; no customer-owned Avenor domain or customer support address is configured.
