@@ -2375,3 +2375,29 @@ body {
   .subscribe-price { align-items:flex-start; flex-direction:column; }
   .subscribe-price p { text-align:left; }
 }
+
+/* Workspace privacy and erasure controls */
+.danger-zone {
+  margin-top: 26px;
+  padding: 20px;
+  border: 1px solid #eadad8;
+  border-radius: 12px;
+  background: #fffdfd;
+}
+.danger-zone h3 {
+  margin: 8px 0 6px;
+  color: #29384b;
+  font-size: 16px;
+}
+.danger-zone .form-intro {
+  max-width: 760px;
+  line-height: 1.7;
+}
+.danger-zone .billing-actions button:last-child {
+  border-color: #e6c8c5;
+  color: #9f4b44;
+}
+.danger-zone .billing-actions button:last-child:hover:not(:disabled) {
+  background: #fff5f4;
+  border-color: #d7aaa5;
+}
