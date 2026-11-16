@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { verifyStripeSignature } from '@/lib/stripe-webhook';
+import { stripeSubscriptionPeriodEnd, verifyStripeSignature } from '@/lib/stripe-webhook';
 
 type StripeSubscription = {
   id?: string;
@@ -95,6 +95,7 @@ export async function POST(request: Request) {
     const customerId = typeof subscription.customer === 'string'
       ? subscription.customer
       : subscription.customer?.id ?? null;
+    const periodEnd = stripeSubscriptionPeriodEnd(subscription);
 
     const { error: subscriptionError } = await admin
       .from('subscriptions')
@@ -103,8 +104,8 @@ export async function POST(request: Request) {
         stripe_customer_id: customerId,
         stripe_subscription_id: subscription.id,
         status: String(subscription.status ?? 'unknown'),
-        current_period_end: subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
+        current_period_end: periodEnd
+          ? new Date(periodEnd * 1000).toISOString()
           : null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'organization_id' });
