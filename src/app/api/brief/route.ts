@@ -5,6 +5,7 @@ import { validateModelInputs, type ModelInputs } from '@/lib/finance';
 import { buildCfoBrief } from '@/lib/cfo-brief';
 import type { ActualRecord, CompanyKpis } from '@/lib/finance-intelligence';
 import { CompanyContextSchema, EMPTY_COMPANY_CONTEXT } from '@/lib/company-context';
+import { enforceApiRateLimit } from '@/lib/rate-limit';
 
 const QuerySchema = z.object({ organizationId: z.string().uuid() });
 
@@ -34,6 +35,14 @@ export async function GET(request: Request) {
       .maybeSingle();
     if (membershipError) return NextResponse.json({ error: 'Could not verify workspace access' }, { status: 500 });
     if (!membership) return NextResponse.json({ error: 'Workspace access denied' }, { status: 403 });
+
+    const rateLimit = await enforceApiRateLimit(user.id, 'cfoBrief');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'CFO Brief generation limit reached. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } },
+      );
+    }
 
     const { data: approvedModel, error: approvedModelError } = await supabase
       .from('model_versions')
