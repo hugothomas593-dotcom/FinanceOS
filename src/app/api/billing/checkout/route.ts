@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { requireUser } from '@/lib/supabase/server';
 import {
+  AVENOR_TRIAL_DAYS,
   buildCheckoutSessionParams,
   billingReturnUrls,
   canStartCheckout,
