@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { requireUser } from '@/lib/supabase/server';
+import { enforceApiRateLimit } from '@/lib/rate-limit';
 
 const QuerySchema = z.object({ organizationId: z.string().uuid() });
 const LIMITS = {
@@ -37,6 +38,14 @@ export async function GET(request: Request) {
     }
     if (!membership || !['owner', 'admin'].includes(membership.role)) {
       return NextResponse.json({ error: 'Workspace owner or admin permission required' }, { status: 403 });
+    }
+
+    const rateLimit = await enforceApiRateLimit(user.id, 'workspaceExport');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Workspace export limit reached. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds), 'Cache-Control': 'no-store' } },
+      );
     }
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
