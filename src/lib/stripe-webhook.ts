@@ -1,5 +1,22 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
+export type StripeSubscriptionPeriodShape = {
+  current_period_end?: number | null;
+  items?: { data?: Array<{ current_period_end?: number | null }> };
+};
+
+/** Stripe's newer flexible billing responses expose period end on subscription items. */
+export function stripeSubscriptionPeriodEnd(subscription: StripeSubscriptionPeriodShape): number | null {
+  const topLevel = subscription.current_period_end;
+  if (typeof topLevel === 'number' && Number.isFinite(topLevel) && topLevel > 0) {
+    return topLevel;
+  }
+  const itemEnds = (subscription.items?.data ?? [])
+    .map((item) => item.current_period_end)
+    .filter((value): value is number => typeof value === 'number' && Number.isFinite(value) && value > 0);
+  return itemEnds.length ? Math.max(...itemEnds) : null;
+}
+
 export function verifyStripeSignature(
   rawBody: string,
   signatureHeader: string,
