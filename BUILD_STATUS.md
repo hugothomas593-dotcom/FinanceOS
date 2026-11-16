@@ -1,4 +1,19 @@
-# Avenor engineering status — 14 November 2026
+# Avenor engineering status — 16 November 2026
+
+## Current release snapshot — 16 November 2026
+- Latest branch head: `adf944e8215c60c9d3099d3c6be1b959c79a0dd3` on `chore/avenor-repository-hygiene`; PR #1 remains OPEN and DRAFT.
+- GitHub Actions run #173 passed: 79/79 tests across 10 test files, Next.js production build, and TypeScript.
+- Vercel Preview deployment `dpl_8hchaXAzJqjk51HshaLXE1r2mQas` is READY in `dub1` and the stable alias `avenor-founder-preview-2026.vercel.app` points to this commit. Public routes `/`, `/demo`, `/login?mode=signup` and `/api/health` were fetched successfully (HTTP 200).
+- Added public `/demo` interactive scenario explorer using fictional Northstar data and the deterministic finance engine. Four scenarios are supported; this is intentionally not represented as a live AI chat or real company data.
+- Added KPI date-range handling across the entire calendar month, including records stored on month-end dates.
+- Hardened Stripe scaffold: Checkout verifies an active EUR 59 monthly Price, rejects duplicate active subscriptions, reuses an existing customer when restarting after cancellation, applies a short-window idempotency key, and returns to `/app`; Customer Portal also returns to `/app`. Webhook startup now requires both Stripe secrets and the server-side Supabase credential.
+- Added regression tests for calendar month boundaries, subscription duplicate/restart policy, Stripe return URLs and exact EUR 59 monthly Price validation.
+- Added `docs/COMMERCIAL_LAUNCH_RUNBOOK.md` with Stripe test-mode cases, AI Gateway verification, Supabase Auth/RLS checks, browser acceptance, production gates, target customer, first 15 interviews, five design partners and three paying-customer milestones.
+- Preview environment currently contains only Supabase URL/publishable key. `/api/health` reports Supabase configured, Vercel AI Gateway runtime identity available, Stripe Checkout not configured and Stripe webhook not configured. Gateway identity is not proof of a successful model inference; usage reporting has shown no requests in the last 7 days.
+- Supabase staging remains `ACTIVE_HEALTHY`. Security advisor still reports leaked-password protection disabled (WARN); enable it before public registration. The no-policy `stripe_webhook_events` table is intentional server-only (INFO).
+- No Stripe test payment, live AI inference, authenticated browser E2E or two-user/two-workspace RLS isolation test has been verified in this pass. Stripe tax/VAT configuration, GDPR/legal review, subscription entitlement policy, support/monitoring and recovery procedures remain open.
+- Production was not redeployed, no production database was modified and no live payments were activated. Do not treat the current build as production-certified.
+
 
 ## Work completed in this pass
 - Hardened deterministic financial input validation: finite numbers, bounded growth assumptions, integer forecast horizon, bounded headcount and forecast overflow checks.
