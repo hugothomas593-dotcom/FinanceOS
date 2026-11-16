@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/supabase/server';
 import { normalizeActuals } from '@/lib/csv';
 import { createStableActualReferences } from '@/lib/actuals';
+import { enforceApiRateLimit } from '@/lib/rate-limit';
 
 const Schema = z.object({
   organizationId: z.string().uuid(),
@@ -29,6 +30,14 @@ export async function POST(req: Request) {
     }
     if (!['owner', 'admin', 'finance'].includes(membership.role)) {
       return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    }
+
+    const rateLimit = await enforceApiRateLimit(user.id, 'csvImport');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Import limit reached. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } },
+      );
     }
 
     const { data: organization, error: organizationError } = await supabase
