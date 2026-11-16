@@ -1,5 +1,15 @@
 # Avenor engineering status — 16 November 2026
 
+## Commercial-readiness audit update — 16 November 2026
+- Latest validated code snapshot before this entry: `8942904261f719a65097a556d30d12964e9f467a` on `chore/avenor-repository-hygiene`. GitHub Actions run #192 passed 86/86 tests across 10 files, Next.js production build and TypeScript. A follow-up regression test for per-row currency identity is being added and must be revalidated separately.
+- Added a real sign-out action to the authenticated workspace using Supabase Auth; it clears the remembered workspace and returns to login.
+- Fixed mixed-currency analysis in Copilot: imported transactions and KPI rows that do not match the workspace currency are excluded from calculation; the Copilot prompt and visible data-limitations evidence disclose excluded currencies and the absence of FX conversion.
+- Expanded CSV ingestion for comma-, semicolon- and tab-separated files; ISO and European day-first dates; accented French column labels; Amount/Montant or Debit/Credit fields; BOM headers; decimal comma/thousands separators; and per-row three-letter currencies. Per-row currency contributes to idempotency keys, is persisted with the transaction and is shown in a currency-grouped import preview.
+- Added regression tests for mixed currencies, French debit/credit statements, day-first dates, BOM, invalid currency codes and duplicate import identity by currency. The CSV acceptance workflow is documented in README and the commercial runbook.
+- Important limits remain: imports are historical cash movements, not reconciled accounting; no FX conversion occurs; CSV preview is local parsing only; there is no undo/rollback or duplicate reconciliation screen; and rows with no currency column are assumed to use the workspace base currency.
+- Still not production-ready: no subscription entitlement/paywall enforcement; no Privacy or Terms routes (`/privacy` and `/terms` return 404); Supabase leaked-password protection is disabled; no successful AI Gateway inference or Stripe test payment; no authenticated browser E2E or two-user/two-workspace RLS test; no completed GDPR/VAT/legal review or account-data export/deletion workflow.
+- The current preview is a protected test deployment, not a public customer production service. No production deployment, production database mutation, live charge or marketing email was made.
+
 ## Current release snapshot — 16 November 2026
 - Latest branch head: `adf944e8215c60c9d3099d3c6be1b959c79a0dd3` on `chore/avenor-repository-hygiene`; PR #1 remains OPEN and DRAFT.
 - GitHub Actions run #173 passed: 79/79 tests across 10 test files, Next.js production build, and TypeScript.
