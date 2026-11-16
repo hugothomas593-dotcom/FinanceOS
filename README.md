@@ -91,7 +91,7 @@ Supabase is for database/authentication; it does not host the Next.js website. A
 ## Interface design
 - The workspace uses a restrained finance-software visual system: neutral canvas, white work surfaces, deep blue-grey typography and a muted green accent.
 - Navigation, forecast tables, forms, status indicators and authentication screens share the same visual language.
-- Avenor chat is a quiet right-side utility panel. On desktop it does not dim or block the underlying workspace; on mobile it becomes a full-screen panel.
+- The Copilot is the primary Overview experience, with the financial workspace sections available as supporting views. It is not presented as a secondary floating chat panel.
 - Product copy focuses on the financial tasks and decisions rather than describing AI as the product.
 
 - Vercel Functions are pinned to `dub1` (Dublin, EU West) in `vercel.json` to run close to the Supabase EU West project. This configuration requires a fresh deployment to verify the effective function region; the last inspected Preview predates the setting.
