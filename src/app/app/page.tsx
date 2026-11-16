@@ -125,6 +125,8 @@ export default function Home() {
   const [signOutError, setSignOutError] = useState('');
   const [exportBusy, setExportBusy] = useState(false);
   const [exportError, setExportError] = useState('');
+  const [deleteWorkspaceBusy, setDeleteWorkspaceBusy] = useState(false);
+  const [deleteWorkspaceError, setDeleteWorkspaceError] = useState('');
 
   useEffect(() => {
     const handleDecisionSaved = (event: Event) => {
@@ -512,6 +514,45 @@ export default function Home() {
     }
   }
 
+  async function deleteWorkspaceData() {
+    if (!organizationId || deleteWorkspaceBusy) return;
+    const membership = workspaceMemberships.find((item) => item.organization_id === organizationId);
+    if (membership?.role !== 'owner') {
+      setDeleteWorkspaceError('Only the workspace owner can delete this workspace.');
+      return;
+    }
+    const exactName = membership.organizations?.name ?? organizationName;
+    if (!exactName || !window.confirm(`Delete ${exactName} and permanently remove its active workspace data? All workspace members will lose access. Export the data first if you need a copy.`)) return;
+    const typedName = window.prompt(`Type the exact workspace name to continue:\n${exactName}`);
+    if (typedName !== exactName) {
+      setDeleteWorkspaceError('Workspace name did not match. Nothing was deleted.');
+      return;
+    }
+    const typedPhrase = window.prompt('Final confirmation: type DELETE WORKSPACE');
+    if (typedPhrase !== 'DELETE WORKSPACE') {
+      setDeleteWorkspaceError('Confirmation phrase did not match. Nothing was deleted.');
+      return;
+    }
+
+    setDeleteWorkspaceBusy(true);
+    setDeleteWorkspaceError('');
+    try {
+      const response = await fetch('/api/privacy/delete-workspace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId, confirmationName: exactName, confirmationPhrase: typedPhrase }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || 'Workspace deletion failed');
+      window.localStorage.removeItem('financeos.organizationId');
+      document.cookie = 'avenor_organization_id=; Path=/; Max-Age=0; SameSite=Lax';
+      window.location.replace('/onboarding');
+    } catch (error) {
+      setDeleteWorkspaceError(error instanceof Error ? error.message : 'Workspace deletion failed');
+      setDeleteWorkspaceBusy(false);
+    }
+  }
+
   async function openBillingAction(endpoint: '/api/billing/checkout' | '/api/billing/portal') {
     if (!organizationId) return;
     setBillingBusy(true);
@@ -790,6 +831,16 @@ export default function Home() {
           </>}
           {billingError && <p className="warning-text" role="alert">{billingError}</p>}
           <p className="billing-footnote">No payment is taken from this screen. You will be redirected to Stripe to review and confirm any payment.</p>
+          {workspaceMemberships.find((item) => item.organization_id === organizationId)?.role === 'owner' && <section className="surface danger-zone">
+            <div className="section-kicker">DATA CONTROL</div>
+            <h3>Export or delete this workspace</h3>
+            <p className="form-intro">Export a JSON copy before deletion. Deleting a workspace cancels any linked Stripe subscription and removes the workspace's active records, models, scenarios, Copilot history and team memberships. Provider backups and legally required billing records may remain until their separate retention periods expire.</p>
+            <div className="billing-actions">
+              <button className="button-secondary" disabled={exportBusy || deleteWorkspaceBusy} onClick={() => void exportWorkspaceData()}>{exportBusy ? 'Preparing export…' : 'Export workspace data'}</button>
+              <button className="button-secondary" disabled={deleteWorkspaceBusy || workspaceLoading} onClick={() => void deleteWorkspaceData()}>{deleteWorkspaceBusy ? 'Deleting workspace…' : 'Delete workspace and data'}</button>
+            </div>
+            {deleteWorkspaceError && <p className="warning-text" role="alert">{deleteWorkspaceError}</p>}
+          </section>}
         </section>}
 
         {view !== 'Overview' && <footer className="app-footer"><span>Avenor <b>·</b> Private beta</span><span>{hasModel ? (modelStatus === 'approved' ? 'Approved financial model' : 'Draft financial model') : 'Financial model not configured'} · Not accounting or tax advice</span></footer>}
