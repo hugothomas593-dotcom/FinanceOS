@@ -207,7 +207,7 @@ export default function MarketingHome() {
               {included.map((item) => <li key={item}><span>✓</span>{item}</li>)}
             </ul>
             <Link className="a-button a-button-dark a-price-cta" href="/login?mode=signup">Get started with Avenor <span>↗</span></Link>
-            <small>One plan. €59 per month.</small>
+            <small>30 days free for first-time customers, then €59/month. Card required; cancel anytime.</small>
           </div>
         </div>
       </section>
