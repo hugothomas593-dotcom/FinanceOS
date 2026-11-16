@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { requireUser } from '@/lib/supabase/server';
 import { canStartCheckout } from '@/lib/stripe-billing';
@@ -44,6 +45,44 @@ export async function GET(request: Request) {
       process.env.NEXT_PUBLIC_SUPABASE_URL,
     );
     const billingConfigured = checkoutConfigured && webhookConfigured;
+    let trialAvailable: boolean | null = null;
+
+    if (billingRole && process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+      const admin = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL,
+        process.env.SUPABASE_SERVICE_ROLE_KEY,
+        { auth: { persistSession: false, autoRefreshToken: false } },
+      );
+      const { data: claim, error: claimError } = await admin
+        .from('billing_trial_claims')
+        .select('state')
+        .eq('user_id', user.id)
+        .maybeSingle();
+      if (claimError) return NextResponse.json({ error: 'Could not verify trial eligibility' }, { status: 500 });
+
+      if (claim) {
+        trialAvailable = false;
+      } else {
+        const { data: memberships, error: membershipsError } = await admin
+          .from('organization_members')
+          .select('organization_id')
+          .eq('user_id', user.id);
+        if (membershipsError) return NextResponse.json({ error: 'Could not verify trial eligibility' }, { status: 500 });
+        const organizationIds = (memberships ?? []).map((row) => row.organization_id);
+        if (!organizationIds.length) {
+          trialAvailable = true;
+        } else {
+          const { data: priorSubscriptions, error: historyError } = await admin
+            .from('subscriptions')
+            .select('stripe_subscription_id')
+            .in('organization_id', organizationIds)
+            .not('stripe_subscription_id', 'is', null)
+            .limit(1);
+          if (historyError) return NextResponse.json({ error: 'Could not verify trial eligibility' }, { status: 500 });
+          trialAvailable = !priorSubscriptions?.length;
+        }
+      }
+    }
 
     // Ordinary workspace members receive only the entitlement result. Stripe
     // customer/subscription details remain visible to owners and admins only.
@@ -53,6 +92,7 @@ export async function GET(request: Request) {
         billingConfigured,
         canStartCheckout: false,
         canManageBilling: false,
+        trialAvailable: null,
         subscriptionStatus: null,
         currentPeriodEnd: null,
         trialDays: null,
@@ -76,6 +116,7 @@ export async function GET(request: Request) {
     return NextResponse.json({
       hasAccess: hasAccess === true,
       billingConfigured,
+      trialAvailable,
       subscriptionStatus: subscription?.status ?? null,
       currentPeriodEnd,
       trialDays,
