@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AVENOR_TRIAL_DAYS,
+  buildCheckoutSessionParams,
   billingPortalReturnUrl,
   billingReturnUrls,
   canStartCheckout,
@@ -52,6 +53,34 @@ describe('Stripe return URLs', () => {
 });
 
 
+
+describe('Stripe Checkout trial parameters', () => {
+  const base = {
+    organizationId: 'org-avenor',
+    ownerUserId: 'user-avenor',
+    priceId: 'price_avenor',
+    successUrl: 'https://avenor.example/subscribe?checkout=success',
+    cancelUrl: 'https://avenor.example/subscribe?checkout=cancelled',
+  };
+
+  it('collects a card and applies a 30-day trial without charging at signup', () => {
+    const params = buildCheckoutSessionParams({ ...base, trialEligible: true, customerEmail: 'founder@example.com' });
+    expect(params.get('mode')).toBe('subscription');
+    expect(params.get('payment_method_collection')).toBe('always');
+    expect(params.get('subscription_data[trial_period_days]')).toBe('30');
+    expect(params.get('subscription_data[trial_settings][end_behavior][missing_payment_method]')).toBe('cancel');
+    expect(params.get('customer_email')).toBe('founder@example.com');
+    expect(params.get('subscription_data[metadata][owner_user_id]')).toBe('user-avenor');
+  });
+
+  it('does not grant a second free trial to a returning subscriber', () => {
+    const params = buildCheckoutSessionParams({ ...base, trialEligible: false, customerId: 'cus_existing' });
+    expect(params.get('payment_method_collection')).toBe('always');
+    expect(params.get('subscription_data[trial_period_days]')).toBeNull();
+    expect(params.get('subscription_data[trial_settings][end_behavior][missing_payment_method]')).toBeNull();
+    expect(params.get('customer')).toBe('cus_existing');
+  });
+});
 
 describe('Avenor free trial configuration', () => {
   it('offers a 30-day trial', () => {
