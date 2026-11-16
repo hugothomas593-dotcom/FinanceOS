@@ -11,7 +11,7 @@ describe('CSV import', () => {
         'Date opération;Débit;Crédit;Libellé;Catégorie;Devise',
         '16/11/2026;1 234,56;;"Fournisseur; bureau";Frais;EUR',
         '17/11/2026;;2 500,00;Paiement client;Ventes;GBP',
-      ].join('\\n'),
+      ].join('\n'),
       'releve-fr.csv',
     );
 
@@ -38,15 +38,15 @@ describe('CSV import', () => {
   });
 
   it('strips a UTF-8 BOM from the first header and keeps the workspace currency as an optional default', () => {
-    const rows = normalizeActuals('\\uFEFFDate;Montant\\n01/12/2026;12,50');
+    const rows = normalizeActuals('\uFEFFDate;Montant\n01/12/2026;12,50');
     expect(rows[0].period).toBe('2026-12-01');
     expect(rows[0].amount).toBe(12.5);
     expect(rows[0].currency).toBeUndefined();
   });
 
   it('rejects invalid currency codes and rows with both debit and credit values', () => {
-    expect(() => normalizeActuals('Date;Montant;Devise\\n2026-11-01;12;EURO')).toThrow('three-letter currency code');
-    expect(() => normalizeActuals('Date;Debit;Credit\\n2026-11-01;12;5')).toThrow('both a debit and a credit');
+    expect(() => normalizeActuals('Date;Montant;Devise\n2026-11-01;12;EURO')).toThrow('three-letter currency code');
+    expect(() => normalizeActuals('Date;Debit;Credit\n2026-11-01;12;5')).toThrow('both a debit and a credit');
   });
 
   it('rejects invalid dates, malformed quotes and inconsistent columns', () => { expect(() => normalizeActuals('Date,Amount\n2026-02-30,10')).toThrow(); expect(() => parseCsv('Date,Amount\n2026-01-01,"10')).toThrow(); expect(() => parseCsv('Date,Amount\n2026-01-01,10,extra')).toThrow(); });
