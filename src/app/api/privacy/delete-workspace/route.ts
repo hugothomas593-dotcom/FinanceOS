@@ -37,14 +37,6 @@ export async function POST(request: Request) {
       return error('Only the workspace owner can permanently delete workspace data', 403);
     }
 
-    const rateLimit = await enforceApiRateLimit(user.id, 'workspaceDeletion');
-    if (!rateLimit.allowed) {
-      return NextResponse.json(
-        { error: 'A workspace deletion was already attempted recently. Please contact support if you need help.' },
-        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds), 'Cache-Control': 'no-store' } },
-      );
-    }
-
     const { data: organization, error: organizationError } = await supabase
       .from('organizations')
       .select('id,name')
@@ -81,9 +73,20 @@ export async function POST(request: Request) {
     }
 
     const stripeSubscriptionId = subscription?.stripe_subscription_id || trialClaim?.stripe_subscription_id || null;
+    const stripeSecret = process.env.STRIPE_SECRET_KEY;
+    if (stripeSubscriptionId && subscription?.status !== 'canceled' && subscription?.status !== 'incomplete_expired' && !stripeSecret) {
+      return error('The linked subscription must be canceled before this workspace can be deleted.', 503);
+    }
+
+    const rateLimit = await enforceApiRateLimit(user.id, 'workspaceDeletion');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many workspace deletion attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds), 'Cache-Control': 'no-store' } },
+      );
+    }
+
     if (stripeSubscriptionId && subscription?.status !== 'canceled' && subscription?.status !== 'incomplete_expired') {
-      const stripeSecret = process.env.STRIPE_SECRET_KEY;
-      if (!stripeSecret) return error('The linked subscription must be canceled before this workspace can be deleted.', 503);
 
       const response = await fetch(
         `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(stripeSubscriptionId)}`,
