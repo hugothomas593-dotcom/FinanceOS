@@ -11,5 +11,8 @@ describe('deterministic forecast engine', () => {
   it('rejects invalid COGS ratio, fractional headcount and fractional horizons', () => { expect(() => forecast({ ...model, cogsRatio: 1.2 })).toThrow(); expect(() => forecast(model, [{ ...hire, headcount: 1.5 }])).toThrow(); expect(() => forecast(model, [], 2.5)).toThrow(); });
   it('rejects non-finite or excessive growth assumptions', () => { expect(() => forecast({ ...model, monthlyRevenueGrowth: Number.NaN })).toThrow(); expect(() => forecast({ ...model, monthlyRevenueGrowth: 3 })).toThrow(); });
   it('summarizes the first month with negative cash', () => { const rows = forecast({ ...model, openingCash: 0, monthlyRevenue: 0 }, [], 2); expect(summarize(rows).firstMonthCashNegative).toBe(1); });
+  it('compounds revenue and operating-cost growth month by month', () => { const rows = forecast({ ...model, monthlyRevenueGrowth: .1, monthlyOpexGrowth: .05 }, [], 3); expect(rows[1].revenue).toBeCloseTo(110_000); expect(rows[2].revenue).toBeCloseTo(121_000); expect(rows[1].nonPayrollOpex).toBeCloseTo(31_500); expect(rows[2].nonPayrollOpex).toBeCloseTo(33_075); });
+  it('keeps gross margin undefined when revenue is zero', () => { expect(forecast({ ...model, monthlyRevenue: 0 }, [], 1)[0].grossMargin).toBeNull(); });
+  it('reports runway as zero rather than a negative number after cash is exhausted', () => { const row = forecast({ ...model, openingCash: 0, monthlyRevenue: 0 }, [], 1)[0]; expect(row.closingCash).toBeLessThan(0); expect(row.runwayMonths).toBe(0); });
   it('returns null runway when net cash flow is positive', () => { expect(forecast(model, [], 1)[0].runwayMonths).toBeNull(); });
 });
