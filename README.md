@@ -15,7 +15,7 @@ Avenor has one subscription only: **Avenor Founder — €59/month**. There are 
 - Stripe Checkout + signed webhook scaffold
 
 ## Local setup
-1. Use Node.js 20 or later.
+1. Use Node.js 22 or later (the current AI SDK tool-loop runtime is validated with Node 22).
 2. Create a Supabase project.
 3. Copy `.env.example` to `.env.local` and configure Supabase URL and anon key.
 4. Apply migrations in order: `001_initial_schema.sql`, `002_product_completion.sql`, `003_rls_policy_hardening.sql`, `004_stripe_webhook_idempotency.sql`. Alternatively, use `supabase/FINANCEOS_SETUP_ALL.sql` once on a fresh project; do not run both paths.
@@ -41,11 +41,13 @@ Avenor has one subscription only: **Avenor Founder — €59/month**. There are 
 - `GET|POST /api/scenarios` — list and save scenarios.
 - `GET /api/actuals` — list actuals for a member organization.
 - `POST /api/actuals/import` — import CSV with Date and Amount columns; requires owner/admin/finance role.
-- `POST /api/copilot` — requires auth, organization membership, and an approved model. Optionally calls OpenAI to explain deterministic outputs.
-- `POST /api/billing/checkout` — creates a Stripe subscription checkout session.
-- `POST /api/billing/webhook` — verifies Stripe signature and records subscription state.
+- `POST /api/copilot/chat` — requires auth and workspace membership; uses the latest approved model (or latest draft with an explicit warning), deterministic financial tools, and Vercel AI Gateway for explanations, with a bounded local fallback when inference is unavailable.
+- `POST /api/billing/checkout` — verifies an active EUR 59 monthly Stripe Price, blocks duplicate active subscriptions and creates a subscription Checkout session with retry idempotency.
+- `POST /api/billing/webhook` — verifies Stripe signature and configured server credentials, synchronizes subscription state and records event receipts.
 - `GET /api/health` — reports whether key services are configured; not a security audit.
 - `GET /api/brief?organizationId=...` — authenticated, deterministic Weekly CFO Brief for the selected workspace; on-demand, not a scheduled email or push alert.
+- `GET|POST /api/kpis` — reads and saves KPI records by full calendar month, including month-end dates.
+- `GET /demo` — public interactive decision demo using fictional, synthetic financial data; no account or database write required.
 
 ## CSV format
 Minimum columns: `Date,Amount`. Optional columns: `Description,Category`. Positive amounts are treated as inflows; negative amounts as outflows. Use ISO dates (`YYYY-MM-DD`). Dot-decimal and common European decimal-comma amounts are supported. Maximum 10,000 rows / 2 MB per import.
@@ -96,3 +98,13 @@ Supabase is for database/authentication; it does not host the Next.js website. A
 
 ## Weekly CFO Brief — current scope
 The Brief is generated on demand when the workspace loads and can be manually refreshed. It computes the current 18-month model outlook, summarizes imported transaction history and latest monthly unit-economics inputs, then highlights negative-cash/runway thresholds, significant historical cash-flow trends, missing data and foreign-currency records. Foreign-currency rows are excluded from local-currency totals; no FX rates are inferred. It does not reconcile historical actuals into the forecast, run automatically each Monday, or send emails/push notifications. The Copilot discussion button requires a working Vercel AI Gateway configuration; the Brief's underlying calculations do not.
+
+
+## Public product demo
+The marketing page links to `/demo`. The demo is deliberately not a fake AI conversation: it uses a fictional SaaS company and the same deterministic scenario engine to compare hiring, revenue downside, pricing and fundraising decisions. It is read-only and never writes demo values into a customer's workspace.
+
+## Stripe checkout safeguards
+The Checkout API validates that `STRIPE_PRICE_ID` points to an active EUR 59 monthly recurring Price before creating a session. It blocks another Checkout session when an active subscription is already linked, reuses an existing Stripe customer after cancellation, uses a short-window idempotency key, and returns the user to `/app`. The customer portal also returns to `/app`. The signed webhook requires the webhook secret, Stripe API secret, Supabase service-role key and Supabase URL. These code paths still need successful Stripe test-mode end-to-end acceptance before live keys are used.
+
+## Release and commercial beta
+See [docs/COMMERCIAL_LAUNCH_RUNBOOK.md](docs/COMMERCIAL_LAUNCH_RUNBOOK.md) for the ordered Stripe/AI Gateway/Supabase setup, the browser acceptance checklist, production release gates and the first 15 founder interviews / five design partners / three paying customers plan.
