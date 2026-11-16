@@ -6,6 +6,7 @@ import {
   calculateFundraisingImpact,
   calculatePricingImpact,
   calculateWorkingCapitalImpact,
+  filterActualsToCurrency,
   simulateFinancialDecision,
   simulateHiringDecision,
 } from '../src/lib/finance-intelligence';
@@ -81,6 +82,24 @@ describe('Avenor financial intelligence', () => {
     expect(result.payablesCashImpact).toBe(10_000);
     expect(result.inventoryCashImpact).toBeCloseTo(-3_333.3333, 3);
     expect(result.totalEstimatedCashImpact).toBeCloseTo(-93_333.3333, 3);
+  });
+
+  it('excludes foreign-currency transactions before calculating workspace-currency cash totals', () => {
+    const actuals = [
+      { period: '2026-01-05', metric_key: 'inflow:sales', amount: 100_000, currency: 'EUR' },
+      { period: '2026-01-06', metric_key: 'outflow:payroll', amount: -40_000, currency: 'EUR' },
+      { period: '2026-01-07', metric_key: 'inflow:sales', amount: 50_000, currency: 'GBP' },
+      { period: '2026-01-08', metric_key: 'outflow:rent', amount: -10_000, currency: 'USD' },
+    ];
+    const filtered = filterActualsToCurrency(actuals, ' eur ');
+    const historical = analyzeHistoricalActuals(filtered.compatible);
+
+    expect(filtered.compatible).toHaveLength(2);
+    expect(filtered.mismatchedRecords).toBe(2);
+    expect(filtered.mismatchedCurrencies).toEqual(['GBP', 'USD']);
+    expect(historical.totalInflows).toBe(100_000);
+    expect(historical.totalOutflows).toBe(40_000);
+    expect(historical.currencies).toEqual(['EUR']);
   });
 
   it('summarizes monthly actuals and expense categories', () => {
