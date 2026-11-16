@@ -46,7 +46,7 @@ function makeCookieHeader(cookieJar: Map<string, string>) {
 }
 
 async function deleteQaWorkspace(
-  admin: ReturnType<typeof createClient>,
+  admin: any,
   organizationId: string,
   userId: string,
 ) {
@@ -110,7 +110,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'QA environment is not configured' }, { status: 503 });
   }
 
-  const admin = createClient(url, serviceRoleKey, {
+  const admin: any = createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
