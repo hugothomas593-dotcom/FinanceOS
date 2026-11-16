@@ -23,18 +23,19 @@ This is the operational checklist for moving Avenor from private Preview to a sm
 - Copilot uses the Vercel AI Gateway for open-ended explanation, with bounded deterministic fallback calculations if inference is unavailable.
 - Stripe Checkout, Customer Portal and signed webhook scaffolding exist. Checkout now verifies that the configured Price is active, EUR 59 and recurring monthly; it blocks a second subscription while one is already linked and uses Stripe idempotency for short retry windows.
 - KPI reads cover the full calendar month, including transactions stored on month-end dates.
-- The Stripe test-mode product/price and webhook endpoint are configured. GitHub CI and a Preview build pass, and a staging entitlement simulation has been run. This does not yet prove a complete Checkout → webhook → Customer Portal lifecycle or a successful AI inference.
+- The Stripe test-mode product/price and webhook endpoint are configured. A synthetic EUR 59/month, 30-day test subscription successfully exercised signed `customer.subscription.created`, `customer.subscription.updated` and `customer.subscription.deleted` webhooks. Staging persisted the subscription, granted access during the trial, then revoked access on cancellation; the temporary subscription row was removed. No live charge was made. The signed-in browser Checkout and Customer Portal journey remains untested.
+- GitHub CI passes unit tests, production build and TypeScript; the latest Vercel Preview is READY. Staging entitlement and rate-limit permissions have been simulated. A live AI inference has not been verified.
 
 ## 3. External account setup
 
 ### Vercel / AI Gateway
 
-1. Complete the Vercel AI Gateway customer verification/payment-method step for the team.
-2. Confirm the Vercel deployment receives its OIDC token and that the selected model `anthropic/claude-sonnet-4.6` can serve tool use in the EU region.
+1. 1. Confirm that the Vercel team has AI Gateway enabled and a payment method / billing setup for model inference.
+2. Confirm the deployed Preview receives its OIDC token; Vercel supports OIDC on deployments, but this alone does not prove inference works.
 3. Run a live Copilot request on Preview using the synthetic Northstar Demo workspace.
 4. Verify a successful request in AI Gateway Logs and check model, provider, input/output tokens, cost, duration and EU routing.
-5. Test the failure path as well: invalid credentials, provider unavailable, timeout and rate limit. The deterministic fallback must clearly identify itself as local analysis; do not imply the LLM was available.
-6. Set a team/project spend budget and alert before inviting beta users. Confirm that average cost per active workspace leaves enough gross margin at €59/month.
+5. Test the failure path as well: provider unavailable, timeout and rate limit. The deterministic fallback must clearly identify itself as local analysis; do not imply the LLM was available.
+6. Set a team/project spend budget and alert before inviting beta users. Confirm that average cost per active workspace leaves enough gross margin at €59/month. The observed seven-day AI Gateway usage query returned no requests as of 16 November 2026; a controlled inference is still outstanding.
 
 ### Stripe — test mode first
 
@@ -77,7 +78,7 @@ Do not add live keys until the test flow is green and a human has reviewed the l
 ### Supabase
 
 - Keep staging and production projects strictly separate.
-- The current Supabase organization is on the Free plan. Leaked-password protection is not included on Free; upgrade the staging and eventual Production Supabase organizations to Pro or above before public registration, then enable it in Auth → Sign In / Providers → Email. Do not claim this control is enabled until the advisor confirms it.
+- The current Supabase organization is on the Free plan. Leaked-password protection and automatic backups are not included on Free. Supabase Pro is currently listed at USD 25/month (compute may add costs); upgrading is a paid decision and has not been authorized. Before public registration or customer financial data, upgrade the organization, enable leaked-password protection in Auth → Sign In / Providers → Email, verify the advisor clears, and confirm backup retention/restore options.
 - Test signup, email confirmation, login, password reset, callback redirects and session refresh.
 - Create two unrelated test users with two workspaces each. Attempt cross-workspace SELECT, INSERT, UPDATE and DELETE on models, actuals, scenarios, Copilot threads/messages, context, subscriptions and audit records. Every unauthorized attempt must fail.
 - Keep `stripe_webhook_events` server-only, protected by RLS with no client policy; only the server service-role webhook can access it.
