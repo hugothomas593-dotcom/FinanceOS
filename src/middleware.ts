@@ -6,7 +6,8 @@ export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
   const isAppPage = pathname === '/app' || pathname.startsWith('/app/');
   const isOnboarding = pathname === '/onboarding' || pathname.startsWith('/onboarding');
-  const isProtectedPage = isAppPage || isOnboarding;
+  const isSubscribe = pathname === '/subscribe' || pathname.startsWith('/subscribe/');
+  const isProtectedPage = isAppPage || isOnboarding || isSubscribe;
   const supabaseConfig = getSupabasePublicConfig();
 
   // The public marketing site must remain accessible even before setup.
@@ -53,17 +54,36 @@ export async function middleware(request: NextRequest) {
 
   if (isProtectedPage && !userId) return redirectWithCookies('/login');
 
-  if (userId && (isAppPage || isOnboarding || pathname === '/login')) {
-    const { data: membership } = await supabase
+  if (userId && (isAppPage || isOnboarding || isSubscribe || pathname === '/login')) {
+    const { data: membership, error: membershipError } = await supabase
       .from('organization_members')
       .select('organization_id')
       .eq('user_id', userId)
+      .order('created_at', { ascending: true })
       .limit(1)
       .maybeSingle();
 
-    if (!membership && isAppPage) return redirectWithCookies('/onboarding');
-    if (membership && (isOnboarding || pathname === '/login')) return redirectWithCookies('/app');
-    if (!membership && pathname === '/login') return response;
+    if (membershipError) return redirectWithCookies('/subscribe?status=verification');
+
+    if (!membership) {
+      if (isAppPage || isSubscribe) return redirectWithCookies('/onboarding');
+      if (isOnboarding || pathname === '/login') return response;
+    }
+
+    if (membership) {
+      // This public RPC returns only a boolean. It does not expose Stripe IDs or
+      // other billing metadata to ordinary workspace members.
+      const { data: hasAccess, error: entitlementError } = await supabase.rpc(
+        'has_organization_access',
+        { org_id: membership.organization_id },
+      );
+      const entitled = !entitlementError && hasAccess === true;
+
+      if (isAppPage && !entitled) return redirectWithCookies('/subscribe');
+      if (isOnboarding) return redirectWithCookies(entitled ? '/app' : '/subscribe');
+      if (pathname === '/login') return redirectWithCookies(entitled ? '/app' : '/subscribe');
+      if (isSubscribe && entitled) return redirectWithCookies('/app');
+    }
   }
 
   return response;
