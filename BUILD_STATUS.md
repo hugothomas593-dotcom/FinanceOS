@@ -1,54 +1,63 @@
 # Avenor engineering status — 16 November 2026
 
-## Current verified snapshot — 16 November 2026, 22:10 UTC
+## Current verified snapshot — 16 November 2026, 23:15 UTC
 
-This section supersedes older point-in-time release notes below. The repository is still an engineering/beta candidate, not a production-certified service.
+This snapshot supersedes older point-in-time release notes below. The repository is still an engineering/beta candidate, not a production-certified service.
 
-### Source and deployment
-- Correction branch: `fix/avenor-commercial-readiness`.
-- Latest branch HEAD: `2c1952a1ef2392fc403f255ce9cab69520822692`; PR #2 is OPEN and DRAFT.
-- GitHub Actions run #43963968845 completed successfully on this HEAD: Vitest, Next.js production build and TypeScript check all passed. A separate clean install using a temporary generated npm lockfile also passed `npm ci`, all 129 tests, TypeScript and the production build. The generated lockfile was not committed; CI still uses `npm install`, so dependency resolution is not yet fully reproducible.
-- Latest READY Vercel application deployment is `dpl_D9PBbwYx5eU8Xb5x16bcv1YEYBFy`, source commit `765cb7b00412ec97b0176ff12931b20e69b6b6b7`, region `dub1`. Subsequent commits to the branch change tests/documentation only; the deployed application code is the same.
-- Preview is protected by Vercel Authentication/SSO. It is not an anonymous customer-facing production URL.
-- The only attached Production domain is `financeosss.vercel.app`; no customer-owned Avenor domain or customer support address is configured.
+### Source, CI and deployment
+- Correction branch: `fix/avenor-commercial-readiness`; PR #2 remains OPEN and DRAFT.
+- Latest branch HEAD: `f44fbaebfbb2aede0ffcb19c874e0e916cb109f4`.
+- GitHub Actions run #280 (`43976651748`) completed successfully on this HEAD: **139 tests passed across 15 files**, Next.js production build and TypeScript check passed.
+- The new test file `tests/copilot-synthetic-qa.test.ts` covers ten distinct founder questions against the deterministic finance functions used by Copilot. These tests do not call Claude or prove a live AI Gateway response.
+- Latest READY Preview application deployment remains `dpl_4dGJmcYrB3ddVbp2hsSSH7ukyQgx`, sourced from the earlier application commit `09f6df82abf0cae6b6171150d1ffebe1f8c240f5`. It does not contain the new homepage/demo changes.
+- Vercel rejected additional Preview deployments with `api-deployments-free-per-day` (over 100 deployments in the rolling day). The newest branch changes are therefore in GitHub/PR and CI, but are **not yet visible on the deployed Preview**. Do not tell users the current Preview URL shows them.
+- Preview remains protected by Vercel Authentication/SSO; it is not a public customer-facing production URL. No Production deployment or release was performed.
 
-### Changes on the correction branch
-- Same-origin / Fetch Metadata protection for cookie-authenticated mutating API requests; Stripe webhook remains signature-authenticated.
-- Shared Postgres-backed per-user rate limits on Copilot, CSV import, Checkout, Billing Portal, CFO Brief, export and workspace deletion.
-- Owner/admin JSON workspace export and owner-only active-workspace erasure with explicit confirmation, pending-Checkout guard and Stripe cancellation first.
-- One-time trial claim survives workspace deletion (migration 013).
-- Sign-up and password-reset UI use the same 12+ character mixed-case, digit and symbol rule.
-- Stripe flexible-billing webhook period-end parsing and late canceled-webhook behavior hardened.
-- Model approval now uses a transactional RPC (migration 014); Postgres partial unique index enforces at most one approved model per workspace (migration 015).
-- Internal draft Privacy Notice, Terms, DPA and Subprocessor Register added; these are not approved for signature or publication.
+### Product demo added on the correction branch
+- Homepage `/` now has a prominent interactive-demo section, with a direct CTA to `/demo`. The homepage already had links to the demo in the header and hero; this makes the route substantially more discoverable.
+- `/demo` is upgraded from four static decision buttons to six founder questions: two hires, 20% revenue downside, price/volume sensitivity, €1m fundraising, 30-day collection delay and a marketing investment.
+- The demo displays synthetic company context, base-versus-scenario closing cash, modeled 18-month impact, first negative cash month, explicit assumptions and limitations, plus a CTA to create a workspace.
+- The page is explicitly labelled as a synthetic deterministic illustration, not a live AI conversation, real company data or financial advice. No account or data upload is required.
+- The new UI compiles and passes CI. It has not yet been visually reviewed on a successful new Preview deployment because Vercel's daily deployment quota was exhausted.
 
-### Verified on staging / Preview / Stripe test mode
+### Ten-question finance-engine QA
+The CI suite exercises these ten questions using the real deterministic functions imported by the Copilot route:
+1. What happens to cash over the next 18 months?
+2. Can we hire two engineers at €60k each with a 35% employer-cost assumption?
+3. What if revenue is 20% below plan?
+4. How much monthly revenue is needed to break even?
+5. Can we spend €30k while preserving 12 months of runway?
+6. Does a 10% price increase offset a 5% customer-volume decline?
+7. What does a €1m raise at €6m pre-money mean for cash and dilution?
+8. What if customers pay 30 days later?
+9. What do the SaaS unit economics look like?
+10. What do six months of imported cash movements show?
+- All ten deterministic calculation tests passed in CI. This validates the finance tools, **not** natural-language intent routing, LLM reasoning, real AI Gateway inference or the full authenticated browser flow.
+- A previously provisioned fictional staging workspace `Northstar Demo — fictional QA workspace` contains an approved EUR model and 66 synthetic historical/KPI records over May–October 2026. It is staging-only.
+- A real authenticated Copilot conversation has still not been completed. The environment does not provide a disposable authenticated test session; no existing user's password or session was used. Vercel AI Gateway has not yet shown a successful inference from this application.
+
+### Existing safeguards and staging verification
 - Staging project `avenor-staging` (`fozwtnfzzancgdwjxopy`) is ACTIVE_HEALTHY and has migrations through 015.
-- The staging rate-limit table and RPC are inaccessible to `anon` and `authenticated`; a rolled-back SQL check confirmed a limit of two requests blocks the third.
-- A rolled-back model-approval simulation confirmed that approving a second version archives the prior approved version. The database partial unique index is present.
-- A synthetic non-member access simulation returned zero rows for another workspace's financial actuals, models, scenarios, Copilot threads and messages; a cross-tenant insert attempt was blocked by RLS. This is a targeted isolation check, not a full two-customer CRUD acceptance suite.
-- Stripe test mode: a synthetic EUR 59/month 30-day trial subscription delivered signed create/update/delete webhooks. Staging persisted the trial, granted entitlement, then revoked it after cancellation. The temporary subscription row was removed. No live charge was made.
-- Direct HTTP checks on the protected Preview: `/`, `/demo`, `/login` returned 200; `/app` and `/subscribe` redirected without a session; cross-origin organization creation returned 403; same-origin unauthenticated creation returned 401.
-- A browser loaded the landing page, demo and login with no browser page errors or console errors. Authenticated browser E2E for signup, reset completion, onboarding, Copilot and billing is still outstanding.
-- Stripe Checkout and Customer Portal have not been verified end-to-end in an authenticated browser session. The test-mode webhook lifecycle has been verified separately.
-- Vercel AI Gateway's seven-day usage query returned no requests; successful live Copilot inference, provider routing, retention, contractual data handling and unit economics are not yet evidenced.
+- Postgres-backed rate limits, transactional model approval and the single-approved-model index are applied on staging.
+- Targeted tenant isolation simulation blocked a non-member from reading another workspace's financial rows and blocked a cross-tenant insert. This is not a full two-customer CRUD suite.
+- Stripe test mode: synthetic EUR 59/month, 30-day trial; signed create/update/delete webhooks processed and subscription entitlement became active then false after cancellation. No live charge.
+- Preview HTTP smoke checks previously confirmed `/`, `/demo`, `/login` return 200, protected routes redirect without an authenticated session, cross-origin organization creation returns 403 and same-origin unauthenticated creation returns 401.
+- Authenticated browser E2E for signup, onboarding, Copilot and billing remains outstanding.
 
 ### Staging and Production are deliberately separate
-- Preview-only Stripe test secrets and the staging service-role key are scoped to `fix/avenor-commercial-readiness`. No Stripe Live or service-role secret is configured for Vercel Production.
-- Production Supabase project `qeitvqzujytiiupmkmyp` is in `eu-west-1`, has zero business rows, RLS enabled on its 10 existing tables, and migration history only through the recovered baseline (migration 006). It has not received migrations 007–015.
-- No Production app deployment, Production database migration or Live Stripe charge was made. Do not merge/deploy this branch to Production until the missing migration plan, env vars, billing and legal settings are reviewed and tested.
+- Stripe test secrets and the staging service-role key are Preview-only and branch-scoped. No Production Stripe Live secret or production service-role key was added.
+- Production Supabase project `qeitvqzujytiiupmkmyp` remains at recovered migration baseline 006; migrations 007–015 are not applied.
+- No Production app deployment, Production database migration, Live Stripe charge, paid Supabase upgrade, domain purchase or legal-document publication was performed.
 
-### Remaining blockers before accepting real customer data or payment
-- Supabase organization is on Free. Leaked-password protection and automatic backups are unavailable on this plan. Pro upgrade is a paid account decision and was not made; after upgrade, enable leaked-password protection and verify the advisor.
-- Complete two-independent-customer RLS/API CRUD tests, authenticated browser tests, backup/restore drill, privileged-account MFA/access review and incident-response rehearsal.
-- Complete successful AI Gateway inference, downstream model/provider data handling and spend controls.
-- Complete full Stripe Checkout/Portal journey, renewal/failure/cancellation and reconciliation acceptance in test mode.
-- Confirm legal operator identity/address, support/privacy contacts, governing law, customer geography, B2B/B2C scope and VAT/tax status; then finalize GDPR privacy notice, Terms, customer DPA, subprocessor register, retention/deletion schedule and Stripe Tax settings with qualified review.
-- Obtain a customer-owned domain and configure public Production auth redirects, live billing keys and webhook only after release gates pass.
-- Commission an independent application security assessment before making security certification or assurance claims.
+### Remaining blockers before accepting real customer data or payments
+- Complete a successful authenticated Copilot conversation and verify model/provider routing, downstream data handling, retention terms and spend controls.
+- Complete two-independent-customer RLS/API CRUD tests, authenticated browser E2E, backup/restore drill, privileged-account MFA/access review, incident response rehearsal and independent security assessment.
+- Complete full Stripe Checkout/Customer Portal, renewal/failure/cancellation and reconciliation tests in test mode.
+- Confirm legal operator identity/address, support/privacy contacts, governing law, customer geography, B2B/B2C scope and VAT/tax status; then finalize GDPR notice, Terms, DPA, subprocessor register, retention schedule and Stripe Tax settings with qualified review.
+- Obtain a customer-owned domain and configure Production auth redirects, Live billing keys and webhooks only after the release gates pass.
+- The repository still lacks a committed lockfile; CI uses `npm install`.
 
 No software can be guaranteed free of bugs or described as perfectly secure. Do not claim SOC 2/ISO certification, independent penetration testing, completed GDPR readiness, AI inference readiness or a public paid launch.
-
 ---
 
 ## Historical engineering notes
