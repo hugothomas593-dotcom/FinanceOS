@@ -12,7 +12,7 @@ This is the operational checklist for moving Avenor from private Preview to a sm
 
 **Initial plan:** Avenor Founder — €59/month, one plan, no feature tiers.
 
-Do not add a free trial, annual discount or tiered pricing until customer interviews validate the €59 willingness to pay and the cost of AI usage per active workspace. The public demo is free and uses synthetic data; it is not a free customer workspace.
+**Trial policy:** eligible first-time users receive a 30-day trial after providing a payment method; the subscription then renews at €59/month unless canceled. Stripe is configured to cancel at trial end when no payment method is available. The public demo remains free and uses synthetic data; it is not a free customer workspace.
 
 ## 2. Current implementation in this repository
 
@@ -23,7 +23,7 @@ Do not add a free trial, annual discount or tiered pricing until customer interv
 - Copilot uses the Vercel AI Gateway for open-ended explanation, with bounded deterministic fallback calculations if inference is unavailable.
 - Stripe Checkout, Customer Portal and signed webhook scaffolding exist. Checkout now verifies that the configured Price is active, EUR 59 and recurring monthly; it blocks a second subscription while one is already linked and uses Stripe idempotency for short retry windows.
 - KPI reads cover the full calendar month, including transactions stored on month-end dates.
-- None of the above proves a live AI request or Stripe payment has succeeded.
+- The Stripe test-mode product/price and webhook endpoint are configured. GitHub CI and a Preview build pass, and a staging entitlement simulation has been run. This does not yet prove a complete Checkout → webhook → Customer Portal lifecycle or a successful AI inference.
 
 ## 3. External account setup
 
@@ -77,7 +77,7 @@ Do not add live keys until the test flow is green and a human has reviewed the l
 ### Supabase
 
 - Keep staging and production projects strictly separate.
-- Enable leaked-password protection in Supabase Auth before public registration.
+- The current Supabase organization is on the Free plan. Leaked-password protection is not included on Free; upgrade the staging and eventual Production Supabase organizations to Pro or above before public registration, then enable it in Auth → Sign In / Providers → Email. Do not claim this control is enabled until the advisor confirms it.
 - Test signup, email confirmation, login, password reset, callback redirects and session refresh.
 - Create two unrelated test users with two workspaces each. Attempt cross-workspace SELECT, INSERT, UPDATE and DELETE on models, actuals, scenarios, Copilot threads/messages, context, subscriptions and audit records. Every unauthorized attempt must fail.
 - Keep `stripe_webhook_events` server-only, protected by RLS with no client policy; only the server service-role webhook can access it.
@@ -154,7 +154,7 @@ Production must remain unchanged until all are true:
 - Financial-model limitations and professional-advice boundaries are shown in product copy.
 - The founder explicitly approves promotion to Production and live Stripe keys.
 
-## 7. Still not automated / not yet proven
+## 7. Current candidate safeguards and remaining evidence gaps\n\nImplemented on the correction branch: cross-origin browser mutations are rejected (except Stripe webhooks, which use signed payloads); authenticated Copilot, CSV import, Checkout, Billing Portal and CFO Brief calls have shared Postgres-backed per-user rate limits. Rate-limit state is server-only and inaccessible to anon/authenticated roles. These safeguards require the Preview deployment and migration 012 to be present together.\n\nThe staging migration and database function are applied and the rate-limit table is denied to authenticated users. End-to-end route verification and browser acceptance are still required.\n\n## 8. Still not automated / not yet proven
 
 - Live AI Gateway verification and successful inference.
 - Stripe product/price creation and test-mode end-to-end payment.
