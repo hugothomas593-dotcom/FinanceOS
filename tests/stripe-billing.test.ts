@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AVENOR_TRIAL_DAYS,
   billingPortalReturnUrl,
   billingReturnUrls,
   canStartCheckout,
@@ -29,8 +30,8 @@ describe('Stripe subscription checkout policy', () => {
 describe('Stripe return URLs', () => {
   it('returns successful and canceled Checkout sessions to the authenticated app', () => {
     expect(billingReturnUrls('https://avenor.example')).toEqual({
-      successUrl: 'https://avenor.example/app?billing=success',
-      cancelUrl: 'https://avenor.example/app?billing=cancelled',
+      successUrl: 'https://avenor.example/subscribe?checkout=success',
+      cancelUrl: 'https://avenor.example/subscribe?checkout=cancelled',
     });
   });
 
@@ -50,6 +51,13 @@ describe('Stripe return URLs', () => {
   });
 });
 
+
+
+describe('Avenor free trial configuration', () => {
+  it('offers a 30-day trial', () => {
+    expect(AVENOR_TRIAL_DAYS).toBe(30);
+  });
+});
 
 describe('Avenor Founder Stripe price validation', () => {
   const validPrice = {
