@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { z } from 'zod';
 import { requireUser } from '@/lib/supabase/server';
 import {
-  AVENOR_TRIAL_DAYS,
+  buildCheckoutSessionParams,
   billingReturnUrls,
   canStartCheckout,
   isAvenorFounderPrice,
@@ -174,31 +174,16 @@ export async function POST(request: Request) {
     }
 
     const { successUrl, cancelUrl } = billingReturnUrls(appUrl);
-    const params = new URLSearchParams({
-      mode: 'subscription',
-      payment_method_collection: 'always',
-      'line_items[0][price]': price,
-      'line_items[0][quantity]': '1',
-      success_url: successUrl,
-      cancel_url: cancelUrl,
-      client_reference_id: organizationId,
-      'metadata[organization_id]': organizationId,
-      'metadata[owner_user_id]': user.id,
-      'subscription_data[metadata][organization_id]': organizationId,
-      'subscription_data[metadata][owner_user_id]': user.id,
+    const params = buildCheckoutSessionParams({
+      organizationId,
+      ownerUserId: user.id,
+      priceId: price,
+      successUrl,
+      cancelUrl,
+      trialEligible,
+      customerId: existingSubscription?.stripe_customer_id,
+      customerEmail: user.email,
     });
-
-    if (trialEligible) {
-      params.set('subscription_data[trial_period_days]', String(AVENOR_TRIAL_DAYS));
-      params.set('subscription_data[trial_settings][end_behavior][missing_payment_method]', 'cancel');
-    }
-
-    if (existingSubscription?.stripe_customer_id) {
-      params.set('customer', existingSubscription.stripe_customer_id);
-    } else if (user.email) {
-      params.set('customer_email', user.email);
-    }
-
     const response = await fetch('https://api.stripe.com/v1/checkout/sessions', {
       method: 'POST',
       headers: {
