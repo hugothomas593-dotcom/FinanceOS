@@ -33,6 +33,29 @@ function signedActualAmount(row: ActualRecord): number {
   return row.amount;
 }
 
+export function filterActualsToCurrency(actuals: ActualRecord[], baseCurrency: string) {
+  const currency = baseCurrency.trim().toUpperCase();
+  const compatible: ActualRecord[] = [];
+  const mismatchedCurrencies = new Set<string>();
+  let mismatchedRecords = 0;
+
+  for (const row of actuals) {
+    const rowCurrency = String(row.currency ?? '').trim().toUpperCase();
+    if (rowCurrency === currency) {
+      compatible.push(row);
+    } else {
+      mismatchedRecords += 1;
+      mismatchedCurrencies.add(rowCurrency || 'UNKNOWN');
+    }
+  }
+
+  return {
+    compatible,
+    mismatchedRecords,
+    mismatchedCurrencies: [...mismatchedCurrencies].sort(),
+  };
+}
+
 export function analyzeHistoricalActuals(actuals: ActualRecord[]) {
   const valid = actuals.filter(
     (row) => /^\d{4}-\d{2}-\d{2}$/.test(row.period) && Number.isFinite(row.amount),
