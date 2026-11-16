@@ -67,6 +67,13 @@ describe('stable CSV import references', () => {
       .toEqual(createStableActualReferences('org-1', 'EUR', renamed));
   });
 
+  it('includes the actual row currency in the stable import reference', () => {
+    const eur = [{ ...rows[0], currency: 'EUR' }];
+    const gbp = [{ ...rows[0], currency: 'GBP' }];
+    expect(createStableActualReferences('org-1', 'EUR', eur))
+      .not.toEqual(createStableActualReferences('org-1', 'EUR', gbp));
+  });
+
   it('creates different references for different organizations or currencies', () => {
     expect(createStableActualReferences('org-1', 'EUR', rows))
       .not.toEqual(createStableActualReferences('org-2', 'EUR', rows));
