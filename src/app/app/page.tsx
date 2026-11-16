@@ -220,6 +220,7 @@ export default function Home() {
         const selectedOrganizationId = selected.organization_id;
         const organization = selected.organizations;
         localStorage.setItem('financeos.organizationId', selectedOrganizationId);
+        document.cookie = `avenor_organization_id=${encodeURIComponent(selectedOrganizationId)}; Path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
 
         if (cancelled) return;
         setOrganizationId(selectedOrganizationId);
@@ -475,6 +476,7 @@ export default function Home() {
       if (error) throw error;
 
       window.localStorage.removeItem('financeos.organizationId');
+      document.cookie = 'avenor_organization_id=; Path=/; Max-Age=0; SameSite=Lax';
       window.location.replace('/login');
     } catch (error) {
       setSignOutError(error instanceof Error ? error.message : 'Could not sign out. Please try again.');
@@ -537,6 +539,7 @@ export default function Home() {
             const nextOrganizationId = event.target.value;
             if (!nextOrganizationId || nextOrganizationId === organizationId) return;
             localStorage.setItem('financeos.organizationId', nextOrganizationId);
+            document.cookie = `avenor_organization_id=${encodeURIComponent(nextOrganizationId)}; Path=/; SameSite=Lax${window.location.protocol === 'https:' ? '; Secure' : ''}`;
             window.location.assign('/app');
           }}
         >
