@@ -55,15 +55,42 @@ export async function middleware(request: NextRequest) {
   if (isProtectedPage && !userId) return redirectWithCookies('/login');
 
   if (userId && (isAppPage || isOnboarding || isSubscribe || pathname === '/login')) {
-    const { data: membership, error: membershipError } = await supabase
+    const requestedOrganizationId = isSubscribe
+      ? request.nextUrl.searchParams.get('organizationId')
+      : null;
+    const cookieOrganizationId = request.cookies.get('avenor_organization_id')?.value ?? null;
+    const preferredOrganizationId = requestedOrganizationId || cookieOrganizationId;
+    const isUuid = (value: string | null): value is string =>
+      Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
+
+    let membershipQuery = supabase
       .from('organization_members')
       .select('organization_id')
       .eq('user_id', userId)
       .order('created_at', { ascending: true })
-      .limit(1)
-      .maybeSingle();
+      .limit(1);
 
-    if (membershipError) return redirectWithCookies('/login?error=workspace_verification');
+    if (isUuid(preferredOrganizationId)) {
+      membershipQuery = membershipQuery.eq('organization_id', preferredOrganizationId);
+    }
+
+    let { data: membership, error: membershipError } = await membershipQuery.maybeSingle();
+    if (!membership && !membershipError && isUuid(preferredOrganizationId)) {
+      const fallback = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      membership = fallback.data;
+      membershipError = fallback.error;
+    }
+
+    if (membershipError) {
+      if (pathname === '/login' || isOnboarding) return response;
+      return redirectWithCookies('/login?error=workspace_verification');
+    }
 
     if (!membership) {
       if (isAppPage || isSubscribe) return redirectWithCookies('/onboarding');
@@ -78,10 +105,11 @@ export async function middleware(request: NextRequest) {
         { org_id: membership.organization_id },
       );
       const entitled = !entitlementError && hasAccess === true;
+      const organizationQuery = '?organizationId=' + encodeURIComponent(membership.organization_id);
 
-      if (isAppPage && !entitled) return redirectWithCookies('/subscribe');
-      if (isOnboarding) return redirectWithCookies(entitled ? '/app' : '/subscribe');
-      if (pathname === '/login') return redirectWithCookies(entitled ? '/app' : '/subscribe');
+      if (isAppPage && !entitled) return redirectWithCookies('/subscribe' + organizationQuery);
+      if (isOnboarding) return redirectWithCookies(entitled ? '/app' : '/subscribe' + organizationQuery);
+      if (pathname === '/login') return redirectWithCookies(entitled ? '/app' : '/subscribe' + organizationQuery);
       if (isSubscribe && entitled) return redirectWithCookies('/app');
     }
   }
