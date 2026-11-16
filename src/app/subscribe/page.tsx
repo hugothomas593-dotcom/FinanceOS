@@ -234,7 +234,7 @@ export default function SubscribePage() {
         </div>
 
         <p className="subscribe-legal">
-          A card is required to start the trial. At the end of the trial, the subscription renews at €59/month until cancelled. You can cancel through the Stripe billing portal before the first payment. The exact first billing date and applicable terms are shown in Checkout. Taxes, if applicable, are shown before payment.
+          A card is required to start the trial. At the end of the trial, the subscription renews at €59/month until cancelled. You can cancel through the Stripe billing portal before the first payment. The exact first billing date and applicable terms are shown in Checkout. The €59 is the subscription price. VAT/tax treatment and registrations must be configured before public billing is enabled.
         </p>
       </section>
     </main>
