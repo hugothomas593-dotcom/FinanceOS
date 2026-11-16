@@ -9,6 +9,7 @@ import {
   canStartCheckout,
   isAvenorFounderPrice,
 } from '@/lib/stripe-billing';
+import { enforceApiRateLimit } from '@/lib/rate-limit';
 
 const Schema = z.object({ organizationId: z.string().uuid() });
 const CHECKOUT_SESSION_LIFETIME_MS = 24 * 60 * 60 * 1000;
@@ -36,6 +37,14 @@ export async function POST(request: Request) {
       .maybeSingle();
     if (!member || !['owner', 'admin'].includes(member.role)) {
       return jsonError('Only a workspace owner or admin can start billing', 403);
+    }
+
+    const rateLimit = await enforceApiRateLimit(user.id, 'checkout');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many Checkout attempts. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } },
+      );
     }
 
     const { data: existingSubscription, error: subscriptionError } = await supabase
