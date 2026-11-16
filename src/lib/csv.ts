@@ -1,23 +1,74 @@
 export type ImportedActual = { period: string; category: string; description: string; amount: number; direction: 'inflow' | 'outflow'; source: string };
 
+function detectDelimiter(text: string): string {
+  const delimiters = [',', ';', '\t'];
+  const counts = new Map(delimiters.map((delimiter) => [delimiter, 0]));
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
+    if (character === '"' && quoted && text[index + 1] === '"') {
+      index += 1;
+      continue;
+    }
+    if (character === '"') {
+      quoted = !quoted;
+      continue;
+    }
+    if (character === '\n') break;
+    if (!quoted && counts.has(character)) {
+      counts.set(character, (counts.get(character) ?? 0) + 1);
+    }
+  }
+
+  return delimiters.reduce(
+    (best, delimiter) => (counts.get(delimiter)! > counts.get(best)! ? delimiter : best),
+    ',',
+  );
+}
+
 export function parseCsv(text: string): string[][] {
-  const rows: string[][] = []; let row: string[] = []; let cell = ''; let quoted = false;
-  for (let i = 0; i < text.length; i++) {
-    const c = text[i];
+  const delimiter = detectDelimiter(text);
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let cell = '';
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const character = text[index];
     if (quoted) {
-      if (c === '"' && text[i + 1] === '"') { cell += '"'; i++; }
-      else if (c === '"') quoted = false;
-      else cell += c;
-    } else if (c === '"') {
+      if (character === '"' && text[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else if (character === '"') {
+        quoted = false;
+      } else {
+        cell += character;
+      }
+    } else if (character === '"') {
       if (cell.length) throw new Error('CSV contains an unexpected quote');
       quoted = true;
-    } else if (c === ',') { row.push(cell); cell = ''; }
-    else if (c === '\n') { row.push(cell.replace(/\r$/, '')); if (row.some(v => v.trim())) rows.push(row); row = []; cell = ''; }
-    else cell += c;
+    } else if (character === delimiter) {
+      row.push(cell);
+      cell = '';
+    } else if (character === '\n') {
+      row.push(cell.replace(/\r$/, ''));
+      if (row.some((value) => value.trim())) rows.push(row);
+      row = [];
+      cell = '';
+    } else {
+      cell += character;
+    }
   }
+
   if (quoted) throw new Error('CSV contains an unclosed quoted field');
-  if (cell.length || row.length) { row.push(cell.replace(/\r$/, '')); if (row.some(v => v.trim())) rows.push(row); }
-  if (rows.some(r => r.length !== rows[0].length)) throw new Error('CSV rows have inconsistent column counts');
+  if (cell.length || row.length) {
+    row.push(cell.replace(/\r$/, ''));
+    if (row.some((value) => value.trim())) rows.push(row);
+  }
+  if (rows.length && rows.some((csvRow) => csvRow.length !== rows[0].length)) {
+    throw new Error('CSV rows have inconsistent column counts');
+  }
   return rows;
 }
 
