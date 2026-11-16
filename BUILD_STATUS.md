@@ -1,6 +1,60 @@
 # Avenor engineering status — 16 November 2026
 
-## Commercial-readiness audit update — 16 November 2026
+## Current verified snapshot — 16 November 2026, 22:10 UTC
+
+This section supersedes older point-in-time release notes below. The repository is still an engineering/beta candidate, not a production-certified service.
+
+### Source and deployment
+- Correction branch: `fix/avenor-commercial-readiness`.
+- Latest branch HEAD: `2c1952a1ef2392fc403f255ce9cab69520822692`; PR #2 is OPEN and DRAFT.
+- GitHub Actions run #43963968845 completed successfully on this HEAD: Vitest, Next.js production build and TypeScript check all passed.
+- Latest READY Vercel application deployment is `dpl_D9PBbwYx5eU8Xb5x16bcv1YEYBFy`, source commit `765cb7b00412ec97b0176ff12931b20e69b6b6b7`, region `dub1`. Subsequent commits to the branch change tests/documentation only; the deployed application code is the same.
+- Preview is protected by Vercel Authentication/SSO. It is not an anonymous customer-facing production URL.
+- The only attached Production domain is `financeosss.vercel.app`; no customer-owned Avenor domain or customer support address is configured.
+
+### Changes on the correction branch
+- Same-origin / Fetch Metadata protection for cookie-authenticated mutating API requests; Stripe webhook remains signature-authenticated.
+- Shared Postgres-backed per-user rate limits on Copilot, CSV import, Checkout, Billing Portal, CFO Brief, export and workspace deletion.
+- Owner/admin JSON workspace export and owner-only active-workspace erasure with explicit confirmation, pending-Checkout guard and Stripe cancellation first.
+- One-time trial claim survives workspace deletion (migration 013).
+- Sign-up and password-reset UI use the same 12+ character mixed-case, digit and symbol rule.
+- Stripe flexible-billing webhook period-end parsing and late canceled-webhook behavior hardened.
+- Model approval now uses a transactional RPC (migration 014); Postgres partial unique index enforces at most one approved model per workspace (migration 015).
+- Internal draft Privacy Notice, Terms, DPA and Subprocessor Register added; these are not approved for signature or publication.
+
+### Verified on staging / Preview / Stripe test mode
+- Staging project `avenor-staging` (`fozwtnfzzancgdwjxopy`) is ACTIVE_HEALTHY and has migrations through 015.
+- The staging rate-limit table and RPC are inaccessible to `anon` and `authenticated`; a rolled-back SQL check confirmed a limit of two requests blocks the third.
+- A rolled-back model-approval simulation confirmed that approving a second version archives the prior approved version. The database partial unique index is present.
+- A synthetic non-member access simulation returned zero rows for another workspace's financial actuals, models, scenarios, Copilot threads and messages; a cross-tenant insert attempt was blocked by RLS. This is a targeted isolation check, not a full two-customer CRUD acceptance suite.
+- Stripe test mode: a synthetic EUR 59/month 30-day trial subscription delivered signed create/update/delete webhooks. Staging persisted the trial, granted entitlement, then revoked it after cancellation. The temporary subscription row was removed. No live charge was made.
+- Direct HTTP checks on the protected Preview: `/`, `/demo`, `/login` returned 200; `/app` and `/subscribe` redirected without a session; cross-origin organization creation returned 403; same-origin unauthenticated creation returned 401.
+- A browser loaded the landing page, demo and login with no browser page errors or console errors. Authenticated browser E2E for signup, reset completion, onboarding, Copilot and billing is still outstanding.
+- Stripe Checkout and Customer Portal have not been verified end-to-end in an authenticated browser session. The test-mode webhook lifecycle has been verified separately.
+- Vercel AI Gateway's seven-day usage query returned no requests; successful live Copilot inference, provider routing, retention, contractual data handling and unit economics are not yet evidenced.
+
+### Staging and Production are deliberately separate
+- Preview-only Stripe test secrets and the staging service-role key are scoped to `fix/avenor-commercial-readiness`. No Stripe Live or service-role secret is configured for Vercel Production.
+- Production Supabase project `qeitvqzujytiiupmkmyp` is in `eu-west-1`, has zero business rows, RLS enabled on its 10 existing tables, and migration history only through the recovered baseline (migration 006). It has not received migrations 007–015.
+- No Production app deployment, Production database migration or Live Stripe charge was made. Do not merge/deploy this branch to Production until the missing migration plan, env vars, billing and legal settings are reviewed and tested.
+
+### Remaining blockers before accepting real customer data or payment
+- Supabase organization is on Free. Leaked-password protection and automatic backups are unavailable on this plan. Pro upgrade is a paid account decision and was not made; after upgrade, enable leaked-password protection and verify the advisor.
+- Complete two-independent-customer RLS/API CRUD tests, authenticated browser tests, backup/restore drill, privileged-account MFA/access review and incident-response rehearsal.
+- Complete successful AI Gateway inference, downstream model/provider data handling and spend controls.
+- Complete full Stripe Checkout/Portal journey, renewal/failure/cancellation and reconciliation acceptance in test mode.
+- Confirm legal operator identity/address, support/privacy contacts, governing law, customer geography, B2B/B2C scope and VAT/tax status; then finalize GDPR privacy notice, Terms, customer DPA, subprocessor register, retention/deletion schedule and Stripe Tax settings with qualified review.
+- Obtain a customer-owned domain and configure public Production auth redirects, live billing keys and webhook only after release gates pass.
+- Commission an independent application security assessment before making security certification or assurance claims.
+
+No software can be guaranteed free of bugs or described as perfectly secure. Do not claim SOC 2/ISO certification, independent penetration testing, completed GDPR readiness, AI inference readiness or a public paid launch.
+
+---
+
+## Historical engineering notes
+
+Older entries below are retained as a dated engineering history. Their statements about missing paywall, workspace export/deletion, trial webhook tests and the migration head are point-in-time observations and are superseded by the current verified snapshot above.
+
 - Latest validated code snapshot before this entry: `8942904261f719a65097a556d30d12964e9f467a` on `chore/avenor-repository-hygiene`. GitHub Actions run #192 passed 86/86 tests across 10 files, Next.js production build and TypeScript. A follow-up regression test for per-row currency identity is being added and must be revalidated separately.
 - Added a real sign-out action to the authenticated workspace using Supabase Auth; it clears the remembered workspace and returns to login.
 - Fixed mixed-currency analysis in Copilot: imported transactions and KPI rows that do not match the workspace currency are excluded from calculation; the Copilot prompt and visible data-limitations evidence disclose excluded currencies and the absence of FX conversion.
