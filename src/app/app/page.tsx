@@ -730,7 +730,7 @@ export default function Home() {
           <p className="form-intro">One founder membership. Every Avenor feature is included in the same plan—there are no feature tiers.</p>
           <div className="billing-single-plan">
             <div><span className="plan-eyebrow">ONE SUBSCRIPTION</span><h3>Avenor Founder</h3><p>AI financial decision support, cash forecasting, scenario analysis, operating metrics and your saved decision history.</p></div>
-            <div className="billing-single-price"><strong>€59</strong><span> / month</span></div>
+            <div className="billing-single-price"><strong>€59</strong><span> / month after 30 days free</span></div>
           </div>
           <ul className="billing-included">
             <li>Copilot with persistent conversation history</li>
@@ -748,8 +748,8 @@ export default function Home() {
             </div>
             <div className="billing-actions">
               {billingStatus?.canManageBilling && <button className="button-secondary" disabled={billingBusy} onClick={() => void openBillingAction('/api/billing/portal')}>{billingBusy ? 'Opening…' : 'Manage subscription'}</button>}
-              {billingStatus?.canStartCheckout && <button className="button-primary" disabled={billingBusy} onClick={() => void openBillingAction('/api/billing/checkout')}>{billingBusy ? 'Opening secure checkout…' : 'Subscribe — €59/month'}</button>}
-              {!billingStatus?.billingConfigured && <p className="billing-note">Checkout is not connected yet. Configure the single recurring EUR 59/month Avenor Founder price in Stripe, plus secure server credentials, before testing payments.</p>}
+              {billingStatus?.canStartCheckout && <button className="button-primary" disabled={billingBusy} onClick={() => void openBillingAction('/api/billing/checkout')}>{billingBusy ? 'Opening secure checkout…' : 'Restart — €59/month'}</button>}
+              {!billingStatus?.billingConfigured && <p className="billing-note">Checkout is not connected yet. Configure the EUR 59/month price, 30-day trial and signed webhook in Stripe before accepting subscriptions.</p>}
             </div>
           </>}
           {billingError && <p className="warning-text" role="alert">{billingError}</p>}
