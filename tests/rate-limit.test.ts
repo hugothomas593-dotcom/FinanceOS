@@ -19,7 +19,7 @@ describe('server-side API rate limit policy', () => {
     expect(API_RATE_LIMITS.cfoBrief).toEqual({ maxRequests: 5, windowSeconds: 300 });
   });
 
-  it('allows only one destructive workspace deletion attempt per day', () => {
-    expect(API_RATE_LIMITS.workspaceDeletion).toEqual({ maxRequests: 1, windowSeconds: 86_400 });
+  it('allows only three destructive workspace deletion attempts per day', () => {
+    expect(API_RATE_LIMITS.workspaceDeletion).toEqual({ maxRequests: 3, windowSeconds: 86_400 });
   });
 });
