@@ -1,60 +1,61 @@
 # Avenor engineering status — 16 November 2026
 
-## Current verified snapshot — 16 November 2026, 23:15 UTC
+## Current verified snapshot — 17 November 2026
 
-This snapshot supersedes older point-in-time release notes below. The repository is still an engineering/beta candidate, not a production-certified service.
+This snapshot supersedes older point-in-time release notes below. The repository remains an engineering/beta candidate, not a production-certified service.
 
 ### Source, CI and deployment
 - Correction branch: `fix/avenor-commercial-readiness`; PR #2 remains OPEN and DRAFT.
-- Latest branch HEAD: `f44fbaebfbb2aede0ffcb19c874e0e916cb109f4`.
-- GitHub Actions run #280 (`43976651748`) completed successfully on this HEAD: **139 tests passed across 15 files**, Next.js production build and TypeScript check passed.
-- The new test file `tests/copilot-synthetic-qa.test.ts` covers ten distinct founder questions against the deterministic finance functions used by Copilot. These tests do not call Claude or prove a live AI Gateway response.
-- Latest READY Preview application deployment remains `dpl_4dGJmcYrB3ddVbp2hsSSH7ukyQgx`, sourced from the earlier application commit `09f6df82abf0cae6b6171150d1ffebe1f8c240f5`. It does not contain the new homepage/demo changes.
-- Vercel rejected additional Preview deployments with `api-deployments-free-per-day` (over 100 deployments in the rolling day). The newest branch changes are therefore in GitHub/PR and CI, but are **not yet visible on the deployed Preview**. Do not tell users the current Preview URL shows them.
-- Preview remains protected by Vercel Authentication/SSO; it is not a public customer-facing production URL. No Production deployment or release was performed.
+- Latest branch HEAD: `66620f7f513af88d00612d1abb19235d2400b300`.
+- GitHub Actions run #282 (`43977870041`) completed successfully on this HEAD: **139 tests passed across 15 files**, Next.js production build and TypeScript check passed.
+- The ten-question deterministic finance QA suite passed on this branch. It does not call Claude or verify an AI Gateway inference.
+- Latest READY Preview deployment is `dpl_9Xgu8fEjY1A1haETb5KnBkSsuZwX`, URL `financeosss-k51q2qwf0-hugothomas593-dotcom.vercel.app`, source commit `5e4ab153969260b999a2832ed711ed5bd54437d2`.
+- This READY Preview contains the homepage/demo redesign, but not the final hydration correction in branch HEAD `66620f7...`. Vercel marked deployment of the latest commit as failed because the daily `api-deployments-free-per-day` limit was exceeded. Do not claim the current Preview URL contains the latest hydration fix.
+- Preview remains protected by Vercel Authentication/SSO; it is not a public paid-production URL. No Production release was performed.
 
 ### Product demo added on the correction branch
-- Homepage `/` now has a prominent interactive-demo section, with a direct CTA to `/demo`. The homepage already had links to the demo in the header and hero; this makes the route substantially more discoverable.
-- `/demo` is upgraded from four static decision buttons to six founder questions: two hires, 20% revenue downside, price/volume sensitivity, €1m fundraising, 30-day collection delay and a marketing investment.
-- The demo displays synthetic company context, base-versus-scenario closing cash, modeled 18-month impact, first negative cash month, explicit assumptions and limitations, plus a CTA to create a workspace.
-- The page is explicitly labelled as a synthetic deterministic illustration, not a live AI conversation, real company data or financial advice. No account or data upload is required.
-- The new UI compiles and passes CI. It has not yet been visually reviewed on a successful new Preview deployment because Vercel's daily deployment quota was exhausted.
+- Homepage `/` now has a dedicated interactive-demo section, in addition to header and hero links to `/demo`.
+- `/demo` has six founder questions: two hires, 20% revenue downside, price/volume sensitivity, €1m fundraising, a 30-day collection delay and a marketing investment.
+- Each choice recalculates the 18-month cash model and shows base-versus-scenario closing cash, modeled impact, first negative-cash month, assumptions and caveats.
+- Synthetic data and deterministic scenario calculations are explicitly labelled; the page is not represented as a live AI conversation or financial advice.
+- Browser QA on the READY Preview confirmed homepage and demo HTTP 200, four homepage links to `/demo`, six working scenario buttons, changing metrics across all six scenarios and no horizontal overflow at 390px viewport width.
+- That same browser pass detected React hydration error #418 on the demo's initial load, although the scenario controls worked. The likely mismatch was locale-sensitive compact currency formatting. Branch HEAD now replaces that formatting with deterministic server/browser-identical formatting; CI passed, but this fix has not yet been deployed to Preview due to the Vercel daily build limit. The next successful Preview deployment must recheck the hydration error.
 
 ### Ten-question finance-engine QA
-The CI suite exercises these ten questions using the real deterministic functions imported by the Copilot route:
-1. What happens to cash over the next 18 months?
-2. Can we hire two engineers at €60k each with a 35% employer-cost assumption?
+The suite `tests/copilot-synthetic-qa.test.ts` exercises ten questions against the actual deterministic functions used by the Copilot:
+1. What happens to cash over 18 months?
+2. Can we hire two €60k engineers at a 35% employer-cost assumption?
 3. What if revenue is 20% below plan?
 4. How much monthly revenue is needed to break even?
 5. Can we spend €30k while preserving 12 months of runway?
-6. Does a 10% price increase offset a 5% customer-volume decline?
+6. Does a 10% price increase offset a 5% volume decline?
 7. What does a €1m raise at €6m pre-money mean for cash and dilution?
-8. What if customers pay 30 days later?
-9. What do the SaaS unit economics look like?
+8. What if customer collections are delayed by 30 days?
+9. What do SaaS ARPA, CAC, logo churn, payback and LTV/CAC show?
 10. What do six months of imported cash movements show?
-- All ten deterministic calculation tests passed in CI. This validates the finance tools, **not** natural-language intent routing, LLM reasoning, real AI Gateway inference or the full authenticated browser flow.
-- A previously provisioned fictional staging workspace `Northstar Demo — fictional QA workspace` contains an approved EUR model and 66 synthetic historical/KPI records over May–October 2026. It is staging-only.
-- A real authenticated Copilot conversation has still not been completed. The environment does not provide a disposable authenticated test session; no existing user's password or session was used. Vercel AI Gateway has not yet shown a successful inference from this application.
+- All ten deterministic calculation tests passed in CI. They validate finance functions, not natural-language intent routing, LLM reasoning or live inference.
+- Staging has a fictional `Northstar Demo` workspace with an approved EUR model and 66 synthetic historical/KPI records from May–October 2026.
+- A real authenticated Copilot conversation remains untested: no disposable authenticated browser session was available, and no existing user's password/session was used. Vercel AI Gateway usage previously showed no requests from this application.
 
-### Existing safeguards and staging verification
+### Existing staging safeguards
 - Staging project `avenor-staging` (`fozwtnfzzancgdwjxopy`) is ACTIVE_HEALTHY and has migrations through 015.
 - Postgres-backed rate limits, transactional model approval and the single-approved-model index are applied on staging.
-- Targeted tenant isolation simulation blocked a non-member from reading another workspace's financial rows and blocked a cross-tenant insert. This is not a full two-customer CRUD suite.
-- Stripe test mode: synthetic EUR 59/month, 30-day trial; signed create/update/delete webhooks processed and subscription entitlement became active then false after cancellation. No live charge.
-- Preview HTTP smoke checks previously confirmed `/`, `/demo`, `/login` return 200, protected routes redirect without an authenticated session, cross-origin organization creation returns 403 and same-origin unauthenticated creation returns 401.
-- Authenticated browser E2E for signup, onboarding, Copilot and billing remains outstanding.
+- Targeted tenant-isolation simulation blocked a non-member from reading another workspace's financial rows and blocked a cross-tenant insert. This is not a full two-customer CRUD suite.
+- Stripe test mode: synthetic EUR 59/month, 30-day trial; signed create/update/delete webhooks processed and entitlement became active then false after cancellation. No Live charge.
+- Earlier Preview HTTP smoke checks: `/`, `/demo`, `/login` returned 200; protected routes redirected without an authenticated session; cross-origin organization creation returned 403 and same-origin unauthenticated creation returned 401.
 
 ### Staging and Production are deliberately separate
-- Stripe test secrets and the staging service-role key are Preview-only and branch-scoped. No Production Stripe Live secret or production service-role key was added.
+- Stripe test secrets and staging service-role key are Preview-only and branch-scoped. No Production Stripe Live secret or production service-role key was added.
 - Production Supabase project `qeitvqzujytiiupmkmyp` remains at recovered migration baseline 006; migrations 007–015 are not applied.
-- No Production app deployment, Production database migration, Live Stripe charge, paid Supabase upgrade, domain purchase or legal-document publication was performed.
+- No Production app deployment, Production database migration, Live Stripe charge, paid Supabase upgrade, custom-domain purchase or legal-document publication was performed.
 
 ### Remaining blockers before accepting real customer data or payments
-- Complete a successful authenticated Copilot conversation and verify model/provider routing, downstream data handling, retention terms and spend controls.
+- Complete a successful authenticated Copilot conversation and verify provider routing, retention/data handling and spend controls.
+- Re-deploy the latest branch after Vercel's daily build limit allows it, then rerun browser QA to confirm the hydration correction.
 - Complete two-independent-customer RLS/API CRUD tests, authenticated browser E2E, backup/restore drill, privileged-account MFA/access review, incident response rehearsal and independent security assessment.
-- Complete full Stripe Checkout/Customer Portal, renewal/failure/cancellation and reconciliation tests in test mode.
-- Confirm legal operator identity/address, support/privacy contacts, governing law, customer geography, B2B/B2C scope and VAT/tax status; then finalize GDPR notice, Terms, DPA, subprocessor register, retention schedule and Stripe Tax settings with qualified review.
-- Obtain a customer-owned domain and configure Production auth redirects, Live billing keys and webhooks only after the release gates pass.
+- Complete full authenticated Stripe Checkout/Customer Portal and billing edge-case tests in test mode.
+- Confirm legal operator identity/address, support/privacy contacts, governing law, customer geography, B2B/B2C scope and VAT/tax status; finalize GDPR notice, Terms, DPA, subprocessor register and retention schedule with qualified review.
+- Obtain a customer-owned domain and configure Production auth redirects, Live billing keys and webhooks only after all release gates pass.
 - The repository still lacks a committed lockfile; CI uses `npm install`.
 
 No software can be guaranteed free of bugs or described as perfectly secure. Do not claim SOC 2/ISO certification, independent penetration testing, completed GDPR readiness, AI inference readiness or a public paid launch.
