@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { requireUser } from '@/lib/supabase/server';
 import {
   analyzeHistoricalActuals,
+  filterActualsToCurrency,
   buildCompanySnapshot,
   calculateAffordableInvestment,
   calculateBreakEven,
@@ -150,7 +151,9 @@ export async function POST(request: Request) {
       .limit(5_000);
 
     const allActualRows = (actualRows ?? []) as ActualRecord[];
-    const kpiRows = allActualRows.filter((row) => row.metric_key.startsWith('kpi:'));
+    const currencyQuality = filterActualsToCurrency(allActualRows, currency);
+    const compatibleActualRows = currencyQuality.compatible;
+    const kpiRows = compatibleActualRows.filter((row) => row.metric_key.startsWith('kpi:'));
     const kpiPeriod = kpiRows
       .map((row) => row.period)
       .sort((a, b) => b.localeCompare(a))[0]?.slice(0, 7) ?? null;
@@ -171,7 +174,7 @@ export async function POST(request: Request) {
       }
     }
 
-    const actuals = allActualRows.filter((row) => !row.metric_key.startsWith('kpi:'));
+    const actuals = compatibleActualRows.filter((row) => !row.metric_key.startsWith('kpi:'));
     const snapshot = buildCompanySnapshot(
       inputs,
       actuals,
@@ -520,6 +523,8 @@ export async function POST(request: Request) {
         forecast: 'forecast' in snapshot ? snapshot.forecast : null,
         actuals: {
           records: historical.records,
+          currencyMismatchedRecords: currencyQuality.mismatchedRecords,
+          excludedCurrencies: currencyQuality.mismatchedCurrencies,
           monthsCovered: historical.monthsCovered,
           inflowTrendPct: historical.inflowTrendPct,
           outflowTrendPct: historical.outflowTrendPct,
