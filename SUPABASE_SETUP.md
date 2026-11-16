@@ -16,7 +16,7 @@ Set these in the hosting provider's environment-variable settings (and in a loca
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (preferred; legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` remains supported)
 - `NEXT_PUBLIC_APP_URL`
-- `OPENAI_API_KEY` (server-side only, optional until Copilot is enabled)
+- `AI_GATEWAY_API_KEY` (server-side only; optional for local development outside Vercel. Vercel deployments use platform OIDC for AI Gateway)\n- `AI_GATEWAY_MODEL` (optional; defaults to `anthropic/claude-sonnet-4.6`)
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID` (server-side only, only when billing is configured)
 - `SUPABASE_SERVICE_ROLE_KEY` (server-side only; never expose it to the browser)
 
