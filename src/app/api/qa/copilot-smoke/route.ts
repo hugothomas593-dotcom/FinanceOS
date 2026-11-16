@@ -64,7 +64,7 @@ async function deleteQaWorkspace(
     .from('copilot_threads')
     .select('id')
     .eq('organization_id', organizationId);
-  const threadIds = (threads ?? []).map((thread) => thread.id as string);
+  const threadIds: string[] = (threads ?? []).map((thread: { id: string }) => thread.id);
 
   if (threadIds.length) {
     await admin.from('copilot_messages').delete().in('thread_id', threadIds);
