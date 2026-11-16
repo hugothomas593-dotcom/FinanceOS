@@ -112,6 +112,7 @@ export default function MarketingHome() {
             <a href="#pricing">Pricing</a>
           </nav>
           <div className="a-header-actions">
+            <Link className="a-login" href="/demo">Try demo</Link>
             <Link className="a-login" href="/login">Sign in</Link>
             <Link className="a-button a-button-dark a-header-cta" href="/login?mode=signup">Get started <span>↗</span></Link>
           </div>
@@ -127,7 +128,7 @@ export default function MarketingHome() {
             <p className="a-hero-lede">Ask what you can afford, understand what is putting pressure on cash, and see what changes when you take a different route. Avenor turns your company numbers into decisions you can explain.</p>
             <div className="a-hero-actions">
               <Link className="a-button a-button-dark" href="/login?mode=signup">Meet your Copilot <span>↗</span></Link>
-              <a className="a-text-link" href="#what-it-does">See what Avenor can do <span>↓</span></a>
+              <Link className="a-text-link" href="/demo">Try an interactive demo <span>↗</span></Link>
             </div>
             <div className="a-hero-proof">
               <span>01</span><b>Calculations, not guesses</b>
@@ -221,7 +222,7 @@ export default function MarketingHome() {
       <footer className="a-footer">
         <Brand />
         <span>Financial decision intelligence for founders.</span>
-        <div><a href="#copilot">The Copilot</a><a href="#what-it-does">What it does</a><a href="#pricing">Pricing</a><Link href="/login">Sign in</Link></div>
+        <div><a href="#copilot">The Copilot</a><a href="#what-it-does">What it does</a><a href="#pricing">Pricing</a><Link href="/demo">Try demo</Link><Link href="/login">Sign in</Link></div>
         <small>© {new Date().getFullYear()} Avenor · Forecasts depend on supplied assumptions and are not professional financial advice.</small>
       </footer>
     </main>
