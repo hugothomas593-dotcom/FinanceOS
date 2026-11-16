@@ -6,6 +6,7 @@ import { getSupabasePublicConfig } from '@/lib/supabase/config';
 import { forecast, summarize, type ModelInputs, type MonthResult } from '@/lib/finance';
 import { AvenorCopilot } from '@/components/avenor-copilot';
 import { CfoBrief } from '@/components/cfo-brief';
+import { FinancialOperations } from '@/components/financial-operations';
 import { EMPTY_COMPANY_CONTEXT, companyContextCompletion, type CompanyContext } from '@/lib/company-context';
 
 type View = 'Overview' | 'CFO Brief' | 'Financial overview' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
@@ -723,6 +724,16 @@ export default function Home() {
             <section className="surface decision-card"><div className="surface-heading"><div><div className="section-kicker">YOUR NEXT MOVES</div><h2>Decisions you have explored</h2></div><button className="text-button" onClick={() => setView('Decision ledger')}>View all →</button></div>{saved.length === 0 ? <div className="empty-state"><div className="empty-icon">⌁</div><b>No saved decisions yet</b><p>Try a hiring or growth decision. Save it here to compare options later.</p><button className="button-secondary" onClick={() => setView('Overview')}>Plan your first decision</button></div> : saved.slice(0,2).map(item => <DecisionRow key={item.id} item={item} currency={currency}/>)}</section>
           </div>
           <section className="surface table-panel cash-table-panel"><div className="surface-heading"><div><div className="section-kicker">THE NEXT SIX MONTHS</div><h2>How your cash could move month by month</h2><p>Use this breakdown to see the steps behind the forecast</p></div><button className="text-button" onClick={() => setView('Overview')}>Try a decision →</button></div><div className="table-scroll"><table><thead><tr><th>MONTH</th><th>REVENUE</th><th>NET CASH CHANGE</th><th>CASH LEFT</th><th>RUNWAY</th></tr></thead><tbody>{base.slice(0,6).map(row => <tr key={row.month}><td>Month {row.month}</td><td>{money(row.revenue, currency)}</td><td className={row.netCashFlow >= 0 ? 'positive-text' : 'negative-text'}>{row.netCashFlow > 0 ? '+' : ''}{money(row.netCashFlow, currency)}</td><td className="strong-cell">{money(row.closingCash, currency)}</td><td>{row.runwayMonths === null ? 'Cash-flow positive' : `${row.runwayMonths.toFixed(1)} mo.`}</td></tr>)}</tbody></table></div></section>
+          <FinancialOperations
+            organizationId={organizationId}
+            currency={currency}
+            forecastRows={base.slice(0, 6)}
+            decisions={saved.slice(0, 3)}
+            insightCount={insightCount}
+            onOpenImport={() => setView('Data import')}
+            onOpenBrief={() => setView('CFO Brief')}
+            onOpenDecisions={() => setView('Decision ledger')}
+          />
           </>}
         </>}
 
