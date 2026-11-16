@@ -76,8 +76,8 @@ export async function POST(request: Request) {
     ]);
     if (subscriptionError || claimError) return error('Could not safely verify billing before deletion', 500);
 
-    if (trialClaim?.state === 'reserved' && trialClaim.checkout_session_id) {
-      return error('A Checkout session is still pending. Complete or cancel that session before deleting the workspace.', 409);
+    if (trialClaim?.state === 'reserved') {
+      return error('A Checkout attempt is still being prepared or awaiting Stripe confirmation. Let it expire or finish before deleting the workspace.', 409);
     }
 
     const stripeSubscriptionId = subscription?.stripe_subscription_id || trialClaim?.stripe_subscription_id || null;
