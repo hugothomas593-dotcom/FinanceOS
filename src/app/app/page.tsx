@@ -164,6 +164,7 @@ export default function Home() {
     currentPeriodEnd: string | null;
     canStartCheckout: boolean;
     canManageBilling: boolean;
+    trialDays?: number | null;
   } | null>(null);
 
   useEffect(() => {
@@ -729,8 +730,8 @@ export default function Home() {
           <h2>Plan and billing</h2>
           <p className="form-intro">One founder membership. Every Avenor feature is included in the same plan—there are no feature tiers.</p>
           <div className="billing-single-plan">
-            <div><span className="plan-eyebrow">ONE SUBSCRIPTION</span><h3>Avenor Founder</h3><p>AI financial decision support, cash forecasting, scenario analysis, operating metrics and your saved decision history.</p></div>
-            <div className="billing-single-price"><strong>€59</strong><span> / month after 30 days free</span></div>
+            <div><span className="plan-eyebrow">ONE SUBSCRIPTION</span><h3>Avenor Founder</h3><p>AI financial decision support, cash forecasting, scenario analysis, operating metrics and your saved decision history. First-time customers receive one 30-day trial; the subscription then renews at €59/month.</p></div>
+            <div className="billing-single-price"><strong>€59</strong><span> / month · 30-day trial for new customers</span></div>
           </div>
           <ul className="billing-included">
             <li>Copilot with persistent conversation history</li>
@@ -742,8 +743,8 @@ export default function Home() {
           </ul>
           {billingLoading ? <p className="form-intro">Checking your subscription…</p> : <>
             <div className="billing-grid">
-              <div><span>Subscription status</span><b>{billingStatus?.subscriptionStatus ? billingStatus.subscriptionStatus.replaceAll('_', ' ') : 'No subscription linked'}</b></div>
-              <div><span>Next renewal</span><b>{billingStatus?.currentPeriodEnd ? new Date(billingStatus.currentPeriodEnd).toLocaleDateString('en-GB') : 'Not available'}</b></div>
+              <div><span>Subscription status</span><b>{billingStatus?.subscriptionStatus === 'trialing' ? 'Free trial' : billingStatus?.subscriptionStatus ? billingStatus.subscriptionStatus.replaceAll('_', ' ') : 'No subscription linked'}</b></div>
+              <div><span>{billingStatus?.subscriptionStatus === 'trialing' ? 'First payment date' : 'Next renewal'}</span><b>{billingStatus?.currentPeriodEnd ? new Date(billingStatus.currentPeriodEnd).toLocaleDateString('en-GB') : 'Not available'}</b></div>
               <div><span>Payment setup</span><b>{billingStatus?.billingConfigured ? 'Connected' : 'Not configured'}</b></div>
             </div>
             <div className="billing-actions">
