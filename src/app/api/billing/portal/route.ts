@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/supabase/server';
+import { billingPortalReturnUrl } from '@/lib/stripe-billing';
 
 export async function POST(request: Request) {
   try {
@@ -37,7 +38,7 @@ export async function POST(request: Request) {
 
     const body = new URLSearchParams({
       customer: subscription.stripe_customer_id,
-      return_url: new URL('/?billing=returned', origin).toString(),
+      return_url: billingPortalReturnUrl(appUrl),
     });
     const response = await fetch('https://api.stripe.com/v1/billing_portal/sessions', {
       method: 'POST',
