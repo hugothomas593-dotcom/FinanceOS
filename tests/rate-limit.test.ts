@@ -18,4 +18,8 @@ describe('server-side API rate limit policy', () => {
   it('limits CFO Brief generation to 5 per user per five minutes', () => {
     expect(API_RATE_LIMITS.cfoBrief).toEqual({ maxRequests: 5, windowSeconds: 300 });
   });
+
+  it('allows only one destructive workspace deletion attempt per day', () => {
+    expect(API_RATE_LIMITS.workspaceDeletion).toEqual({ maxRequests: 1, windowSeconds: 86_400 });
+  });
 });
