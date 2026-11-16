@@ -1,3 +1,5 @@
+export const AVENOR_TRIAL_DAYS = 30;
+
 const restartableSubscriptionStatuses = new Set(['canceled', 'incomplete_expired']);
 
 /**
@@ -19,8 +21,8 @@ export function billingReturnUrls(appUrl: string): { successUrl: string; cancelU
   }
 
   return {
-    successUrl: new URL('/app?billing=success', origin).toString(),
-    cancelUrl: new URL('/app?billing=cancelled', origin).toString(),
+    successUrl: new URL('/subscribe?checkout=success', origin).toString(),
+    cancelUrl: new URL('/subscribe?checkout=cancelled', origin).toString(),
   };
 }
 
