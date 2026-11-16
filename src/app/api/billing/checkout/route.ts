@@ -96,8 +96,11 @@ export async function POST(request: Request) {
 
     if (priorClaim?.state === 'reserved') {
       const reservedAt = Date.parse(priorClaim.created_at);
-      const age = Number.isFinite(reservedAt) ? Date.now() - reservedAt : 0;
-      if (age < RESERVATION_GRACE_MS || !priorClaim.checkout_session_id) {
+      if (!Number.isFinite(reservedAt)) {
+        return jsonError('The previous trial reservation needs support review before another Checkout can start.', 409);
+      }
+      const age = Date.now() - reservedAt;
+      if (age < RESERVATION_GRACE_MS) {
         return jsonError('A free-trial Checkout is already being prepared. Complete or cancel that Checkout before trying again.', 409);
       }
       if (priorClaim.checkout_session_id) {
@@ -115,13 +118,13 @@ export async function POST(request: Request) {
         if (session.status !== 'expired') {
           return jsonError('A previous Checkout session is still being processed. Please return to that session or contact support.', 409);
         }
-        const { error: releaseError } = await admin
-          .from('billing_trial_claims')
-          .delete()
-          .eq('user_id', user.id)
-          .eq('state', 'reserved');
-        if (releaseError) return jsonError('Could not release the expired trial reservation', 500);
       }
+      const { error: releaseError } = await admin
+        .from('billing_trial_claims')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('state', 'reserved');
+      if (releaseError) return jsonError('Could not release the expired trial reservation', 500);
     }
 
     const { data: existingClaim, error: refreshedClaimError } = await admin
