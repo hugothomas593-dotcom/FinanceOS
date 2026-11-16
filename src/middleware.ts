@@ -63,7 +63,7 @@ export async function middleware(request: NextRequest) {
       .limit(1)
       .maybeSingle();
 
-    if (membershipError) return redirectWithCookies('/subscribe?status=verification');
+    if (membershipError) return redirectWithCookies('/login?error=workspace_verification');
 
     if (!membership) {
       if (isAppPage || isSubscribe) return redirectWithCookies('/onboarding');
