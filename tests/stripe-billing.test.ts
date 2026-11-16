@@ -49,3 +49,32 @@ describe('Stripe return URLs', () => {
       .toBe('http://localhost:3000/app?billing=success');
   });
 });
+
+
+describe('Avenor Founder Stripe price validation', () => {
+  const validPrice = {
+    active: true,
+    currency: 'eur',
+    unit_amount: 5_900,
+    recurring: { interval: 'month', interval_count: 1 },
+  };
+
+  it('accepts only an active EUR 59 monthly price', async () => {
+    const { isAvenorFounderPrice } = await import('../src/lib/stripe-billing');
+    expect(isAvenorFounderPrice(validPrice)).toBe(true);
+  });
+
+  it.each([
+    { ...validPrice, active: false },
+    { ...validPrice, currency: 'usd' },
+    { ...validPrice, unit_amount: 5_901 },
+    { ...validPrice, recurring: { interval: 'year', interval_count: 1 } },
+    { ...validPrice, recurring: { interval: 'month', interval_count: 3 } },
+    { ...validPrice, recurring: null },
+    null,
+    undefined,
+  ])('rejects an unexpected Stripe price shape', async (price) => {
+    const { isAvenorFounderPrice } = await import('../src/lib/stripe-billing');
+    expect(isAvenorFounderPrice(price)).toBe(false);
+  });
+});
