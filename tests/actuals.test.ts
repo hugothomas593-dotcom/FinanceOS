@@ -14,7 +14,7 @@ describe('European CSV import formats', () => {
         'Date;Amount;Description;Category',
         '2026-02-01;1 234,56;"Client; invoice";Sales',
         '2026-02-02;-2 345,67;Paie;Payroll',
-      ].join('\\n'),
+      ].join('\n'),
       'banque.csv',
     );
 
@@ -40,7 +40,7 @@ describe('European CSV import formats', () => {
 
   it('keeps comma-separated CSV compatibility, including a quoted decimal comma', () => {
     const imported = normalizeActuals(
-      'Date,Amount,Description\\n2026-03-01,"123,45",Invoice',
+      'Date,Amount,Description\n2026-03-01,"123,45",Invoice',
     );
     expect(imported[0].amount).toBe(123.45);
     expect(imported[0].direction).toBe('inflow');
@@ -48,7 +48,7 @@ describe('European CSV import formats', () => {
 
   it('supports tab-separated exports', () => {
     const imported = normalizeActuals(
-      'Date\\tAmount\\tDescription\\n2026-03-02\\t-42.50\\tSoftware',
+      'Date\tAmount\tDescription\n2026-03-02\t-42.50\tSoftware',
     );
     expect(imported[0].amount).toBe(42.5);
     expect(imported[0].direction).toBe('outflow');
