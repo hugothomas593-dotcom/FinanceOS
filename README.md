@@ -50,7 +50,7 @@ Avenor has one subscription only: **Avenor Founder — €59/month**. There are 
 - `GET /demo` — public interactive decision demo using fictional, synthetic financial data; no account or database write required.
 
 ## CSV format
-Minimum columns: `Date,Amount`. Optional columns: `Description,Category`. Positive amounts are treated as inflows; negative amounts as outflows. Use ISO dates (`YYYY-MM-DD`). Dot-decimal and common European decimal-comma amounts are supported. Maximum 10,000 rows / 2 MB per import.
+Supports comma-, semicolon- and tab-delimited files. Use either `Date,Amount` / `Date,Montant` or `Date,Debit,Credit`; optional columns include `Description`, `Category` and `Currency` / `Devise`. Positive amounts are inflows and negative amounts are outflows; debit/credit columns are normalized automatically. Dates may use ISO `YYYY-MM-DD` or European day-first `DD/MM/YYYY` (also `DD-MM-YYYY` / `DD.MM.YYYY`). Dot-decimal, decimal-comma and common thousands separators are supported. When a currency column is present, each transaction's three-letter currency is preserved; otherwise the workspace currency is used. Foreign-currency records are not converted and are excluded from workspace-currency historical totals. Maximum 10,000 rows / 2 MB per import. Imported actuals remain separate from forecast assumptions.
 
 ## Required environment variables
 See `.env.example`. `SUPABASE_SERVICE_ROLE_KEY`, `AI_GATEWAY_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_PRICE_ID` are server-only. Vercel deployments use the platform-provided OIDC token for AI Gateway; a private `AI_GATEWAY_API_KEY` is only needed for local development outside a linked Vercel environment. `AI_GATEWAY_MODEL` defaults to `anthropic/claude-sonnet-4.6`.
