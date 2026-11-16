@@ -5,8 +5,12 @@ import { verifyStripeSignature } from '@/lib/stripe-webhook';
 export async function POST(req: Request) {
   const secret = process.env.STRIPE_WEBHOOK_SECRET;
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  if (!secret || !serviceKey || !supabaseUrl) return NextResponse.json({ error: 'Webhook is not configured' }, { status: 503 });
+  const stripeSecret = process.env.STRIPE_SECRET_KEY;
+  if (!secret || !serviceKey || !supabaseUrl || !stripeSecret) {
+    return NextResponse.json({ error: 'Webhook is not fully configured' }, { status: 503 });
+  }
   const raw = await req.text();
   if (raw.length > 1_000_000) return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
   if (!verifyStripeSignature(raw, req.headers.get('stripe-signature') ?? '', secret)) return NextResponse.json({ error: 'Invalid signature' }, { status: 400 });
@@ -52,7 +56,7 @@ export async function POST(req: Request) {
       if (orgId && session.mode === 'subscription' && subscriptionId) {
         const subscriptionResponse = await fetch(
           `https://api.stripe.com/v1/subscriptions/${encodeURIComponent(subscriptionId)}`,
-          { headers: { Authorization: `Bearer ${process.env.STRIPE_SECRET_KEY}` }, signal: AbortSignal.timeout(10_000) },
+          { headers: { Authorization: `Bearer ${stripeSecret}` }, signal: AbortSignal.timeout(10_000) },
         );
         const subscription = await subscriptionResponse.json().catch(() => null);
         if (!subscriptionResponse.ok || !subscription?.id) throw new Error('Could not retrieve the completed Stripe subscription');
