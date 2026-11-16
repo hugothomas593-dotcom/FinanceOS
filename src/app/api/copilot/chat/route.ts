@@ -50,6 +50,7 @@ const formatInstructions = (
   currency: string,
   snapshot: ReturnType<typeof buildCompanySnapshot>,
   companyContext: CompanyContext,
+  currencyQuality: ReturnType<typeof filterActualsToCurrency>,
 ) => `You are Avenor Intelligence, the embedded finance and decision teammate for ${organizationName}.
 Your job is to help a founder understand the company's financial position and evaluate business decisions with the discipline of a strong finance lead.
 
@@ -62,6 +63,7 @@ WORKING RULES
 - You do not have authority to execute transfers, change a company's books, send payments, alter payroll, approve spend, or change the underlying model. You only analyze and simulate.
 - Never invent revenue, customers, margins, payroll taxes, VAT, tax treatment, market data, customer churn, CAC, LTV, retention, payment terms, debt terms, or valuation. Treat user-provided values as assumptions and label them.
 - Distinguish actual imported transactions from forecast assumptions. Imported actuals are not automatically reconciled into the forecast.
+- Transactions in currencies other than ${currency} are excluded from all historical cash-flow totals and KPI calculations. ${currencyQuality.mismatchedRecords} imported records across currencies ${currencyQuality.mismatchedCurrencies.join(", ") || "none"} were excluded; explicitly disclose this limitation when it is relevant. Never convert currencies without a supplied FX rate.
 - A draft model is provisional. An approved model is still only as reliable as the assumptions and source records.
 - If a metric cannot be calculated because the relevant data is missing, say exactly what is missing and ask for the smallest useful additional input.
 - If a decision involves tax, legal, employment, accounting compliance or regulated advice, flag that a qualified specialist should validate it. Do not present a simplified forecast as professional advice.
@@ -464,7 +466,7 @@ export async function POST(request: Request) {
 
     const agent = new ToolLoopAgent({
       model: process.env.AI_GATEWAY_MODEL || 'anthropic/claude-sonnet-4.6',
-      instructions: formatInstructions(organizationName, currency, snapshot, companyContext),
+      instructions: formatInstructions(organizationName, currency, snapshot, companyContext, currencyQuality),
       tools,
       stopWhen: stepCountIs(6),
       maxRetries: 1,
@@ -534,7 +536,12 @@ export async function POST(request: Request) {
           period: kpiPeriod,
           unitEconomics,
         },
-        missingData: snapshot.missingData,
+        missingData: [
+          ...snapshot.missingData,
+          ...(currencyQuality.mismatchedRecords > 0
+            ? [`Excluded ${currencyQuality.mismatchedRecords} imported record(s) in ${currencyQuality.mismatchedCurrencies.join(', ')} because they do not match the workspace currency ${currency}; no FX conversion was applied.`]
+            : []),
+        ],
       },
       calculations: toolEvidence,
       saveableScenario,
