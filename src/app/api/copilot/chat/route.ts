@@ -258,6 +258,7 @@ export async function POST(request: Request) {
 
     const toolEvidence: Array<{ title: string; summary: string; detail?: unknown }> = [];
     let saveableScenario: SaveableScenario | null = null;
+    let decisionComparison: ReturnType<typeof compareFinancialScenarios> | null = null;
 
     const unavailable = { available: false, reason: 'A saved and valid financial model is required for this calculation. Save company assumptions and approve a model version first.' };
     const modelOrUnavailable = () => inputs ?? null;
@@ -353,6 +354,7 @@ export async function POST(request: Request) {
           const model = modelOrUnavailable();
           if (!model) return unavailable;
           const result = compareFinancialScenarios(model, scenarios);
+          decisionComparison = result;
           toolEvidence.push({
             title: 'Side-by-side decision comparison',
             summary: scenarios.length + ' alternatives compared against the same saved baseline over their stated forecast horizons.',
@@ -583,6 +585,7 @@ export async function POST(request: Request) {
         ],
       },
       calculations: toolEvidence,
+      decisionComparison: decisionComparison ? { ...decisionComparison, currency } : null,
       saveableScenario,
     };
 
