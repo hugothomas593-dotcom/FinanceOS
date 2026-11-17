@@ -878,7 +878,7 @@ export default function Home() {
             <Metric label="Monthly net cash flow" value={money(base[0].netCashFlow, currency)} sub="Current model month" trend="neutral" icon="⌁"/>
             <Metric label="Month 18 cash" value={money(baseSummary.endingCash, currency)} sub="Base case forecast" trend="neutral" icon="◈"/>
           </div>
-          <div className="button-row">
+          <div className="billing-actions">
             <button className="button-primary" onClick={() => {
               const report = buildInvestorUpdateMarkdown({
                 companyName: organizationName || 'Your company',
