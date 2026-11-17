@@ -64,7 +64,10 @@ export function buildCfoBrief(input: CfoBriefInput) {
     { id: 'payroll', label: 'Payroll', match: /payroll|salary|salaries|wage/ },
     { id: 'marketing', label: 'Marketing', match: /marketing|advertis|paidmedia|adspend/ },
   ];
-  if (latestCompletedMonth && previousCompletedMonth) {
+  const expectedPreviousMonth = latestCompletedMonth
+    ? new Date(Date.UTC(Number(latestCompletedMonth.slice(0, 4)), Number(latestCompletedMonth.slice(5, 7)) - 2, 1)).toISOString().slice(0, 7)
+    : null;
+  if (latestCompletedMonth && previousCompletedMonth === expectedPreviousMonth) {
     for (const rule of categoryWatchRules) {
       const latestAmount = [...(categorySpendByMonth.get(latestCompletedMonth) ?? [])]
         .filter(([category]) => rule.match.test(category))
