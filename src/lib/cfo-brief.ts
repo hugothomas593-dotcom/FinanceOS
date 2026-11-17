@@ -44,6 +44,46 @@ export function buildCfoBrief(input: CfoBriefInput) {
     (row) => row.runwayMonths !== null && row.runwayMonths < targetRunwayMonths,
   )?.month ?? null;
 
+
+  const categorySpendByMonth = new Map<string, Map<string, number>>();
+  for (const row of compatibleActuals) {
+    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(row.period) || !Number.isFinite(row.amount)) continue;
+    if (row.metric_key.split(':')[0]?.toLowerCase() !== 'outflow') continue;
+    const month = row.period.slice(0, 7);
+    const category = row.metric_key.split(':').slice(1).join(':').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (!category) continue;
+    const monthCategories = categorySpendByMonth.get(month) ?? new Map<string, number>();
+    monthCategories.set(category, (monthCategories.get(category) ?? 0) + Math.abs(row.amount));
+    categorySpendByMonth.set(month, monthCategories);
+  }
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const completedMonths = [...categorySpendByMonth.keys()].filter((month) => month < currentMonth).sort();
+  const latestCompletedMonth = completedMonths[completedMonths.length - 1];
+  const previousCompletedMonth = completedMonths[completedMonths.length - 2];
+  const categoryWatchRules = [
+    { id: 'payroll', label: 'Payroll', match: /payroll|salary|salaries|wage/ },
+    { id: 'marketing', label: 'Marketing', match: /marketing|advertis|paidmedia|adspend/ },
+  ];
+  if (latestCompletedMonth && previousCompletedMonth) {
+    for (const rule of categoryWatchRules) {
+      const latestAmount = [...(categorySpendByMonth.get(latestCompletedMonth) ?? [])]
+        .filter(([category]) => rule.match.test(category))
+        .reduce((sum, [, amount]) => sum + amount, 0);
+      const previousAmount = [...(categorySpendByMonth.get(previousCompletedMonth) ?? [])]
+        .filter(([category]) => rule.match.test(category))
+        .reduce((sum, [, amount]) => sum + amount, 0);
+      if (previousAmount > 0 && latestAmount >= previousAmount * 1.2) {
+        const changePct = ((latestAmount / previousAmount) - 1) * 100;
+        alerts.push({
+          id: rule.id + '-spend-increase',
+          severity: 'warning',
+          title: rule.label + ' outflows increased ' + changePct.toFixed(1) + '% month-on-month',
+          description: 'Imported transactions classified as ' + rule.label.toLowerCase() + ' show ' + latestAmount.toLocaleString('en-GB', { maximumFractionDigits: 0 }) + ' ' + currency + ' in ' + latestCompletedMonth + ', versus ' + previousAmount.toLocaleString('en-GB', { maximumFractionDigits: 0 }) + ' ' + currency + ' in ' + previousCompletedMonth + '. This is a change in recorded cash outflows, not proof of a change in headcount or campaign performance. Check category mapping and whether both months are complete.',
+        });
+      }
+    }
+  }
+
   const alerts: CfoBriefAlert[] = [];
   if (!input.inputs || !forecastSummary) {
     alerts.push({
