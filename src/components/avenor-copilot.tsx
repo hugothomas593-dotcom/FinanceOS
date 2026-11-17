@@ -38,7 +38,7 @@ type CopilotEvidence = {
   } | null;
   combinedDecision?: {
     currency: string;
-    actions: Array<{ name: string; startMonth: number; durationMonths: number; revenueChangePct?: number; monthlyOpexChange?: number; monthlyPayrollChange?: number; grossMarginChangePp?: number; monthlyOtherCashFlowChange?: number; oneTimeCashImpact?: number; oneTimeMonth: number }>;
+    actions: Array<{ name: string; startMonth: number; durationMonths: number; revenueChangePct?: number; monthlyOpexChange?: number; monthlyPayrollChange?: number; hiring?: { headcount: number; grossAnnualSalary: number; employerCostRate: number; benefitsMonthlyPerPerson?: number; recruitingCostPerPerson?: number; equipmentCostPerPerson?: number }; grossMarginChangePp?: number; monthlyOtherCashFlowChange?: number; oneTimeCashImpact?: number; oneTimeMonth: number }>;
     assumptions: { horizonMonths: number; targetRunwayMonths: number };
     base: { endingCash: number; minimumForecastCash: number; firstMonthCashNegative: number | null };
     scenario: { endingCash: number; minimumForecastCash: number; firstMonthCashNegative: number | null };
@@ -489,7 +489,7 @@ export function AvenorCopilot({
                                             <td>{action.name}</td>
                                             <td>Month {action.startMonth}</td>
                                             <td>{action.durationMonths} mo.</td>
-                                            <td>{formatMoney((action.monthlyOpexChange ?? 0) + (action.monthlyPayrollChange ?? 0) + (action.monthlyOtherCashFlowChange ?? 0), evidence.combinedDecision!.currency)} / mo.</td>
+                                            <td>{formatMoney((action.monthlyOpexChange ?? 0) + (action.monthlyPayrollChange ?? 0) + (action.monthlyOtherCashFlowChange ?? 0) + (action.hiring ? action.hiring.headcount * (action.hiring.grossAnnualSalary * (1 + action.hiring.employerCostRate) / 12 + (action.hiring.benefitsMonthlyPerPerson ?? 0)) : 0), evidence.combinedDecision!.currency)} / mo.</td>
                                           </tr>
                                         ))}
                                       </tbody>
