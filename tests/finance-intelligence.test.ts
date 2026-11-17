@@ -164,6 +164,7 @@ describe('Avenor financial intelligence', () => {
       ],
     });
     const alert = brief.alerts.find((item) => item.id === 'payroll-spend-increase');
+    expect(brief.alerts[0].id).toBe('model-missing');
     expect(alert?.severity).toBe('warning');
     expect(alert?.title).toContain('30.0%');
     expect(alert?.description).toContain(previousMonth);
