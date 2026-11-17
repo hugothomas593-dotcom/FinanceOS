@@ -87,8 +87,28 @@ export async function POST(request: Request) {
       },
     );
     const stripePrice = await priceResponse.json().catch(() => null);
-    if (!priceResponse.ok || !isAvenorFounderPrice(stripePrice)) {
-      return jsonError('The configured Stripe price must be active, EUR 59, and billed monthly.', 503);
+    if (!priceResponse.ok) {
+      const stripeError = stripePrice?.error;
+      if (priceResponse.status === 401) {
+        return jsonError('Stripe rejected STRIPE_SECRET_KEY (401). Use the test-mode secret key from the same Stripe account as STRIPE_PRICE_ID.', 503);
+      }
+      if (priceResponse.status === 404) {
+        return jsonError('Stripe could not find STRIPE_PRICE_ID in the account selected by STRIPE_SECRET_KEY. Check that both values belong to the same test account.', 503);
+      }
+      return jsonError(
+        `Stripe price verification failed (HTTP ${priceResponse.status}${typeof stripeError?.code === 'string' ? `, ${stripeError.code}` : ''}). Check the Preview Stripe credentials.`,
+        503,
+      );
+    }
+    if (!isAvenorFounderPrice(stripePrice)) {
+      const active = stripePrice?.active === true;
+      const currency = typeof stripePrice?.currency === 'string' ? stripePrice.currency.toUpperCase() : 'unknown currency';
+      const amount = typeof stripePrice?.unit_amount === 'number' ? stripePrice.unit_amount : 'unknown amount';
+      const interval = typeof stripePrice?.recurring?.interval === 'string' ? stripePrice.recurring.interval : 'non-recurring';
+      return jsonError(
+        `Stripe returned a price, but it does not match Avenor Founder: active=${active}, currency=${currency}, amount_minor=${amount}, interval=${interval}. Expected active EUR 5900 monthly.`,
+        503,
+      );
     }
 
     const admin = createClient(supabaseUrl, serviceKey, {
