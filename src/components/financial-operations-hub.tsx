@@ -41,6 +41,7 @@ export function FinancialOperationsHub({ organizationId, currency }: {
 }) {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [bankConfigured, setBankConfigured] = useState(false);
+  const [scheduledSyncConfigured, setScheduledSyncConfigured] = useState(false);
   const [bankLoading, setBankLoading] = useState(true);
   const [bankBusy, setBankBusy] = useState(false);
   const [syncing, setSyncing] = useState('');
@@ -86,6 +87,7 @@ export function FinancialOperationsHub({ organizationId, currency }: {
       if (!response.ok) throw new Error(data.error || 'Could not load bank connections');
       setConnections(data.connections ?? []);
       setBankConfigured(Boolean(data.configured));
+      setScheduledSyncConfigured(Boolean(data.scheduledSyncConfigured));
     } catch (error) {
       setBankError(error instanceof Error ? error.message : 'Could not load bank connections');
     } finally { setBankLoading(false); }
@@ -171,7 +173,10 @@ export function FinancialOperationsHub({ organizationId, currency }: {
       const response = await fetch('/api/connections/' + encodeURIComponent(id) + '/sync', { method: 'POST' });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Bank synchronization failed');
-      setBankMessage(String(data.importedTransactions || 0) + ' transactions synchronized.');
+      const syncNotes = [String(data.importedTransactions || 0) + ' transactions synchronized.'];
+      if (data.truncated) syncNotes.push('The provider response reached the pagination limit; older transactions may still need a later sync.');
+      if (!data.bankBalanceUpdated) syncNotes.push('The consolidated bank balance was not updated because a single base-currency balance was unavailable.');
+      setBankMessage(syncNotes.join(' '));
       await Promise.all([loadBank(), loadCash(), loadReconciliation()]);
       window.dispatchEvent(new CustomEvent('avenor:financial-data-updated'));
     } catch (error) {
@@ -300,7 +305,7 @@ export function FinancialOperationsHub({ organizationId, currency }: {
 
       <section className={styles.card}>
         <div className={styles.cardHeading}>
-          <div><span>01 · DATA CONNECTIONS</span><h3>Bank connections</h3><p>Connect a bank securely. CSV imports remain available at any time.</p></div>
+          <div><span>01 · DATA CONNECTIONS</span><h3>Bank connections</h3><p>Connect a bank securely. CSV imports remain available at any time.</p><small className={styles.muted}>{scheduledSyncConfigured ? 'Daily automatic synchronization is configured.' : 'Manual synchronization is available; daily sync needs server cron configuration.'}</small></div>
           <button className={styles.primary} type="button" onClick={() => void connectBank()} disabled={!bankConfigured || bankBusy}>{bankBusy ? 'Opening…' : '＋ Connect bank'}</button>
         </div>
         {!bankConfigured && <p className={styles.notice}>Open Banking is not configured in this environment. A Powens business account, server credentials and encryption key are required.</p>}
