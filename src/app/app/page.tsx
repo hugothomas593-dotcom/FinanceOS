@@ -8,7 +8,15 @@ import { AvenorCopilot } from '@/components/avenor-copilot';
 import { CfoBrief } from '@/components/cfo-brief';
 import { FinancialOperations } from '@/components/financial-operations';
 import { FinancialOperationsHub } from '@/components/financial-operations-hub';
+import { FounderPulse } from '@/components/founder-pulse';
 import { EMPTY_COMPANY_CONTEXT, companyContextCompletion, type CompanyContext } from '@/lib/company-context';
+
+type FounderBriefData = {
+  generatedAt?: string;
+  alerts?: Array<{ id: string; severity: 'critical' | 'warning' | 'info'; title: string; description: string }>;
+  forecast?: { endingCash: number; firstMonthCashNegative: number | null; firstMonthBelowTargetRunway: number | null; targetRunwayMonths: number } | null;
+  historical?: { records: number; monthsCovered: number; inflowTrendPct: number | null; outflowTrendPct: number | null };
+};
 
 type View = 'Overview' | 'CFO Brief' | 'Financial overview' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
 const viewTitles: Record<View, string> = {
@@ -115,6 +123,7 @@ export default function Home() {
   const [modelUpdatedAt, setModelUpdatedAt] = useState('');
   const [actualsCount, setActualsCount] = useState(0);
   const [insightCount, setInsightCount] = useState(0);
+  const [cfoBrief, setCfoBrief] = useState<FounderBriefData | null>(null);
   const [cash, setCash] = useState(initial.openingCash);
   const [revenue, setRevenue] = useState(initial.monthlyRevenue);
   const [payroll, setPayroll] = useState(initial.existingMonthlyPayroll);
@@ -300,7 +309,9 @@ export default function Home() {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Could not load proactive insights');
         if (!active) return;
-        const alerts = (data.brief?.alerts ?? []) as { severity?: string }[];
+        const brief = (data.brief ?? null) as FounderBriefData | null;
+        setCfoBrief(brief);
+        const alerts = brief?.alerts ?? [];
         setInsightCount(alerts.filter((alert) => alert.severity === 'critical' || alert.severity === 'warning').length);
       })
       .catch(() => { if (active) setInsightCount(0); });
@@ -669,7 +680,9 @@ export default function Home() {
              <Metric label="Monthly revenue" value={money(base[0].revenue, currency)} sub={`${growth.toFixed(1)}% assumed monthly growth`} trend="positive" icon="↗" />
              <Metric label="Monthly spending" value={money(monthlyOperatingCosts, currency)} sub="Direct costs, team and other running costs" trend="neutral" icon="⌁" />
              <Metric label="How long cash may last" value={baseRunway === null ? 'Cash-flow positive' : `${baseRunway.toFixed(1)} months`} sub={baseRunway === null ? 'The current plan is not using cash each month' : 'Estimated at the current monthly cash burn'} trend={baseRunway !== null && baseRunway < 6 ? 'warning' : 'positive'} icon="◷" />
-           </div><section className="decision-intro">
+           </div>
+          <FounderPulse organizationId={organizationId} currency={currency} brief={cfoBrief} />
+          <section className="decision-intro">
             <div className="decision-intro-copy">
               <div className="section-kicker">THE AVENOR DIFFERENCE</div>
               <h2>Know what a decision will cost before you commit.</h2>
