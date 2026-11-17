@@ -190,6 +190,9 @@ export function buildCfoBrief(input: CfoBriefInput) {
       description: currencyMismatchedRecords + ' record(s) were excluded from historical totals because their currency does not match the workspace currency (' + currency + '). Convert or re-import them consistently before comparing totals.',
     });
   }
+  const severityOrder: Record<CfoBriefSeverity, number> = { critical: 0, warning: 1, info: 2 };
+  alerts.sort((left, right) => severityOrder[left.severity] - severityOrder[right.severity]);
+
   if (alerts.length === 0) {
     alerts.push({
       id: 'no-priority-alerts',
