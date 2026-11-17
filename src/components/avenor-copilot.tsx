@@ -482,7 +482,7 @@ export function AvenorCopilot({
                                   </div>
                                   <div className={styles.comparisonTableWrap}>
                                     <table className={styles.comparisonTable}>
-                                      <thead><tr><th>Action</th><th>Starts</th><th>Duration</th><th>Monthly cost / cash change</th></tr></thead>
+                                      <thead><tr><th>Action</th><th>Starts</th><th>Duration</th><th>Recurring monthly change</th><th>One-off cash impact</th></tr></thead>
                                       <tbody>
                                         {evidence.combinedDecision.actions.map((action, index) => (
                                           <tr key={action.name + index}>
@@ -490,6 +490,7 @@ export function AvenorCopilot({
                                             <td>Month {action.startMonth}</td>
                                             <td>{action.durationMonths} mo.</td>
                                             <td>{formatMoney((action.monthlyOpexChange ?? 0) + (action.monthlyPayrollChange ?? 0) + (action.monthlyOtherCashFlowChange ?? 0) + (action.hiring ? action.hiring.headcount * (action.hiring.grossAnnualSalary * (1 + action.hiring.employerCostRate) / 12 + (action.hiring.benefitsMonthlyPerPerson ?? 0)) : 0), evidence.combinedDecision!.currency)} / mo.</td>
+                                            <td>{formatMoney((action.oneTimeCashImpact ?? 0) - (action.hiring ? action.hiring.headcount * ((action.hiring.recruitingCostPerPerson ?? 0) + (action.hiring.equipmentCostPerPerson ?? 0)) : 0), evidence.combinedDecision!.currency)}</td>
                                           </tr>
                                         ))}
                                       </tbody>
