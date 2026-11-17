@@ -14,7 +14,7 @@ import { EMPTY_COMPANY_CONTEXT, companyContextCompletion, type CompanyContext } 
 type FounderBriefData = {
   generatedAt?: string;
   alerts?: Array<{ id: string; severity: 'critical' | 'warning' | 'info'; title: string; description: string }>;
-  forecast?: { endingCash: number; firstMonthCashNegative: number | null; firstMonthBelowTargetRunway: number | null; targetRunwayMonths: number } | null;
+  forecast?: { endingCash: number; monthlyBurn?: number; firstMonthCashNegative: number | null; firstMonthBelowTargetRunway: number | null; targetRunwayMonths: number } | null;
   historical?: { records: number; monthsCovered: number; inflowTrendPct: number | null; outflowTrendPct: number | null };
 };
 
