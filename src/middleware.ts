@@ -114,7 +114,11 @@ export async function middleware(request: NextRequest) {
         'has_organization_access',
         { org_id: membership.organization_id },
       );
-      const entitled = !entitlementError && hasAccess === true;
+      // Allow authenticated product testing on this dedicated Preview branch only.
+      // Production and every other Preview branch continue to require a paid/trial entitlement.
+      const founderPreviewAccess = process.env.VERCEL_ENV === 'preview' &&
+        process.env.VERCEL_GIT_COMMIT_REF === 'feat/avenor-founder-value';
+      const entitled = founderPreviewAccess || (!entitlementError && hasAccess === true);
       const organizationQuery = '?organizationId=' + encodeURIComponent(membership.organization_id);
 
       if (isAppPage && !entitled) return redirectWithCookies('/subscribe' + organizationQuery);
