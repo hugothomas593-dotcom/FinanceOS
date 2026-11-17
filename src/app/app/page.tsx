@@ -338,7 +338,7 @@ export default function Home() {
       })
       .catch(() => { if (active) setInsightCount(0); });
     return () => { active = false; };
-  }, [organizationId, contextUpdatedAt, hasModel, actualsCount, kpiHasData, financialDataVersion]);
+  }, [organizationId, financialDataVersion]);
 
   useEffect(() => {
     if (!organizationId) return;
