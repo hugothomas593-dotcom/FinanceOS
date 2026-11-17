@@ -63,7 +63,7 @@ WORKING RULES
 - Use the deterministic tools for all financial calculations. Never do authoritative arithmetic from memory when a tool can calculate it.
 - For a financial decision, identify the baseline, model the proposed change, compare the outcomes, name the key drivers, explain downside risks, and propose practical next steps.
 - When the founder asks to compare options, use compare_financial_scenarios for two to four clearly specified alternatives. Compare them side by side on ending cash, minimum cash and any negative-cash month. State that ranking by ending cash is not a complete strategic recommendation; explain the trade-offs and assumptions.
-- When a founder combines multiple changes in one plan (for example hiring plus higher marketing spend), use simulate_combined_decision so every action is modeled together against the same baseline. Require explicit values for salaries, employer costs, revenue uplift and any other unknowns; ask for missing inputs instead of inventing them. Use startMonth and durationMonths to model timing.
+- When a founder combines multiple changes in one plan (for example hiring plus higher marketing spend), use simulate_combined_decision so every action is modeled together against the same baseline. Require explicit values for salaries, employer costs, revenue uplift and any other unknowns; ask for missing inputs instead of inventing them. Use the structured hiring assumptions when headcount, salary and employer cost are known; otherwise ask for the missing loaded monthly payroll amount. Use startMonth and durationMonths to model timing.
 - You may analyze hiring, payroll, revenue, growth, pricing, discounts, churn assumptions, marketing, operating expenses, capex, equipment, offices, product investment, fundraising, dilution, working capital, runway, break-even, and combinations of decisions. Use the generic simulation tool for decisions that do not have a dedicated tool.
 - You do not have authority to execute transfers, change a company's books, send payments, alter payroll, approve spend, or change the underlying model. You only analyze and simulate.
 - Never invent revenue, customers, margins, payroll taxes, VAT, tax treatment, market data, customer churn, CAC, LTV, retention, payment terms, debt terms, or valuation. Treat user-provided values as assumptions and label them.
@@ -346,6 +346,14 @@ export async function POST(request: Request) {
             revenueChangePct: z.number().min(-100).max(500).optional(),
             monthlyOpexChange: z.number().min(-10_000_000).max(10_000_000).optional(),
             monthlyPayrollChange: z.number().min(-10_000_000).max(10_000_000).optional(),
+            hiring: z.object({
+              headcount: z.number().int().min(1).max(500),
+              grossAnnualSalary: z.number().nonnegative(),
+              employerCostRate: z.number().min(0).max(3),
+              benefitsMonthlyPerPerson: z.number().nonnegative().default(0),
+              recruitingCostPerPerson: z.number().nonnegative().default(0),
+              equipmentCostPerPerson: z.number().nonnegative().default(0),
+            }).optional(),
             grossMarginChangePp: z.number().min(-100).max(100).optional(),
             monthlyOtherCashFlowChange: z.number().min(-10_000_000).max(10_000_000).optional(),
             oneTimeCashImpact: z.number().min(-100_000_000).max(100_000_000).optional(),
