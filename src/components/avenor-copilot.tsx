@@ -36,6 +36,15 @@ type CopilotEvidence = {
     scenarios: Array<{ name: string; endingCash: number; endingCashDelta: number; minimumCash: number; firstNegativeCashMonth: number | null; firstBelowSixMonthsRunway: number | null }>;
     interpretationNote: string;
   } | null;
+  combinedDecision?: {
+    currency: string;
+    actions: Array<{ name: string; startMonth: number; durationMonths: number; revenueChangePct?: number; monthlyOpexChange?: number; monthlyPayrollChange?: number; grossMarginChangePp?: number; monthlyOtherCashFlowChange?: number; oneTimeCashImpact?: number; oneTimeMonth: number }>;
+    assumptions: { horizonMonths: number; targetRunwayMonths: number };
+    base: { endingCash: number; minimumForecastCash: number; firstMonthCashNegative: number | null };
+    scenario: { endingCash: number; minimumForecastCash: number; firstMonthCashNegative: number | null };
+    impact: { endingCashDelta: number; minimumCashDelta: number; firstNegativeCashMonth: number | null; firstBelowTargetRunwayMonth: number | null };
+    caveats: string[];
+  } | null;
   saveableScenario?: SaveableScenario | null;
 };
 
@@ -458,6 +467,36 @@ export function AvenorCopilot({
                                     ))}
                                   </div>
                                 </div>
+                              )}
+                              {evidence.combinedDecision && (
+                                <section className={styles.decisionComparison} aria-label="Combined financial decision analysis">
+                                  <div className={styles.comparisonHeading}>
+                                    <strong>Combined plan impact</strong>
+                                    <span>{evidence.combinedDecision.assumptions.horizonMonths}-month forecast</span>
+                                  </div>
+                                  <div className={styles.metricEvidence}>
+                                    <div><span>Base-case ending cash</span><strong>{formatMoney(evidence.combinedDecision.base.endingCash, evidence.combinedDecision.currency)}</strong></div>
+                                    <div><span>Combined-plan ending cash</span><strong>{formatMoney(evidence.combinedDecision.scenario.endingCash, evidence.combinedDecision.currency)}</strong></div>
+                                    <div><span>Change vs base case</span><strong className={evidence.combinedDecision.impact.endingCashDelta < 0 ? styles.comparisonNegative : styles.comparisonPositive}>{evidence.combinedDecision.impact.endingCashDelta > 0 ? '+' : ''}{formatMoney(evidence.combinedDecision.impact.endingCashDelta, evidence.combinedDecision.currency)}</strong></div>
+                                    <div><span>First breach of runway target</span><strong>{evidence.combinedDecision.impact.firstBelowTargetRunwayMonth === null ? 'Not within horizon' : 'Month ' + evidence.combinedDecision.impact.firstBelowTargetRunwayMonth}</strong></div>
+                                  </div>
+                                  <div className={styles.comparisonTableWrap}>
+                                    <table className={styles.comparisonTable}>
+                                      <thead><tr><th>Action</th><th>Starts</th><th>Duration</th><th>Monthly cost / cash change</th></tr></thead>
+                                      <tbody>
+                                        {evidence.combinedDecision.actions.map((action, index) => (
+                                          <tr key={action.name + index}>
+                                            <td>{action.name}</td>
+                                            <td>Month {action.startMonth}</td>
+                                            <td>{action.durationMonths} mo.</td>
+                                            <td>{formatMoney((action.monthlyOpexChange ?? 0) + (action.monthlyPayrollChange ?? 0) + (action.monthlyOtherCashFlowChange ?? 0), evidence.combinedDecision!.currency)} / mo.</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                  <p>Modeled against the same saved baseline. All assumptions are supplied by the founder; no productivity uplift is inferred. {evidence.combinedDecision.impact.firstNegativeCashMonth === null ? 'The scenario does not show negative closing cash within the forecast.' : 'Negative closing cash is first projected in month ' + evidence.combinedDecision.impact.firstNegativeCashMonth + '.'}</p>
+                                </section>
                               )}
                               {evidence.decisionComparison && (
                                 <section className={styles.decisionComparison} aria-label="Side-by-side financial scenario comparison">
