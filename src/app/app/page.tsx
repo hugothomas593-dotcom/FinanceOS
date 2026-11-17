@@ -492,6 +492,7 @@ export default function Home() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not save business metrics');
       setKpiHasData(true);
+      window.dispatchEvent(new CustomEvent('avenor:financial-data-updated'));
       setToast(`Business metrics saved for ${kpiPeriod}`);
       window.setTimeout(() => setToast(''), 2600);
     } catch (error) {
