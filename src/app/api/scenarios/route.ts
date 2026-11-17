@@ -7,7 +7,7 @@ const TrackingSchema = z.object({
   organizationId: z.string().uuid(),
   scenarioId: z.string().uuid(),
   owner: z.string().trim().max(120).default(''),
-  reviewDate: z.string().regex(/^\\d{4}-\\d{2}-\\d{2}$/).nullable(),
+  reviewDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable(),
   status: z.enum(['planned', 'in_progress', 'reviewed', 'completed', 'paused']),
   actualEndingCash: z.number().finite().nullable(),
   actualOutcomeNote: z.string().trim().max(1_000).default(''),
