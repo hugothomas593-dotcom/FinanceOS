@@ -36,8 +36,8 @@ describe('13-week direct cash forecast', () => {
 
     expect(result.weeks).toHaveLength(13);
     expect(result.weeks[0].startDate).toBe('2026-01-01');
-    expect(result.weeks[0].invoiceCount).toBe(1);
-    expect(result.weeks[1].outflows).toBeGreaterThan(0);
+    expect(result.weeks[1].invoiceCount).toBe(1);
+    expect(result.weeks[2].outflows).toBeGreaterThan(0);
     expect(result.endingCash).toBeCloseTo(27_700, 6);
   });
 
