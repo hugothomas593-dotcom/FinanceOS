@@ -238,6 +238,14 @@ export type CombinedDecisionAction = {
   revenueChangePct?: number;
   monthlyOpexChange?: number;
   monthlyPayrollChange?: number;
+  hiring?: {
+    headcount: number;
+    grossAnnualSalary: number;
+    employerCostRate: number;
+    benefitsMonthlyPerPerson?: number;
+    recruitingCostPerPerson?: number;
+    equipmentCostPerPerson?: number;
+  };
   grossMarginChangePp?: number;
   monthlyOtherCashFlowChange?: number;
   oneTimeCashImpact?: number;
@@ -277,7 +285,19 @@ export function simulateCombinedFinancialDecision(
     if (revenueMultiplier < 0 || revenueMultiplier > 10) {
       throw new Error(`Action ${index + 1} revenue multiplier must remain between 0x and 10x.`);
     }
-    return { ...action, startMonth, durationMonths, oneTimeMonth, revenueMultiplier };
+    if (action.hiring && (!Number.isInteger(action.hiring.headcount) || action.hiring.headcount < 1 || action.hiring.headcount > 500
+      || action.hiring.grossAnnualSalary < 0 || action.hiring.employerCostRate < 0 || action.hiring.employerCostRate > 3
+      || (action.hiring.benefitsMonthlyPerPerson ?? 0) < 0 || (action.hiring.recruitingCostPerPerson ?? 0) < 0
+      || (action.hiring.equipmentCostPerPerson ?? 0) < 0)) {
+      throw new Error(`Action ${index + 1} has invalid hiring assumptions.`);
+    }
+    const hiringMonthlyCost = action.hiring
+      ? action.hiring.headcount * (action.hiring.grossAnnualSalary * (1 + action.hiring.employerCostRate) / 12 + (action.hiring.benefitsMonthlyPerPerson ?? 0))
+      : 0;
+    const hiringOneOffCost = action.hiring
+      ? action.hiring.headcount * ((action.hiring.recruitingCostPerPerson ?? 0) + (action.hiring.equipmentCostPerPerson ?? 0))
+      : 0;
+    return { ...action, startMonth, durationMonths, oneTimeMonth, revenueMultiplier, hiringMonthlyCost, hiringOneOffCost };
   });
 
   const baseRows = forecast(inputs, [], horizonMonths);
@@ -288,6 +308,7 @@ export function simulateCombinedFinancialDecision(
       baseRow.month < action.startMonth + action.durationMonths,
     );
     const revenueMultiplier = active.reduce((multiplier, action) => multiplier * action.revenueMultiplier, 1);
+    if (revenueMultiplier > 10) throw new Error('Combined revenue uplift cannot exceed 10x the baseline.');
     const grossMargin = (1 - inputs.cogsRatio) + active.reduce((sum, action) => sum + (action.grossMarginChangePp ?? 0) / 100, 0);
     if (grossMargin < 0 || grossMargin > 1) {
       throw new Error(`Combined gross-margin assumptions produce an invalid margin in month ${baseRow.month}.`);
@@ -295,12 +316,12 @@ export function simulateCombinedFinancialDecision(
     const revenue = baseRow.revenue * revenueMultiplier;
     const cogs = revenue * (1 - grossMargin);
     const nonPayrollOpex = baseRow.nonPayrollOpex + active.reduce((sum, action) => sum + (action.monthlyOpexChange ?? 0), 0);
-    const payroll = baseRow.payroll + active.reduce((sum, action) => sum + (action.monthlyPayrollChange ?? 0), 0);
+    const payroll = baseRow.payroll + active.reduce((sum, action) => sum + (action.monthlyPayrollChange ?? 0) + action.hiringMonthlyCost, 0);
     if (nonPayrollOpex < 0 || payroll < 0) {
       throw new Error(`Combined decisions reduce operating costs below zero in month ${baseRow.month}; check the supplied assumptions.`);
     }
     const oneOffCashImpact = normalized.reduce(
-      (sum, action) => sum + (action.oneTimeMonth === baseRow.month ? action.oneTimeCashImpact ?? 0 : 0),
+      (sum, action) => sum + (action.oneTimeMonth === baseRow.month ? (action.oneTimeCashImpact ?? 0) - action.hiringOneOffCost : 0),
       0,
     );
     const monthlyOtherCashFlowChange = active.reduce((sum, action) => sum + (action.monthlyOtherCashFlowChange ?? 0), 0);
@@ -330,7 +351,7 @@ export function simulateCombinedFinancialDecision(
   )?.month ?? null;
 
   return {
-    actions: normalized.map(({ revenueMultiplier, ...action }) => action),
+    actions: normalized.map(({ revenueMultiplier, hiringMonthlyCost, hiringOneOffCost, ...action }) => action),
     assumptions: { horizonMonths, targetRunwayMonths },
     base,
     scenario,
