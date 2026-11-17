@@ -9,6 +9,7 @@ import { CfoBrief } from '@/components/cfo-brief';
 import { FinancialOperations } from '@/components/financial-operations';
 import { FinancialOperationsHub } from '@/components/financial-operations-hub';
 import { FounderPulse } from '@/components/founder-pulse';
+import { FinancialPlanning } from '@/components/financial-planning';
 import { EMPTY_COMPANY_CONTEXT, companyContextCompletion, type CompanyContext } from '@/lib/company-context';
 import { buildInvestorUpdateMarkdown } from '@/lib/investor-update';
 
@@ -19,11 +20,12 @@ type FounderBriefData = {
   historical?: { records: number; monthsCovered: number; inflowTrendPct: number | null; outflowTrendPct: number | null };
 };
 
-type View = 'Overview' | 'CFO Brief' | 'Financial overview' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
+type View = 'Overview' | 'CFO Brief' | 'Financial overview' | 'Financial planning' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
 const viewTitles: Record<View, string> = {
   Overview: 'Avenor Intelligence',
   'CFO Brief': 'CFO Brief',
   'Financial overview': 'Financial overview',
+  'Financial planning': 'Financial planning',
   'Decision ledger': 'Saved decisions',
   'Company assumptions': 'Company setup',
   'Business metrics': 'Growth metrics',
@@ -631,6 +633,7 @@ export default function Home() {
       { label: 'Overview', title: 'Avenor Intelligence', icon: '✳' },
       { label: 'CFO Brief', title: 'CFO Brief', icon: '◷' },
       { label: 'Financial overview', title: 'Financial overview', icon: '▦' },
+      { label: 'Financial planning', title: 'Forecast & unit economics', icon: '◈' },
     ] },
     { title: 'OPERATIONS', items: [
       { label: 'Business metrics', title: 'Growth metrics', icon: '↗' },
@@ -691,7 +694,7 @@ export default function Home() {
     <section className="main-area">
       <header className="topbar"><div className="breadcrumb">{organizationName || 'Your company'} <span>/</span> {viewTitles[view]}</div><div className="top-actions"><span className="sync-status"><i/> {workspaceLoading ? 'Loading workspace' : hasModel ? (modelStatus === 'approved' ? 'Plan approved' : 'Plan needs review') : 'Company setup needed'}</span><div className="top-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div></div></header>
       <div className={`page-content ${view === 'Overview' ? 'copilot-page' : ''}`}>
-        {view !== 'Overview' && <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{viewTitles[view]}</h1><p>{view === 'CFO Brief' ? 'A clear management review of cash, performance, risks and recommended actions.' : view === 'Financial overview' ? 'Explore your cash position, operating forecast and the main signals in your financial plan.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit company setup <span>↗</span></button></div></div>}
+        {view !== 'Overview' && <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{viewTitles[view]}</h1><p>{view === 'CFO Brief' ? 'A clear management review of cash, performance, risks and recommended actions.' : view === 'Financial planning' ? 'Compare three cash trajectories, understand unit economics and prepare an investor-ready financial update.' : view === 'Financial overview' ? 'Explore your cash position, operating forecast and the main signals in your financial plan.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit company setup <span>↗</span></button></div></div>}
 
         <div className={`copilot-host ${view === 'Overview' ? 'active' : 'inactive'}`}>
           <AvenorCopilot
@@ -707,6 +710,8 @@ export default function Home() {
         </div>
 
         {view === 'CFO Brief' && organizationId && <CfoBrief organizationId={organizationId} />}
+        {view === 'Financial planning' && organizationId && hasModel && <FinancialPlanning organizationId={organizationId} organizationName={organizationName} currency={currency} inputs={inputs} modelStatus={modelStatus} />}
+        {view === 'Financial planning' && !hasModel && <section className="surface empty-state large-empty"><b>Save your financial model first</b><p>Financial planning uses your saved company assumptions. Add opening cash, revenue and operating costs before comparing the three trajectories.</p><button className="button-primary" onClick={() => setView('Company assumptions')}>Set up company assumptions →</button></section>}
         
         {view === 'Financial overview' && <>
           {workspaceLoading ? <section className="surface empty-state large-empty"><b>Loading your financial workspace…</b></section>
