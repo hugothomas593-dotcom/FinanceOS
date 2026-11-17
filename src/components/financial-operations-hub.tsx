@@ -173,6 +173,7 @@ export function FinancialOperationsHub({ organizationId, currency }: {
       if (!response.ok) throw new Error(data.error || 'Bank synchronization failed');
       setBankMessage(String(data.importedTransactions || 0) + ' transactions synchronized.');
       await Promise.all([loadBank(), loadCash(), loadReconciliation()]);
+      window.dispatchEvent(new CustomEvent('avenor:financial-data-updated'));
     } catch (error) {
       setBankError(error instanceof Error ? error.message : 'Bank synchronization failed');
       await loadBank();
@@ -264,6 +265,7 @@ export function FinancialOperationsHub({ organizationId, currency }: {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not save category mapping');
       await loadReconciliation();
+      window.dispatchEvent(new CustomEvent('avenor:financial-data-updated'));
     } catch (error) { setReconError(error instanceof Error ? error.message : 'Could not save mapping'); }
     finally { setReconBusy(''); }
   }
