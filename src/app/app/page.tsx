@@ -73,6 +73,9 @@ function scenarioCashImpact(outputs: Record<string, unknown>) {
   const legacyCashImpact = typeof outputs.cashImpact === 'number' && Number.isFinite(outputs.cashImpact)
     ? -Math.abs(outputs.cashImpact)
     : undefined;
+  if (Array.isArray(outputs.scenarios)) {
+    return { value: null, label: `${outputs.scenarios.length} options compared` };
+  }
   const candidates: Array<{ value: unknown; label: string }> = [
     { value: directImpact?.endingCash, label: '18-month closing-cash difference' },
     { value: directImpact?.endingCashDelta, label: '18-month closing-cash difference' },
