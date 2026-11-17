@@ -173,7 +173,7 @@ export function AvenorCopilot({
 
   const suggestions = useMemo(() => [
     `Could we spend ${currencySymbol}30k on this and still cover the next 12 months?`,
-    'Why are we spending more than we bring in, and what could we reduce?',
+    'Compare two growth plans: add €5,000 in monthly marketing spend for a 10% revenue uplift, versus a €20,000 one-off campaign for the same uplift. What are the cash and runway trade-offs?',
     'What happens if sales are 20% lower for the next six months?',
     'How much do we need to sell each month to cover our costs?',
     'Would a 10% price increase offset a 5% drop in customers?',
