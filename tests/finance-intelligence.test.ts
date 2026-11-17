@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   analyzeHistoricalActuals,
+  compareFinancialScenarios,
   calculateAffordableInvestment,
   calculateBreakEven,
   calculateFundraisingImpact,
@@ -34,6 +35,25 @@ describe('Avenor financial intelligence', () => {
     expect(result.impact.endingCash).toBe(-115_000);
     expect(result.monthlyComparison[0].cashDifference).toBe(-5_000);
     expect(result.monthlyComparison[1].cashDifference).toBe(-35_000);
+  });
+
+  it('compares two to four scenarios against the same financial baseline', () => {
+    const result = compareFinancialScenarios(inputs, [
+      { name: 'Keep current plan' },
+      { name: 'Hire two engineers', monthlyPayrollChange: 13_700 },
+      { name: 'Delay hiring', oneTimeCashImpact: -7_000, oneTimeMonth: 4 },
+    ]);
+
+    expect(result.scenarios).toHaveLength(3);
+    expect(result.scenarios[0].endingCashDelta).toBe(0);
+    expect(result.scenarios[1].endingCashDelta).toBeLessThan(result.scenarios[0].endingCashDelta);
+    expect(result.rankedByEndingCash[0].name).toBe('Keep current plan');
+    expect(result.interpretationNote).toContain('ending cash only');
+  });
+
+  it('rejects scenario comparisons outside the two-to-four option range', () => {
+    expect(() => compareFinancialScenarios(inputs, [{ name: 'Only one option' }])).toThrow('Compare between two and four');
+    expect(() => compareFinancialScenarios(inputs, Array.from({ length: 5 }, (_, index) => ({ name: 'Option ' + index })))).toThrow('Compare between two and four');
   });
 
   it('computes operating break-even revenue', () => {
