@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   analyzeHistoricalActuals,
   compareFinancialScenarios,
+  simulateCombinedFinancialDecision,
   calculateAffordableInvestment,
   calculateBreakEven,
   calculateFundraisingImpact,
@@ -54,6 +55,31 @@ describe('Avenor financial intelligence', () => {
   it('rejects scenario comparisons outside the two-to-four option range', () => {
     expect(() => compareFinancialScenarios(inputs, [{ name: 'Only one option' }])).toThrow('Compare between two and four');
     expect(() => compareFinancialScenarios(inputs, Array.from({ length: 5 }, (_, index) => ({ name: 'Option ' + index })))).toThrow('Compare between two and four');
+  });
+
+  it('models linked hiring and marketing actions together with their own start dates', () => {
+    const result = simulateCombinedFinancialDecision(inputs, [
+      { name: 'Increase marketing', startMonth: 1, monthlyOpexChange: 5_000 },
+      { name: 'Hire two engineers', startMonth: 2, durationMonths: 3, monthlyPayrollChange: 10_000, oneTimeCashImpact: -20_000 },
+    ], 18, 12);
+
+    expect(result.actions).toHaveLength(2);
+    expect(result.monthlyComparison[0].cashDifference).toBe(-5_000);
+    expect(result.monthlyComparison[1].cashDifference).toBe(-35_000);
+    expect(result.monthlyComparison[3].cashDifference).toBe(-35_000);
+    expect(result.monthlyComparison[4].cashDifference).toBe(-25_000);
+    expect(result.impact.endingCashDelta).toBe(-140_000);
+  });
+
+  it('rejects combined plans with impossible cost or gross-margin assumptions', () => {
+    expect(() => simulateCombinedFinancialDecision(inputs, [
+      { name: 'Cut all costs', startMonth: 1, monthlyOpexChange: -50_000 },
+      { name: 'Another action', startMonth: 1 },
+    ])).toThrow('below zero');
+    expect(() => simulateCombinedFinancialDecision(inputs, [
+      { name: 'Margin uplift', startMonth: 1, grossMarginChangePp: 120 },
+      { name: 'Marketing', startMonth: 1, monthlyOpexChange: 1_000 },
+    ])).toThrow('invalid margin');
   });
 
   it('computes operating break-even revenue', () => {
