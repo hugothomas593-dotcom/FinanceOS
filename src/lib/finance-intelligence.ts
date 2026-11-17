@@ -262,7 +262,7 @@ export function simulateCombinedFinancialDecision(
 
   const normalized = actions.map((action, index) => {
     const startMonth = action.startMonth;
-    const durationMonths = action.durationMonths ?? horizonMonths;
+    const durationMonths = action.durationMonths ?? (horizonMonths - startMonth + 1);
     if (!action.name.trim() || !Number.isInteger(startMonth) || startMonth < 1 || startMonth > horizonMonths) {
       throw new Error(`Action ${index + 1} needs a name and a start month within the forecast horizon.`);
     }
