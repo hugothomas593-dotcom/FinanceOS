@@ -20,6 +20,9 @@ type FounderBrief = {
   };
 };
 
+type CashPosition = { balance: number | string; as_of_date: string; currency: string; source: string; updated_at: string } | null;
+type BankConnection = { status: string; last_synced_at: string | null };
+
 type Reconciliation = {
   months?: Array<{
     month: string;
@@ -64,6 +67,9 @@ export function FounderPulse({
   const [reconciliation, setReconciliation] = useState<Reconciliation | null>(null);
   const [reconciliationLoading, setReconciliationLoading] = useState(true);
   const [reconciliationError, setReconciliationError] = useState('');
+  const [cashPosition, setCashPosition] = useState<CashPosition>(null);
+  const [cashPositionLoaded, setCashPositionLoaded] = useState(false);
+  const [latestBankSync, setLatestBankSync] = useState<string | null>(null);
 
   useEffect(() => {
     let active = true;
@@ -83,6 +89,32 @@ export function FounderPulse({
         if (active) setReconciliationLoading(false);
       });
 
+    return () => { active = false; };
+  }, [organizationId, refreshKey]);
+
+  useEffect(() => {
+    let active = true;
+    setCashPositionLoaded(false);
+    Promise.all([
+      fetch('/api/cash-position?organizationId=' + encodeURIComponent(organizationId), { cache: 'no-store' }),
+      fetch('/api/connections?organizationId=' + encodeURIComponent(organizationId), { cache: 'no-store' }),
+    ]).then(async ([cashResponse, connectionsResponse]) => {
+      const [cashData, connectionsData] = await Promise.all([cashResponse.json(), connectionsResponse.json()]);
+      if (!cashResponse.ok) throw new Error(cashData.error || 'Could not load current cash position');
+      if (!connectionsResponse.ok) throw new Error(connectionsData.error || 'Could not load bank synchronization status');
+      if (!active) return;
+      setCashPosition(cashData.cashPosition ?? null);
+      const connections = (connectionsData.connections ?? []) as BankConnection[];
+      const syncedAt = connections.map((connection) => connection.last_synced_at).filter((value): value is string => Boolean(value)).sort().at(-1) ?? null;
+      setLatestBankSync(syncedAt);
+    }).catch(() => {
+      if (active) {
+        setCashPosition(null);
+        setLatestBankSync(null);
+      }
+    }).finally(() => {
+      if (active) setCashPositionLoaded(true);
+    });
     return () => { active = false; };
   }, [organizationId, refreshKey]);
 
@@ -109,6 +141,23 @@ export function FounderPulse({
       </div>
 
       <div className={styles.summaryGrid}>
+        <article className={styles.summaryCard}>
+          <span className={styles.summaryLabel}>CURRENT CASH POSITION</span>
+          {!cashPositionLoaded ? (
+            <><strong className={styles.loading}>Loading…</strong><p>Checking the latest saved bank or manual balance.</p></>
+          ) : cashPosition ? (
+            <>
+              <strong>{formatMoney(Number(cashPosition.balance), cashPosition.currency || currency)}</strong>
+              <p>{cashPosition.source === 'powens' ? 'Bank balance' : 'Manually entered balance'} · as of {new Date(cashPosition.as_of_date + 'T00:00:00Z').toLocaleDateString('en-GB', { timeZone: 'UTC' })}</p>
+              <p>{latestBankSync ? 'Last bank sync ' + new Date(latestBankSync).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'No bank sync recorded'}</p>
+            </>
+          ) : (
+            <>
+              <strong>Not recorded</strong>
+              <p>Connect a bank or add a current cash balance in Financial Operations.</p>
+            </>
+          )}
+        </article>
         <article className={styles.summaryCard}>
           <span className={styles.summaryLabel}>RUNWAY WATCH</span>
           {!brief ? (
