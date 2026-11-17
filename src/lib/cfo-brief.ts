@@ -45,6 +45,7 @@ export function buildCfoBrief(input: CfoBriefInput) {
   )?.month ?? null;
 
 
+  const alerts: CfoBriefAlert[] = [];
   const categorySpendByMonth = new Map<string, Map<string, number>>();
   for (const row of compatibleActuals) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(row.period) || !Number.isFinite(row.amount)) continue;
@@ -87,7 +88,6 @@ export function buildCfoBrief(input: CfoBriefInput) {
     }
   }
 
-  const alerts: CfoBriefAlert[] = [];
   if (!input.inputs || !forecastSummary) {
     alerts.push({
       id: 'model-missing',
