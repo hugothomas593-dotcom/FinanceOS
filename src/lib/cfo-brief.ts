@@ -47,7 +47,7 @@ export function buildCfoBrief(input: CfoBriefInput) {
 
   const categorySpendByMonth = new Map<string, Map<string, number>>();
   for (const row of compatibleActuals) {
-    if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(row.period) || !Number.isFinite(row.amount)) continue;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(row.period) || !Number.isFinite(row.amount)) continue;
     if (row.metric_key.split(':')[0]?.toLowerCase() !== 'outflow') continue;
     const month = row.period.slice(0, 7);
     const category = row.metric_key.split(':').slice(1).join(':').toLowerCase().replace(/[^a-z0-9]/g, '');
