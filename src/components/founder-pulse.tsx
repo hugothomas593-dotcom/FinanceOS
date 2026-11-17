@@ -102,14 +102,16 @@ export function FounderPulse({
           <p>Signals from your saved financial plan and imported company data.</p>
         </div>
         <span className={priorityAlerts.length > 0 ? styles.attention : styles.neutral}>
-          {priorityAlerts.length > 0 ? priorityAlerts.length + ' priorities' : 'No priority warnings'}
+          {!brief ? 'Loading signals' : priorityAlerts.length > 0 ? priorityAlerts.length + ' priorities' : 'No priority warnings'}
         </span>
       </div>
 
       <div className={styles.summaryGrid}>
         <article className={styles.summaryCard}>
           <span className={styles.summaryLabel}>RUNWAY WATCH</span>
-          {forecast ? (
+          {!brief ? (
+            <><strong className={styles.loading}>Loading signals…</strong><p>Your latest company analysis is being prepared.</p></>
+          ) : forecast ? (
             <>
               <strong>{forecast.firstMonthBelowTargetRunway === null ? 'On track' : 'Review the plan'}</strong>
               <p>
@@ -148,8 +150,8 @@ export function FounderPulse({
 
         <article className={styles.summaryCard}>
           <span className={styles.summaryLabel}>DATA COVERAGE</span>
-          <strong>{history?.records ?? 0} transactions</strong>
-          <p>{history?.monthsCovered ?? 0} month(s) of compatible history available for analysis.</p>
+          <strong>{brief ? (history?.records ?? 0) + ' transactions' : 'Loading…'}</strong>
+          <p>{brief ? (history?.monthsCovered ?? 0) + ' month(s) of compatible history available for analysis.' : 'Checking imported company data.'}</p>
         </article>
       </div>
 
@@ -172,7 +174,7 @@ export function FounderPulse({
           </div>
         ) : (
           <p className={styles.empty}>
-            {alerts.find((alert) => alert.severity === 'info')?.description
+            {!brief ? 'Loading your latest financial signals…' : alerts.find((alert) => alert.severity === 'info')?.description
               ?? 'No priority warning is identified in the latest saved data. Keep your assumptions and actuals up to date.'}
           </p>
         )}
