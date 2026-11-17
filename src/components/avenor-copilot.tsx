@@ -31,6 +31,11 @@ type CopilotEvidence = {
     missingData?: string[];
   };
   calculations?: Array<{ title: string; summary: string; detail?: unknown }>;
+  decisionComparison?: {
+    currency: string;
+    scenarios: Array<{ name: string; endingCash: number; endingCashDelta: number; minimumCash: number; firstNegativeCashMonth: number | null; firstBelowSixMonthsRunway: number | null }>;
+    interpretationNote: string;
+  } | null;
   saveableScenario?: SaveableScenario | null;
 };
 
@@ -453,6 +458,33 @@ export function AvenorCopilot({
                                     ))}
                                   </div>
                                 </div>
+                              )}
+                              {evidence.decisionComparison && (
+                                <section className={styles.decisionComparison} aria-label="Side-by-side financial scenario comparison">
+                                  <div className={styles.comparisonHeading}>
+                                    <strong>Scenario comparison</strong>
+                                    <span>Ranked by projected ending cash</span>
+                                  </div>
+                                  <div className={styles.comparisonTableWrap}>
+                                    <table className={styles.comparisonTable}>
+                                      <thead><tr><th>Scenario</th><th>Ending cash</th><th>Change vs plan</th><th>Lowest cash</th><th>First negative month</th></tr></thead>
+                                      <tbody>
+                                        {evidence.decisionComparison.scenarios.map((item) => (
+                                          <tr key={item.name}>
+                                            <td>{item.name}</td>
+                                            <td>{formatMoney(item.endingCash, evidence.decisionComparison!.currency)}</td>
+                                            <td className={item.endingCashDelta < 0 ? styles.comparisonNegative : styles.comparisonPositive}>
+                                              {item.endingCashDelta > 0 ? '+' : ''}{formatMoney(item.endingCashDelta, evidence.decisionComparison!.currency)}
+                                            </td>
+                                            <td>{formatMoney(item.minimumCash, evidence.decisionComparison!.currency)}</td>
+                                            <td>{item.firstNegativeCashMonth === null ? 'Not within horizon' : 'Month ' + item.firstNegativeCashMonth}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                  <p>{evidence.decisionComparison.interpretationNote}</p>
+                                </section>
                               )}
                               {evidence.calculations?.length ? (
                                 <details className={styles.evidenceDetails}>
