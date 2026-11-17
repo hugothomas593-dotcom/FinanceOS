@@ -72,6 +72,28 @@ describe('Avenor financial intelligence', () => {
     expect(result.impact.endingCashDelta).toBe(-140_000);
   });
 
+  it('derives fully loaded hiring and one-off recruitment costs in a combined plan', () => {
+    const result = simulateCombinedFinancialDecision(inputs, [
+      { name: 'Increase marketing', startMonth: 1, monthlyOpexChange: 5_000 },
+      {
+        name: 'Hire two engineers',
+        startMonth: 2,
+        hiring: {
+          headcount: 2,
+          grossAnnualSalary: 60_000,
+          employerCostRate: 0.35,
+          benefitsMonthlyPerPerson: 100,
+          recruitingCostPerPerson: 2_000,
+          equipmentCostPerPerson: 1_500,
+        },
+      },
+    ], 18, 12);
+
+    expect(result.monthlyComparison[0].cashDifference).toBe(-5_000);
+    expect(result.monthlyComparison[1].cashDifference).toBe(-30_700);
+    expect(result.impact.endingCashDelta).toBe(-329_900);
+  });
+
   it('rejects combined plans with impossible cost or gross-margin assumptions', () => {
     expect(() => simulateCombinedFinancialDecision(inputs, [
       { name: 'Cut all costs', startMonth: 1, monthlyOpexChange: -50_000 },
