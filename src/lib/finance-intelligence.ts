@@ -202,6 +202,34 @@ export function simulateFinancialDecision(inputs: ModelInputs, change: DecisionC
   };
 }
 
+export function compareFinancialScenarios(inputs: ModelInputs, scenarios: DecisionChange[]) {
+  if (scenarios.length < 2 || scenarios.length > 4) {
+    throw new Error('Compare between two and four financial scenarios.');
+  }
+
+  const results = scenarios.map((scenario) => simulateFinancialDecision(inputs, scenario));
+  const comparison = results.map((result) => ({
+    name: result.name,
+    assumptionsApplied: result.assumptionsApplied,
+    endingCash: result.scenario.endingCash,
+    endingCashDelta: result.impact.endingCash,
+    minimumCash: result.scenario.minimumForecastCash,
+    firstNegativeCashMonth: result.impact.firstNegativeCashMonth,
+    firstBelowSixMonthsRunway: result.impact.firstBelowSixMonthsRunway,
+  }));
+  const rankedByEndingCash = [...comparison]
+    .sort((left, right) => right.endingCash - left.endingCash)
+    .map((item, index) => ({ name: item.name, rank: index + 1, endingCash: item.endingCash }));
+
+  return {
+    baseline: results[0].base,
+    scenarios: comparison,
+    rankedByEndingCash,
+    interpretationNote: 'The ranking uses ending cash only. It is not a complete ranking of strategic merit, execution risk, customer impact or long-term value.',
+    caveats: results[0].caveats,
+  };
+}
+
 export function simulateHiringDecision(inputs: ModelInputs, hire: HireInput, horizonMonths = 18) {
   const baseRows = forecast(inputs, [], horizonMonths);
   const scenarioRows = forecast(inputs, [hire], horizonMonths);
