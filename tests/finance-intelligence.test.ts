@@ -13,6 +13,7 @@ import {
   simulateHiringDecision,
 } from '../src/lib/finance-intelligence';
 import type { ModelInputs } from '../src/lib/finance';
+import { buildCfoBrief } from '../src/lib/cfo-brief';
 
 const inputs: ModelInputs = {
   openingCash: 1_000_000,
@@ -146,6 +147,27 @@ describe('Avenor financial intelligence', () => {
     expect(historical.totalInflows).toBe(100_000);
     expect(historical.totalOutflows).toBe(40_000);
     expect(historical.currencies).toEqual(['EUR']);
+  });
+
+  it('flags a material payroll increase using two consecutive completed months of imported actuals', () => {
+    const latest = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 1, 1));
+    const previous = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 2, 1));
+    const latestMonth = latest.toISOString().slice(0, 7);
+    const previousMonth = previous.toISOString().slice(0, 7);
+    const brief = buildCfoBrief({
+      inputs: null,
+      modelStatus: 'none',
+      currency: 'EUR',
+      actuals: [
+        { period: previousMonth + '-05', metric_key: 'outflow:payroll', amount: -10_000, currency: 'EUR' },
+        { period: latestMonth + '-05', metric_key: 'outflow:payroll', amount: -13_000, currency: 'EUR' },
+      ],
+    });
+    const alert = brief.alerts.find((item) => item.id === 'payroll-spend-increase');
+    expect(alert?.severity).toBe('warning');
+    expect(alert?.title).toContain('30.0%');
+    expect(alert?.description).toContain(previousMonth);
+    expect(alert?.description).toContain(latestMonth);
   });
 
   it('summarizes monthly actuals and expense categories', () => {
