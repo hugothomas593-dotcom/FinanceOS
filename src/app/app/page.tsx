@@ -37,7 +37,7 @@ const compact = (v: number) => new Intl.NumberFormat('en-GB', { notation: 'compa
 const initial: ModelInputs = { openingCash: 0, monthlyRevenue: 0, monthlyRevenueGrowth: 0, monthlyOpexExPayroll: 0, monthlyOpexGrowth: 0, cogsRatio: 0, existingMonthlyPayroll: 0, existingOtherNetCashAdjustments: 0 };
 const months = 18;
 
-type SavedDecision = { id: string; title: string; detail: string; cashImpact: number | null; cashImpactLabel?: string; created: string };
+type SavedDecision = { id: string; title: string; detail: string; cashImpact: number | null; cashImpactLabel?: string; created: string; owner: string; reviewDate: string; status: 'planned' | 'in_progress' | 'reviewed' | 'completed' | 'paused'; actualEndingCash: number | null; actualOutcomeNote: string; forecastEndingCash: number | null };
 type WorkspaceMembership = {
   organization_id: string;
   role: string;
@@ -95,6 +95,14 @@ function scenarioCashImpact(outputs: Record<string, unknown>) {
 
 function toSavedDecision(scenario: ScenarioRow): SavedDecision {
   const impact = scenarioCashImpact(scenario.outputs);
+  const tracking = asRecord(asRecord(scenario.assumptions)?.decisionTracking);
+  const forecast = asRecord(scenario.outputs.scenario);
+  const forecastEndingCash = typeof forecast?.endingCash === 'number' && Number.isFinite(forecast.endingCash)
+    ? forecast.endingCash
+    : null;
+  const status = ['planned', 'in_progress', 'reviewed', 'completed', 'paused'].includes(String(tracking?.status))
+    ? tracking!.status as SavedDecision['status']
+    : 'planned';
   return {
     id: scenario.id,
     title: scenario.name,
@@ -102,6 +110,12 @@ function toSavedDecision(scenario: ScenarioRow): SavedDecision {
     cashImpact: impact.value,
     cashImpactLabel: impact.label,
     created: new Date(scenario.created_at).toLocaleDateString('en-GB'),
+    owner: typeof tracking?.owner === 'string' ? tracking.owner : '',
+    reviewDate: typeof tracking?.reviewDate === 'string' ? tracking.reviewDate : '',
+    status,
+    actualEndingCash: typeof tracking?.actualEndingCash === 'number' && Number.isFinite(tracking.actualEndingCash) ? tracking.actualEndingCash : null,
+    actualOutcomeNote: typeof tracking?.actualOutcomeNote === 'string' ? tracking.actualOutcomeNote : '',
+    forecastEndingCash,
   };
 }
 
@@ -779,7 +793,7 @@ export default function Home() {
           </>}
         </>}
 
-        {view === 'Decision ledger' && <section className="surface ledger-surface"><div className="surface-heading"><div><div className="section-kicker">DECISION HISTORY</div><h2>Your decision ledger</h2><p>Scenarios saved for review. Saving a scenario never changes the approved base plan.</p></div><button className="button-primary" onClick={() => setView('Overview')}>＋ New scenario</button></div>{saved.length === 0 ? <div className="empty-state large-empty"><div className="empty-icon">▤</div><b>Your ledger is ready</b><p>Once you save a scenario, it will appear here with its assumptions and projected cash impact.</p><button className="button-primary" onClick={() => setView('Overview')}>Build your first scenario →</button></div> : <div className="ledger-list">{saved.map(item => <DecisionRow key={item.id} item={item} detailed currency={currency}/>)}</div>}</section>}
+        {view === 'Decision ledger' && <section className="surface ledger-surface"><div className="surface-heading"><div><div className="section-kicker">DECISION HISTORY</div><h2>Your decision ledger</h2><p>Scenarios saved for review. Saving a scenario never changes the approved base plan.</p></div><button className="button-primary" onClick={() => setView('Overview')}>＋ New scenario</button></div>{saved.length === 0 ? <div className="empty-state large-empty"><div className="empty-icon">▤</div><b>Your ledger is ready</b><p>Once you save a scenario, it will appear here with its assumptions and projected cash impact.</p><button className="button-primary" onClick={() => setView('Overview')}>Build your first scenario →</button></div> : <div className="ledger-list">{saved.map(item => <DecisionRow key={item.id} item={item} detailed currency={currency} organizationId={organizationId}/>)}</div>}</section>}
 
         {view === 'Company assumptions' && <>
           <section className="surface assumptions-surface company-context-surface">
@@ -908,13 +922,63 @@ function Metric({label,value,sub,trend,icon}:{label:string;value:string;sub:stri
 function KpiField({label,value,set,min,max,step}:{label:string;value:string;set:(v:string)=>void;min?:string;max?:string;step?:string}) { return <label className="number-field"><span>{label}</span><div className="number-input"><input type="number" min={min} max={max} step={step} value={value} placeholder="Not provided" onChange={e=>set(e.target.value)}/></div></label>; }
 function NumberField({label,value,set,min,max,step=1,prefix,suffix}:{label:string;value:number;set:(n:number)=>void;min:number;max:number;step?:number;prefix?:string;suffix?:string}) { return <label className="number-field"><span>{label}</span><div className="number-input">{prefix && <i>{prefix}</i>}<input type="number" min={min} max={max} step={step} value={value} onChange={e=>set(Math.max(min,Math.min(max,Number(e.target.value))))}/>{suffix && <i>{suffix}</i>}</div></label>; }
 function CompareBar({label,value,max,currency="EUR"}:{label:string;value:number;max:number;currency?:string}) { return <div className="compare-row"><div><span>{label}</span><b>{money(value,currency)}</b></div><div className="bar-track"><i style={{width:`${Math.max(0,Math.min(100,value/max*100))}%`}}/></div></div>; }
-function DecisionRow({item,detailed=false,currency="EUR"}:{item:SavedDecision;detailed?:boolean;currency?:string}) {
+function DecisionRow({item,detailed=false,currency="EUR",organizationId=""}:{item:SavedDecision;detailed?:boolean;currency?:string;organizationId?:string}) {
   const amount = item.cashImpact;
+  const [owner,setOwner] = useState(item.owner);
+  const [reviewDate,setReviewDate] = useState(item.reviewDate);
+  const [status,setStatus] = useState<SavedDecision['status']>(item.status);
+  const [actualEndingCash,setActualEndingCash] = useState(item.actualEndingCash === null ? '' : String(item.actualEndingCash));
+  const [actualOutcomeNote,setActualOutcomeNote] = useState(item.actualOutcomeNote);
+  const [trackingBusy,setTrackingBusy] = useState(false);
+  const [trackingError,setTrackingError] = useState('');
+  const [trackingSaved,setTrackingSaved] = useState(false);
+  async function saveTracking() {
+    if (!organizationId) return;
+    setTrackingBusy(true); setTrackingError(''); setTrackingSaved(false);
+    try {
+      const response = await fetch('/api/scenarios', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId,
+          scenarioId: item.id,
+          owner,
+          reviewDate: reviewDate || null,
+          status,
+          actualEndingCash: actualEndingCash.trim() === '' ? null : Number(actualEndingCash),
+          actualOutcomeNote,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not update this decision');
+      setTrackingSaved(true);
+    } catch (error) {
+      setTrackingError(error instanceof Error ? error.message : 'Could not update this decision');
+    } finally { setTrackingBusy(false); }
+  }
+  const actualDelta = actualEndingCash.trim() !== '' && item.forecastEndingCash !== null
+    ? Number(actualEndingCash) - item.forecastEndingCash
+    : null;
   return <div className="decision-row">
     <div className="decision-icon">⌁</div>
     <div className="decision-copy">
       <b>{item.title}</b><span>{item.detail}</span>
-      {detailed && <small>Saved {item.created} · Scenario preserved independently of base plan</small>}
+      {detailed && <>
+        <small>Saved {item.created} · Scenario preserved independently of base plan</small>
+        <div className="form-grid" style={{marginTop:12,gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>
+          <label className="number-field"><span>Owner</span><input maxLength={120} value={owner} onChange={event=>setOwner(event.target.value)} placeholder="Assign a responsible person"/></label>
+          <label className="number-field"><span>Review date</span><input type="date" value={reviewDate} onChange={event=>setReviewDate(event.target.value)}/></label>
+          <label className="number-field"><span>Decision status</span><select value={status} onChange={event=>setStatus(event.target.value as SavedDecision['status'])}><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="reviewed">Reviewed</option><option value="completed">Completed</option><option value="paused">Paused</option></select></label>
+          <label className="number-field"><span>Actual ending cash ({currency})</span><input type="number" value={actualEndingCash} onChange={event=>setActualEndingCash(event.target.value)} placeholder="Add when known"/></label>
+        </div>
+        {actualDelta !== null && Number.isFinite(actualDelta) && <small className={actualDelta < 0 ? 'negative-text' : 'positive-text'}>Actual vs scenario forecast: {actualDelta > 0 ? '+' : ''}{money(actualDelta,currency)}</small>}
+        <label className="number-field" style={{display:'block',marginTop:8}}><span>Outcome / review notes</span><textarea rows={2} maxLength={1000} value={actualOutcomeNote} onChange={event=>setActualOutcomeNote(event.target.value)} placeholder="What happened compared with the original assumptions?"/></label>
+        <div className="assumption-actions" style={{marginTop:8}}>
+          <button className="button-secondary" type="button" disabled={trackingBusy} onClick={()=>void saveTracking()}>{trackingBusy?'Saving…':'Save review details'}</button>
+          {trackingSaved && <span>Review details saved</span>}
+        </div>
+        {trackingError && <small className="warning-text" role="alert">{trackingError}</small>}
+      </>}
     </div>
     <div className="decision-impact">
       {amount === null ? (
