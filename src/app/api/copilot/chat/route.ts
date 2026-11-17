@@ -355,6 +355,12 @@ export async function POST(request: Request) {
           if (!model) return unavailable;
           const result = compareFinancialScenarios(model, scenarios);
           decisionComparison.value = result;
+          saveableScenario = {
+            name: 'Comparison of ' + scenarios.length + ' options',
+            scenarioType: 'comparison',
+            assumptions: { modelVersionId: latestModel?.id ?? null, scenarios },
+            outputs: { ...result, currency },
+          };
           toolEvidence.push({
             title: 'Side-by-side decision comparison',
             summary: scenarios.length + ' alternatives compared against the same saved baseline over their stated forecast horizons.',
