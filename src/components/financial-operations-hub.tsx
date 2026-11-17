@@ -300,7 +300,7 @@ export function FinancialOperationsHub({ organizationId, currency, onOpenImport 
       <header className={styles.hubHeader}>
         <div className={styles.eyebrow}>FINANCIAL CONTROL</div>
         <h2 id="financial-operations-hub-title">Plan cash, understand performance.</h2>
-        <p>Connected data, monthly performance reviews and a clear view of upcoming cash commitments.</p>
+        <p>Imported financial data, monthly performance reviews and a clear view of upcoming cash commitments.</p>
       </header>
 
       <section className={styles.card} aria-labelledby="avenor-data-connect-title">
@@ -308,18 +308,13 @@ export function FinancialOperationsHub({ organizationId, currency, onOpenImport 
         <h3 className={styles.connectTitle} id="avenor-data-connect-title">Connect your financial data</h3>
         <p className={styles.connectIntro}>One simple starting point for your company finances. Choose the method that works best for you.</p>
         <div className={styles.sourceChoices}>
-          <button className={styles.sourceChoice} type="button" onClick={() => void connectBank()} disabled={!bankConfigured || bankBusy}>
-            <span className={styles.sourceIcon} aria-hidden="true">⌂</span>
-            <span className={styles.sourceCopy}><b>Connect your bank</b><small>Securely retrieve your accounts, transactions and cash position automatically.</small><span className={styles.sourceMeta}>{bankBusy ? 'Opening secure connection…' : 'Recommended · Secure bank connection'}</span></span>
-            <span className={styles.sourceArrow} aria-hidden="true">→</span>
-          </button>
           <button className={styles.sourceChoice} type="button" onClick={onOpenImport}>
             <span className={styles.sourceIcon} aria-hidden="true">↥</span>
-            <span className={styles.sourceCopy}><b>Import a CSV</b><small>Upload a bank statement or accounting export in a few steps.</small><span className={styles.sourceMeta}>Works with your existing bank or accounting export</span></span>
+            <span className={styles.sourceCopy}><b>Import your financial data</b><small>Upload a bank statement or accounting export. Avenor will classify and analyse your historical cash movements.</small><span className={styles.sourceMeta}>Available now · CSV from your existing bank or accounting tool</span></span>
             <span className={styles.sourceArrow} aria-hidden="true">→</span>
           </button>
         </div>
-        {!bankConfigured && <p className={styles.notice}>Bank connection is being configured for this environment. You can still import a CSV to get started.</p>}
+        <p className={styles.notice}>Automatic bank synchronisation is not available yet. CSV imports and manual cash-balance updates are fully supported; your forecasts and CFO analysis work without a bank connection.</p>
         {bankError && <p className={styles.error} role="alert">{bankError}</p>}
         {bankMessage && <p className={styles.success} role="status">{bankMessage}</p>}
         {connections.length > 0 && <div className={styles.connectedAccounts}>
