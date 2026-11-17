@@ -60,6 +60,7 @@ WORKING RULES
 - Use the workspace currency ${currency} for every monetary figure. Never label a number EUR unless the workspace currency is EUR.
 - Use the deterministic tools for all financial calculations. Never do authoritative arithmetic from memory when a tool can calculate it.
 - For a financial decision, identify the baseline, model the proposed change, compare the outcomes, name the key drivers, explain downside risks, and propose practical next steps.
+- When the founder asks to compare options, use compare_financial_scenarios for two to four clearly specified alternatives. Compare them side by side on ending cash, minimum cash and any negative-cash month. State that ranking by ending cash is not a complete strategic recommendation; explain the trade-offs and assumptions.
 - You may analyze hiring, payroll, revenue, growth, pricing, discounts, churn assumptions, marketing, operating expenses, capex, equipment, offices, product investment, fundraising, dilution, working capital, runway, break-even, and combinations of decisions. Use the generic simulation tool for decisions that do not have a dedicated tool.
 - You do not have authority to execute transfers, change a company's books, send payments, alter payroll, approve spend, or change the underlying model. You only analyze and simulate.
 - Never invent revenue, customers, margins, payroll taxes, VAT, tax treatment, market data, customer churn, CAC, LTV, retention, payment terms, debt terms, or valuation. Treat user-provided values as assumptions and label them.
@@ -329,6 +330,52 @@ export async function POST(request: Request) {
             outputs: { ...result, currency },
           };
           return result;
+        },
+      }),
+
+      compare_financial_scenarios: tool({
+        description: 'Compare two to four alternative financial decisions side by side against the same saved company baseline. Use when the founder asks which of several options is financially safer or wants to compare timing, hiring, marketing or spending choices. Every scenario must contain explicit assumptions; never invent missing inputs.',
+        inputSchema: z.object({
+          scenarios: z.array(z.object({
+            name: z.string().trim().min(2).max(120),
+            revenueChangePct: z.number().min(-100).max(500).optional(),
+            monthlyOpexChange: z.number().min(-10_000_000).max(10_000_000).optional(),
+            monthlyPayrollChange: z.number().min(-10_000_000).max(10_000_000).optional(),
+            grossMarginChangePp: z.number().min(-100).max(100).optional(),
+            monthlyOtherCashFlowChange: z.number().min(-10_000_000).max(10_000_000).optional(),
+            oneTimeCashImpact: z.number().min(-100_000_000).max(100_000_000).optional(),
+            oneTimeMonth: z.number().int().min(1).max(36).optional(),
+            horizonMonths: z.number().int().min(1).max(36).optional(),
+          })).min(2).max(4),
+        }),
+        execute: async ({ scenarios }) => {
+          const model = modelOrUnavailable();
+          if (!model) return unavailable;
+          const results = scenarios.map((scenario) => simulateFinancialDecision(model, scenario));
+          const comparison = results.map((result) => ({
+            name: result.name,
+            assumptionsApplied: result.assumptionsApplied,
+            endingCash: result.scenario.endingCash,
+            endingCashDelta: result.impact.endingCash,
+            minimumCash: result.scenario.minimumForecastCash,
+            firstNegativeCashMonth: result.impact.firstNegativeCashMonth,
+            firstBelowSixMonthsRunway: result.impact.firstBelowSixMonthsRunway,
+          }));
+          const rankedByEndingCash = [...comparison]
+            .sort((left, right) => right.endingCash - left.endingCash)
+            .map((item, index) => ({ name: item.name, rank: index + 1, endingCash: item.endingCash }));
+          toolEvidence.push({
+            title: 'Side-by-side decision comparison',
+            summary: scenarios.length + ' alternatives compared against the same saved baseline over their stated forecast horizons.',
+            detail: { baseline: results[0].base, scenarios: comparison, rankedByEndingCash },
+          });
+          return {
+            baseline: results[0].base,
+            scenarios: comparison,
+            rankedByEndingCash,
+            interpretationNote: 'The ranking uses ending cash only. It is not a complete ranking of strategic merit, execution risk, customer impact or long-term value.',
+            caveats: results[0].caveats,
+          };
         },
       }),
 
