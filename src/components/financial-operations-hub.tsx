@@ -44,6 +44,8 @@ export function FinancialOperationsHub({ organizationId, currency }: {
   const [bankLoading, setBankLoading] = useState(true);
   const [bankBusy, setBankBusy] = useState(false);
   const [syncing, setSyncing] = useState('');
+  const [reconnecting, setReconnecting] = useState('');
+  const [disconnecting, setDisconnecting] = useState('');
   const [bankMessage, setBankMessage] = useState('');
   const [bankError, setBankError] = useState('');
 
@@ -177,6 +179,34 @@ export function FinancialOperationsHub({ organizationId, currency }: {
     } finally { setSyncing(''); }
   }
 
+  async function reconnectBank(id: string) {
+    setReconnecting(id); setBankError(''); setBankMessage('');
+    try {
+      const response = await fetch('/api/connections/' + encodeURIComponent(id) + '/reconnect', { method: 'POST' });
+      const data = await response.json();
+      if (!response.ok || typeof data.url !== 'string') throw new Error(data.error || 'Could not start bank reconnection');
+      window.location.assign(data.url);
+    } catch (error) {
+      setBankError(error instanceof Error ? error.message : 'Could not start bank reconnection');
+      setReconnecting('');
+    }
+  }
+
+  async function disconnectBank(id: string) {
+    const confirmed = window.confirm('Disconnect this bank account? The connection and its provider-side account history will be removed from Powens. Transactions already imported into Avenor will remain in your workspace.');
+    if (!confirmed) return;
+    setDisconnecting(id); setBankError(''); setBankMessage('');
+    try {
+      const response = await fetch('/api/connections/' + encodeURIComponent(id), { method: 'DELETE' });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not disconnect bank');
+      setBankMessage('Bank disconnected. Historical transactions already imported into Avenor have been retained.');
+      await Promise.all([loadBank(), loadCash(), loadReconciliation()]);
+    } catch (error) {
+      setBankError(error instanceof Error ? error.message : 'Could not disconnect bank');
+    } finally { setDisconnecting(''); }
+  }
+
   async function saveCash(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setCashBusy(true); setCashError('');
     try {
@@ -277,7 +307,12 @@ export function FinancialOperationsHub({ organizationId, currency }: {
         {bankLoading ? <p className={styles.muted}>Loading connections…</p> : connections.length === 0 ? <p className={styles.empty}>No bank accounts connected yet.</p> : connections.map((item) => (
           <div className={styles.connection} key={item.id}>
             <div><b>{item.institution_name}</b><small>{item.account_count} account(s) · {item.last_synced_at ? 'Last sync ' + dateLabel(item.last_synced_at) : 'Not synchronized'}</small>{item.last_sync_error && <small className={styles.error}>{item.last_sync_error}</small>}</div>
-            <div className={styles.connectionRight}><span className={item.status === 'connected' ? styles.good : styles.warning}>{item.status.replaceAll('_', ' ')}</span><button className={styles.link} type="button" onClick={() => void syncBank(item.id)} disabled={syncing === item.id}>{syncing === item.id ? 'Syncing…' : 'Sync now'}</button></div>
+            <div className={styles.connectionRight}>
+              <span className={item.status === 'connected' ? styles.good : styles.warning}>{item.status.replaceAll('_', ' ')}</span>
+              {['action_required','error'].includes(item.status) && <button className={styles.link} type="button" onClick={() => void reconnectBank(item.id)} disabled={reconnecting === item.id}>{reconnecting === item.id ? 'Opening bank…' : 'Reconnect'}</button>}
+              {item.status !== 'disconnected' && <button className={styles.link} type="button" onClick={() => void syncBank(item.id)} disabled={syncing === item.id || reconnecting === item.id}>{syncing === item.id ? 'Syncing…' : 'Sync now'}</button>}
+              {item.status !== 'disconnected' && <button className={styles.disconnect} type="button" onClick={() => void disconnectBank(item.id)} disabled={disconnecting === item.id}>{disconnecting === item.id ? 'Disconnecting…' : 'Disconnect'}</button>}
+            </div>
           </div>
         ))}
       </section>

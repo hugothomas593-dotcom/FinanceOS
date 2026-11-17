@@ -50,16 +50,23 @@ export async function GET(request: Request) {
       .eq('provider', 'powens').in('status', ['connected','action_required']).limit(100);
     if (error) throw new Error('Could not load bank connections');
 
-    let synchronized = 0, failed = 0, imported = 0;
+    let synchronized = 0, failed = 0, skipped = 0, imported = 0;
     for (const connection of connections ?? []) {
       try {
+        const { data: subscription } = await admin.from('subscriptions')
+          .select('status,current_period_end').eq('organization_id', connection.organization_id).maybeSingle();
+        if (!subscription || !['active','trialing'].includes(subscription.status)
+          || !subscription.current_period_end || new Date(subscription.current_period_end).getTime() <= Date.now()) {
+          skipped += 1;
+          continue;
+        }
         const { data: credential, error: credentialError } = await admin.from('financial_provider_credentials')
           .select('encrypted_access_token').eq('organization_id', connection.organization_id).eq('provider','powens').maybeSingle();
         if (credentialError || !credential) throw new Error('Secure provider credential is unavailable');
         const token = decryptConnectionSecret(credential.encrypted_access_token);
         await admin.from('financial_connections').update({ status:'syncing', last_sync_error:null, updated_at:new Date().toISOString() }).eq('id',connection.id);
 
-        const result = await syncPowensConnection(config, token, connection.provider_connection_id);
+        const result = await syncPowensConnection(config, token, connection.provider_connection_id, false);
         const providerConnection = await getPowensConnection(config, token, connection.provider_connection_id) as {
           accounts?: Array<Record<string, unknown>>; state?: string | null;
         };
@@ -107,7 +114,7 @@ export async function GET(request: Request) {
         }).eq('id',connection.id);
       }
     }
-    return NextResponse.json({ synchronized, failed, imported, checked:connections?.length ?? 0 });
+    return NextResponse.json({ synchronized, failed, skipped, imported, checked:connections?.length ?? 0 });
   } catch {
     return NextResponse.json({ error:'Could not synchronize bank connections' }, { status:503 });
   }

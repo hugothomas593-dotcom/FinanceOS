@@ -40,15 +40,19 @@ export async function createPowensTemporaryCode(config: PowensConfig, userToken:
   return parseJson(response) as Promise<{ code: string; type?: string; expires_in?: number }>;
 }
 
-export function buildPowensConnectUrl(config: PowensConfig, code: string, callbackUrl: string, state: string) {
-  const url = new URL('https://webview.powens.com/fr/connect');
-  url.searchParams.set('domain', config.domain + '.biapi.pro');
+export function buildPowensConnectUrl(
+  config: PowensConfig,
+  temporaryCode: string,
+  callbackUrl: string,
+  state: string,
+  connectionId?: string,
+) {
+  const url = new URL('https://' + config.domain + '.biapi.pro/2.0/webauth');
   url.searchParams.set('client_id', config.clientId);
+  url.searchParams.set('token', temporaryCode);
   url.searchParams.set('redirect_uri', callbackUrl);
-  url.searchParams.set('code', code);
   url.searchParams.set('state', state);
-  url.searchParams.set('connector_capabilities', 'bank');
-  url.searchParams.set('account_types', 'checking');
+  if (connectionId) url.searchParams.set('id_connection', connectionId);
   return url.toString();
 }
 
@@ -78,8 +82,8 @@ export async function getPowensAccounts(config: PowensConfig, token: string) {
   return powensUserRequest(config, token, '/users/me/accounts?limit=1000');
 }
 
-export async function syncPowensConnection(config: PowensConfig, token: string, connectionId: string) {
-  await powensUserRequest(config, token, '/users/me/connections/' + encodeURIComponent(connectionId) + '?psu_requested=true', { method: 'PUT' });
+export async function syncPowensConnection(config: PowensConfig, token: string, connectionId: string, psuRequested = true) {
+  await powensUserRequest(config, token, '/users/me/connections/' + encodeURIComponent(connectionId) + '?psu_requested=' + String(psuRequested), { method: 'PUT' });
   const accountResponse = await getPowensAccounts(config, token) as { accounts?: Record<string, unknown>[] };
   const transactions: Record<string, unknown>[] = [];
   let next: string | null = '/users/me/transactions?limit=1000&min_date=' + encodeURIComponent(
