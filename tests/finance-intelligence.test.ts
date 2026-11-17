@@ -170,6 +170,22 @@ describe('Avenor financial intelligence', () => {
     expect(alert?.description).toContain(latestMonth);
   });
 
+  it('does not treat an incomplete current month as a completed-month spend trend', () => {
+    const now = new Date();
+    const currentMonth = now.toISOString().slice(0, 7);
+    const previousMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
+    const brief = buildCfoBrief({
+      inputs: null,
+      modelStatus: 'none',
+      currency: 'EUR',
+      actuals: [
+        { period: previousMonth + '-05', metric_key: 'outflow:marketing', amount: -10_000, currency: 'EUR' },
+        { period: currentMonth + '-05', metric_key: 'outflow:marketing', amount: -20_000, currency: 'EUR' },
+      ],
+    });
+    expect(brief.alerts.some((item) => item.id === 'marketing-spend-increase')).toBe(false);
+  });
+
   it('summarizes monthly actuals and expense categories', () => {
     const result = analyzeHistoricalActuals([
       { period: '2026-01-05', metric_key: 'inflow:sales', amount: 100_000, currency: 'EUR' },
