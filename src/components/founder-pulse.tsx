@@ -8,6 +8,7 @@ type FounderBrief = {
   alerts?: Array<{ id: string; severity: 'critical' | 'warning' | 'info'; title: string; description: string }>;
   forecast?: {
     endingCash: number;
+    monthlyBurn?: number;
     firstMonthCashNegative: number | null;
     firstMonthBelowTargetRunway: number | null;
     targetRunwayMonths: number;
@@ -135,8 +136,8 @@ export function FounderPulse({
           <h2 id="founder-pulse-title">What needs your attention</h2>
           <p>Signals from your saved financial plan and imported company data.</p>
         </div>
-        <span className={priorityAlerts.length > 0 ? styles.attention : styles.neutral}>
-          {!brief ? 'Loading signals' : priorityAlerts.length > 0 ? priorityAlerts.length + ' priorities' : 'No priority warnings'}
+        <span className={priorityAlerts.some((alert) => alert.severity === 'critical') ? styles.critical : priorityAlerts.length > 0 ? styles.attention : styles.neutral}>
+          {!brief ? 'Loading signals' : priorityAlerts.some((alert) => alert.severity === 'critical') ? 'Critical risk' : priorityAlerts.length > 0 ? 'Needs attention' : 'No priority warnings'}
         </span>
       </div>
 
@@ -200,9 +201,17 @@ export function FounderPulse({
         </article>
 
         <article className={styles.summaryCard}>
-          <span className={styles.summaryLabel}>DATA COVERAGE</span>
-          <strong>{brief ? (history?.records ?? 0) + ' transactions' : 'Loading…'}</strong>
-          <p>{brief ? (history?.monthsCovered ?? 0) + ' month(s) of compatible history available for analysis.' : 'Checking imported company data.'}</p>
+          <span className={styles.summaryLabel}>MONTHLY NET BURN</span>
+          {!brief ? (
+            <strong className={styles.loading}>Loading…</strong>
+          ) : forecast ? (
+            <>
+              <strong>{formatMoney(forecast.monthlyBurn ?? 0, currency)}</strong>
+              <p>{(forecast.monthlyBurn ?? 0) > 0 ? 'Net cash consumed in the first forecast month.' : 'The first forecast month is not modeled as cash-consuming.'}</p>
+            </>
+          ) : (
+            <><strong>Plan needed</strong><p>Save a financial model to calculate projected net cash burn.</p></>
+          )}
         </article>
       </div>
 
@@ -232,7 +241,7 @@ export function FounderPulse({
       </div>
 
       <div className={styles.footer}>
-        <span>Planning signals only · verify source data before acting.</span>
+        <span>Planning signals only · {history?.records ?? 0} transactions across {history?.monthsCovered ?? 0} month(s) · verify source data before acting.</span>
         <button
           type="button"
           onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', {
