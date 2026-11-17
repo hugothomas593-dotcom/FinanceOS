@@ -7,6 +7,7 @@ import { forecast, summarize, type ModelInputs, type MonthResult } from '@/lib/f
 import { AvenorCopilot } from '@/components/avenor-copilot';
 import { CfoBrief } from '@/components/cfo-brief';
 import { FinancialOperations } from '@/components/financial-operations';
+import { FinancialOperationsHub } from '@/components/financial-operations-hub';
 import { EMPTY_COMPANY_CONTEXT, companyContextCompletion, type CompanyContext } from '@/lib/company-context';
 
 type View = 'Overview' | 'CFO Brief' | 'Financial overview' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
@@ -733,6 +734,10 @@ export default function Home() {
             onOpenImport={() => setView('Data import')}
             onOpenBrief={() => setView('CFO Brief')}
             onOpenDecisions={() => setView('Decision ledger')}
+          />
+          <FinancialOperationsHub
+            organizationId={organizationId}
+            currency={currency}
           />
           </>}
         </>}
