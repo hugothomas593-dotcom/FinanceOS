@@ -54,10 +54,12 @@ export function FounderPulse({
   organizationId,
   currency,
   brief,
+  refreshKey,
 }: {
   organizationId: string;
   currency: string;
   brief: FounderBrief | null;
+  refreshKey: number;
 }) {
   const [reconciliation, setReconciliation] = useState<Reconciliation | null>(null);
   const [reconciliationLoading, setReconciliationLoading] = useState(true);
@@ -82,7 +84,7 @@ export function FounderPulse({
       });
 
     return () => { active = false; };
-  }, [organizationId]);
+  }, [organizationId, refreshKey]);
 
   const alerts = brief?.alerts ?? [];
   const priorityAlerts = useMemo(
