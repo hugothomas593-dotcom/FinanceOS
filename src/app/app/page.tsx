@@ -969,9 +969,10 @@ function DecisionRow({item,detailed=false,currency="EUR",organizationId=""}:{ite
           <label className="number-field"><span>Owner</span><input maxLength={120} value={owner} onChange={event=>setOwner(event.target.value)} placeholder="Assign a responsible person"/></label>
           <label className="number-field"><span>Review date</span><input type="date" value={reviewDate} onChange={event=>setReviewDate(event.target.value)}/></label>
           <label className="number-field"><span>Decision status</span><select value={status} onChange={event=>setStatus(event.target.value as SavedDecision['status'])}><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="reviewed">Reviewed</option><option value="completed">Completed</option><option value="paused">Paused</option></select></label>
-          <label className="number-field"><span>Actual ending cash ({currency})</span><input type="number" value={actualEndingCash} onChange={event=>setActualEndingCash(event.target.value)} placeholder="Add when known"/></label>
+          <label className="number-field"><span>Actual ending cash at review horizon ({currency})</span><input type="number" value={actualEndingCash} onChange={event=>setActualEndingCash(event.target.value)} placeholder="Add when known"/></label>
         </div>
         {actualDelta !== null && Number.isFinite(actualDelta) && <small className={actualDelta < 0 ? 'negative-text' : 'positive-text'}>Actual vs scenario forecast: {actualDelta > 0 ? '+' : ''}{money(actualDelta,currency)}</small>}
+        <small>Enter actual cash for the same forecast horizon as the saved scenario to make the comparison meaningful.</small>
         <label className="number-field" style={{display:'block',marginTop:8}}><span>Outcome / review notes</span><textarea rows={2} maxLength={1000} value={actualOutcomeNote} onChange={event=>setActualOutcomeNote(event.target.value)} placeholder="What happened compared with the original assumptions?"/></label>
         <div className="assumption-actions" style={{marginTop:8}}>
           <button className="button-secondary" type="button" disabled={trackingBusy} onClick={()=>void saveTracking()}>{trackingBusy?'Saving…':'Save review details'}</button>
