@@ -20,7 +20,7 @@ type FounderBriefData = {
 
 type View = 'Overview' | 'CFO Brief' | 'Financial overview' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
 const viewTitles: Record<View, string> = {
-  Overview: 'Copilot',
+  Overview: 'Avenor Intelligence',
   'CFO Brief': 'CFO Brief',
   'Financial overview': 'Financial overview',
   'Decision ledger': 'Saved decisions',
@@ -103,7 +103,7 @@ function toSavedDecision(scenario: ScenarioRow): SavedDecision {
 }
 
 export default function Home() {
-  const [view, setView] = useState<View>('Overview');
+  const [view, setView] = useState<View>('Financial overview');
   const [organizationId, setOrganizationId] = useState('');
   const [workspaceMemberships, setWorkspaceMemberships] = useState<WorkspaceMembership[]>([]);
   const [organizationName, setOrganizationName] = useState('');
@@ -591,7 +591,7 @@ export default function Home() {
 
   const navGroups: { title: string; items: { label: View; title: string; icon: string }[] }[] = [
     { title: 'WORKSPACE', items: [
-      { label: 'Overview', title: 'Copilot', icon: '✳' },
+      { label: 'Overview', title: 'Avenor Intelligence', icon: '✳' },
       { label: 'CFO Brief', title: 'CFO Brief', icon: '◷' },
       { label: 'Financial overview', title: 'Financial overview', icon: '▦' },
     ] },
