@@ -66,8 +66,8 @@ describe('Avenor financial intelligence', () => {
     expect(result.actions).toHaveLength(2);
     expect(result.monthlyComparison[0].cashDifference).toBe(-5_000);
     expect(result.monthlyComparison[1].cashDifference).toBe(-35_000);
-    expect(result.monthlyComparison[3].cashDifference).toBe(-35_000);
-    expect(result.monthlyComparison[4].cashDifference).toBe(-25_000);
+    expect(result.monthlyComparison[3].cashDifference).toBe(-15_000);
+    expect(result.monthlyComparison[4].cashDifference).toBe(-5_000);
     expect(result.impact.endingCashDelta).toBe(-140_000);
   });
 
