@@ -4,7 +4,7 @@
 .header h2{margin:5px 0 3px;color:#20392a;font-size:16px;font-weight:700;letter-spacing:-.3px}
 .header p{margin:0;color:#75847a;font-size:10px;line-height:1.5}
 .attention,.neutral{display:inline-flex;align-items:center;padding:5px 8px;border-radius:5px;font-size:8px;font-weight:750;white-space:nowrap}
-.attention{background:#fff5e9;color:#986a31}
+.attention{background:#fff5e9;color:#986a31}\n.critical{display:inline-flex;align-items:center;padding:5px 8px;border-radius:5px;background:#fbefed;color:#a34f45;font-size:8px;font-weight:750;white-space:nowrap}
 .neutral{background:#eff4ef;color:#54715c}
 .summaryGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}
 .summaryCard{display:grid;align-content:start;gap:6px;min-width:0;padding:12px;border:1px solid #e8eee8;border-radius:7px;background:#fbfcfa}
