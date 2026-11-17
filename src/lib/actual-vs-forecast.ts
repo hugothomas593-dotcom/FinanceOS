@@ -17,7 +17,7 @@ export function inferForecastCategory(metricKey: string): CategoryMapping['forec
   const [direction, ...parts] = metricKey.toLowerCase().split(':');
   const label = parts.join(':').replace(/[_-]+/g, ' ');
   if (/transfer|loan|financ|fundrais|capital|vat|tax|taxation|dividend|equity|investment/.test(label)) return 'exclude';
-  if (direction === 'inflow') return 'revenue';
+  if (direction === 'inflow') return /revenue|sales|sale|subscription|customer|client|merchant|invoice|payment|income|receipt|commerce|settlement/.test(label) ? 'revenue' : null;
   if (direction !== 'outflow') return null;
   if (/payroll|salary|salaries|wage|personnel|staff|employee|employer|social charge/.test(label)) return 'payroll';
   if (/cogs|cost of goods|direct cost|materials|production|fulfil|fulfill|hosting usage/.test(label)) return 'cogs';

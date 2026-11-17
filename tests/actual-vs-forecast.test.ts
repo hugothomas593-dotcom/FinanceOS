@@ -46,6 +46,7 @@ describe('Actual vs Forecast reconciliation', () => {
 
   it('classifies operating categories and excludes financing movements by default', () => {
     expect(inferForecastCategory('inflow:subscription_revenue')).toBe('revenue');
+    expect(inferForecastCategory('inflow:unknown_transfer')).toBeNull();
     expect(inferForecastCategory('outflow:monthly_payroll')).toBe('payroll');
     expect(inferForecastCategory('outflow:software_subscription')).toBe('opex');
     expect(inferForecastCategory('outflow:bank_transfer')).toBe('exclude');
