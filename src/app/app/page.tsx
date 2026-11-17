@@ -304,6 +304,8 @@ export default function Home() {
   useEffect(() => {
     if (!organizationId) return;
     let active = true;
+    setCfoBrief(null);
+    setInsightCount(0);
     fetch(`/api/brief?organizationId=${encodeURIComponent(organizationId)}`, { cache: 'no-store' })
       .then(async (response) => {
         const data = await response.json();
