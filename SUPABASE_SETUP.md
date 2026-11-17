@@ -8,7 +8,7 @@ Supabase hosts the PostgreSQL database and authentication. It does **not** host 
 2. Create a new query.
 3. Paste the full contents of `supabase/FINANCEOS_SETUP_ALL.sql`.
 4. Run it once on a fresh project. It provides the baseline through migration 011. If it errors, stop and inspect the exact error; do not repeatedly run partial SQL.
-5. Then apply migrations `012_api_rate_limits.sql` through `017_restrict_public_role_privileges.sql` in numerical order. On an existing project already through migration 011, apply only migrations 012–017. On an existing project already through 016, apply only migration 017. Never rerun a migration that is already recorded in migration history.
+5. Then apply migrations `012_api_rate_limits.sql` through `018_optimize_financial_operations_rls_and_indexes.sql` in numerical order. On an existing project already through migration 011, apply only migrations 012–018. On an existing project already through 016, apply only migrations 017–018. Never rerun a migration that is already recorded in migration history.
 6. Verify the tables, RLS policies and service-role-only permissions in Table Editor / Authentication.
 
 ## Application environment variables
