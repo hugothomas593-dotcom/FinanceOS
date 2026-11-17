@@ -214,6 +214,7 @@ export function buildCfoBrief(input: CfoBriefInput) {
       openingCash: input.inputs!.openingCash,
       monthlyRevenue: input.inputs!.monthlyRevenue,
       monthlyOperatingCosts: input.inputs!.monthlyOpexExPayroll + input.inputs!.existingMonthlyPayroll,
+      monthlyBurn: forecastRows[0]?.burn ?? 0,
       endingCash: forecastSummary.endingCash,
       minimumCash: forecastSummary.minimumForecastCash,
       lowestCashMonth: forecastSummary.lowestCashMonth,
