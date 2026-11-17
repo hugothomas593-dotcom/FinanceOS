@@ -194,7 +194,7 @@ export function AvenorCopilot({
     'What if customers start paying us 30 days later?',
     'Are we spending too much to win new customers?',
     'Are we losing customers faster than we are replacing them?',
-    'Can we hire two people and still preserve 12 months of runway?',
+    'Can we combine three hires with an extra ' + currencySymbol + '5,000 in monthly marketing and still preserve 12 months of runway?',
     'How much should we raise, and what dilution would it imply?',
   ], [currencySymbol]);
 
