@@ -123,6 +123,7 @@ export default function Home() {
   const [modelUpdatedAt, setModelUpdatedAt] = useState('');
   const [actualsCount, setActualsCount] = useState(0);
   const [insightCount, setInsightCount] = useState(0);
+  const [financialDataVersion, setFinancialDataVersion] = useState(0);
   const [cfoBrief, setCfoBrief] = useState<FounderBriefData | null>(null);
   const [cash, setCash] = useState(initial.openingCash);
   const [revenue, setRevenue] = useState(initial.monthlyRevenue);
@@ -181,6 +182,22 @@ export default function Home() {
     canManageBilling: boolean;
     trialDays?: number | null;
   } | null>(null);
+
+  useEffect(() => {
+    const refreshFinancialData = () => {
+      setFinancialDataVersion((version) => version + 1);
+      if (!organizationId) return;
+      fetch(`/api/actuals?organizationId=${encodeURIComponent(organizationId)}`, { cache: 'no-store' })
+        .then(async (response) => {
+          if (!response.ok) return;
+          const data = await response.json();
+          setActualsCount(((data.actuals ?? []) as unknown[]).length);
+        })
+        .catch(() => undefined);
+    };
+    window.addEventListener('avenor:financial-data-updated', refreshFinancialData);
+    return () => window.removeEventListener('avenor:financial-data-updated', refreshFinancialData);
+  }, [organizationId]);
 
   useEffect(() => {
     const navigateToCopilot = () => setView('Overview');
@@ -318,7 +335,7 @@ export default function Home() {
       })
       .catch(() => { if (active) setInsightCount(0); });
     return () => { active = false; };
-  }, [organizationId, contextUpdatedAt, hasModel, actualsCount, kpiHasData]);
+  }, [organizationId, contextUpdatedAt, hasModel, actualsCount, kpiHasData, financialDataVersion]);
 
   useEffect(() => {
     if (!organizationId) return;
@@ -442,6 +459,7 @@ export default function Home() {
       setModelName(data.model.name);
       setModelUpdatedAt(new Date(data.model.created_at).toLocaleString('en-GB'));
       setToast(status === 'approved' ? 'Financial model approved and saved' : 'Draft model saved to your workspace');
+      window.dispatchEvent(new CustomEvent('avenor:financial-data-updated'));
       window.setTimeout(() => setToast(''), 2600);
     } catch (error) {
       setWorkspaceError(error instanceof Error ? error.message : 'Could not save the financial model');
@@ -683,7 +701,7 @@ export default function Home() {
              <Metric label="Monthly spending" value={money(monthlyOperatingCosts, currency)} sub="Direct costs, team and other running costs" trend="neutral" icon="⌁" />
              <Metric label="How long cash may last" value={baseRunway === null ? 'Cash-flow positive' : `${baseRunway.toFixed(1)} months`} sub={baseRunway === null ? 'The current plan is not using cash each month' : 'Estimated at the current monthly cash burn'} trend={baseRunway !== null && baseRunway < 6 ? 'warning' : 'positive'} icon="◷" />
            </div>
-          <FounderPulse organizationId={organizationId} currency={currency} brief={cfoBrief} />
+          <FounderPulse organizationId={organizationId} currency={currency} brief={cfoBrief} refreshKey={financialDataVersion} />
           <section className="decision-intro">
             <div className="decision-intro-copy">
               <div className="section-kicker">THE AVENOR DIFFERENCE</div>
@@ -826,7 +844,7 @@ export default function Home() {
           </div>
         </section>}
 
-        {view === 'Data import' && <section className="surface assumptions-surface"><div className="section-kicker">FINANCIAL DATA INGESTION</div><h2>Import your transactions</h2><p className="form-intro">{actualsCount} records are currently stored in this workspace. Imported actuals are kept separately and are not yet included in the forecast.</p><p className="form-intro">Upload a bank or accounting CSV export. Supported formats: comma, semicolon or tab separated; dates in YYYY-MM-DD or DD/MM/YYYY format; either Amount or separate Debit/Credit columns. Optional: Description, Category and Currency/Devise. If no currency is supplied, the workspace currency is used.</p><label className="number-field"><span>CSV file</span><input type="file" accept=".csv,text/csv" onChange={async e=>{setImportError('');setImportRows([]);const f=e.target.files?.[0];if(!f)return;try{if(f.size>2_000_000)throw new Error('Maximum file size is 2 MB');const {normalizeActuals}=await import('@/lib/csv');setImportRows(normalizeActuals(await f.text(),f.name));}catch(err){setImportError(err instanceof Error?err.message:'Could not parse CSV');}}}/></label>{importError&&<p className="warning-text">{importError}</p>}{importRows.length>0&&<><p><b>{importRows.length}</b> records ready for import · {importTotalsByCurrency.map((total) => `${money(total.inflows, total.currency)} inflows · ${money(total.outflows, total.currency)} outflows`).join(' · ')}</p><div className="ledger-list">{importRows.slice(0,5).map((r,i)=><div className="decision-row" key={`${r.period}-${i}`}><div className="decision-icon">{r.direction==='inflow'?'↗':'↘'}</div><div className="decision-copy"><b>{r.description||r.category}</b><span>{r.period} · {r.category}</span></div><div className="decision-impact"><b>{money(r.amount, r.currency ?? currency)}</b><small>{r.direction} · {r.currency ?? currency}</small></div></div>)}</div><button className="button-primary" disabled={importBusy} onClick={async()=>{setImportBusy(true);try{const organizationId=localStorage.getItem('financeos.organizationId');if(!organizationId)throw new Error('Create or select an authenticated workspace first.');const csvText=await new Promise<string>((resolve,reject)=>{const f=(document.querySelector('input[type=file]') as HTMLInputElement)?.files?.[0];if(!f){reject(new Error('Select a CSV file'));return;}f.text().then(resolve,reject);});const res=await fetch('/api/actuals/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({organizationId,csv:csvText})});const data=await res.json();if(!res.ok)throw new Error(data.error||'Import failed');setToast(`${data.imported} records imported · ${data.skipped} duplicates skipped`);const actualsResponse=await fetch(`/api/actuals?organizationId=${encodeURIComponent(organizationId)}`,{cache:'no-store'});if(actualsResponse.ok){const actualsData=await actualsResponse.json();setActualsCount((actualsData.actuals??[]).length);}setImportRows([]);}catch(err){setImportError(err instanceof Error?err.message:'Import failed');}finally{setImportBusy(false);}}}>{importBusy?'Importing…':'Import records to workspace →'}</button></>}</section>}
+        {view === 'Data import' && <section className="surface assumptions-surface"><div className="section-kicker">FINANCIAL DATA INGESTION</div><h2>Import your transactions</h2><p className="form-intro">{actualsCount} records are currently stored in this workspace. Imported actuals are kept separately and are not yet included in the forecast.</p><p className="form-intro">Upload a bank or accounting CSV export. Supported formats: comma, semicolon or tab separated; dates in YYYY-MM-DD or DD/MM/YYYY format; either Amount or separate Debit/Credit columns. Optional: Description, Category and Currency/Devise. If no currency is supplied, the workspace currency is used.</p><label className="number-field"><span>CSV file</span><input type="file" accept=".csv,text/csv" onChange={async e=>{setImportError('');setImportRows([]);const f=e.target.files?.[0];if(!f)return;try{if(f.size>2_000_000)throw new Error('Maximum file size is 2 MB');const {normalizeActuals}=await import('@/lib/csv');setImportRows(normalizeActuals(await f.text(),f.name));}catch(err){setImportError(err instanceof Error?err.message:'Could not parse CSV');}}}/></label>{importError&&<p className="warning-text">{importError}</p>}{importRows.length>0&&<><p><b>{importRows.length}</b> records ready for import · {importTotalsByCurrency.map((total) => `${money(total.inflows, total.currency)} inflows · ${money(total.outflows, total.currency)} outflows`).join(' · ')}</p><div className="ledger-list">{importRows.slice(0,5).map((r,i)=><div className="decision-row" key={`${r.period}-${i}`}><div className="decision-icon">{r.direction==='inflow'?'↗':'↘'}</div><div className="decision-copy"><b>{r.description||r.category}</b><span>{r.period} · {r.category}</span></div><div className="decision-impact"><b>{money(r.amount, r.currency ?? currency)}</b><small>{r.direction} · {r.currency ?? currency}</small></div></div>)}</div><button className="button-primary" disabled={importBusy} onClick={async()=>{setImportBusy(true);try{const organizationId=localStorage.getItem('financeos.organizationId');if(!organizationId)throw new Error('Create or select an authenticated workspace first.');const csvText=await new Promise<string>((resolve,reject)=>{const f=(document.querySelector('input[type=file]') as HTMLInputElement)?.files?.[0];if(!f){reject(new Error('Select a CSV file'));return;}f.text().then(resolve,reject);});const res=await fetch('/api/actuals/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({organizationId,csv:csvText})});const data=await res.json();if(!res.ok)throw new Error(data.error||'Import failed');setToast(`${data.imported} records imported · ${data.skipped} duplicates skipped`);const actualsResponse=await fetch(`/api/actuals?organizationId=${encodeURIComponent(organizationId)}`,{cache:'no-store'});if(actualsResponse.ok){const actualsData=await actualsResponse.json();setActualsCount((actualsData.actuals??[]).length);}window.dispatchEvent(new CustomEvent('avenor:financial-data-updated'));setImportRows([]);}catch(err){setImportError(err instanceof Error?err.message:'Import failed');}finally{setImportBusy(false);}}}>{importBusy?'Importing…':'Import records to workspace →'}</button></>}</section>}
 
         {view === 'Fundraising planner' && <section className="surface assumptions-surface"><div className="section-kicker">FUNDRAISING INTELLIGENCE</div><h2>Model your next round</h2><p className="form-intro">Estimate dilution and cash runway after a hypothetical equity raise. This is a simplified planning calculator, not a valuation opinion.</p><div className="form-grid"><NumberField label="Amount to raise" value={raiseAmount} set={setRaiseAmount} min={0} max={100000000} step={50000} prefix={currencySymbol}/><NumberField label="Company value before investment" value={preMoney} set={setPreMoney} min={1} max={1000000000} step={250000} prefix={currencySymbol}/></div><div className="metric-grid"><Metric label="Estimated company value after investment" value={money(preMoney+raiseAmount, currency)} sub="Value before investment + new capital" trend="neutral" icon="◇"/><Metric label="Share owned by new investors" value={`${(raiseAmount/(preMoney+raiseAmount)*100).toFixed(1)}%`} sub="Before option-pool adjustments" trend="neutral" icon="%"/><Metric label="Cash after funding" value={money(cash+raiseAmount, currency)} sub="Excludes fees and other financing" trend="positive" icon="↗"/><Metric label="How long cash could last" value={base[0].netCashFlow<0?`${((cash+raiseAmount)/Math.abs(base[0].netCashFlow)).toFixed(1)} months`:'Cash positive'} sub="Flat current monthly net burn assumption" trend="neutral" icon="◷"/></div><p className="form-intro">This calculation assumes a simple priced equity round, no convertibles, no option-pool increase, no fees and no other dilution. Validate with legal and finance advisers.</p></section>}
 
