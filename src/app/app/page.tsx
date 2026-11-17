@@ -10,6 +10,7 @@ import { FinancialOperations } from '@/components/financial-operations';
 import { FinancialOperationsHub } from '@/components/financial-operations-hub';
 import { FounderPulse } from '@/components/founder-pulse';
 import { EMPTY_COMPANY_CONTEXT, companyContextCompletion, type CompanyContext } from '@/lib/company-context';
+import { buildInvestorUpdateMarkdown } from '@/lib/investor-update';
 
 type FounderBriefData = {
   generatedAt?: string;
@@ -867,7 +868,71 @@ export default function Home() {
 
         {view === 'Fundraising planner' && <section className="surface assumptions-surface"><div className="section-kicker">FUNDRAISING INTELLIGENCE</div><h2>Model your next round</h2><p className="form-intro">Estimate dilution and cash runway after a hypothetical equity raise. This is a simplified planning calculator, not a valuation opinion.</p><div className="form-grid"><NumberField label="Amount to raise" value={raiseAmount} set={setRaiseAmount} min={0} max={100000000} step={50000} prefix={currencySymbol}/><NumberField label="Company value before investment" value={preMoney} set={setPreMoney} min={1} max={1000000000} step={250000} prefix={currencySymbol}/></div><div className="metric-grid"><Metric label="Estimated company value after investment" value={money(preMoney+raiseAmount, currency)} sub="Value before investment + new capital" trend="neutral" icon="◇"/><Metric label="Share owned by new investors" value={`${(raiseAmount/(preMoney+raiseAmount)*100).toFixed(1)}%`} sub="Before option-pool adjustments" trend="neutral" icon="%"/><Metric label="Cash after funding" value={money(cash+raiseAmount, currency)} sub="Excludes fees and other financing" trend="positive" icon="↗"/><Metric label="How long cash could last" value={base[0].netCashFlow<0?`${((cash+raiseAmount)/Math.abs(base[0].netCashFlow)).toFixed(1)} months`:'Cash positive'} sub="Flat current monthly net burn assumption" trend="neutral" icon="◷"/></div><p className="form-intro">This calculation assumes a simple priced equity round, no convertibles, no option-pool increase, no fees and no other dilution. Validate with legal and finance advisers.</p></section>}
 
-        {view === 'Investor reporting' && <section className="surface ledger-surface"><div className="section-kicker">INVESTOR REPORTING</div><h2>Monthly financial snapshot</h2><p className="form-intro">A simple export from the current model assumptions. Do not share as actual company reporting until connected to verified company data.</p><div className="metric-grid"><Metric label="Monthly revenue" value={money(revenue, currency)} sub="Model assumption" trend="neutral" icon="↗"/><Metric label="Gross margin" value={`${((1-cogs/100)*100).toFixed(1)}%`} sub="Sales less direct costs" trend="neutral" icon="%"/><Metric label="Monthly net cash flow" value={money(base[0].netCashFlow, currency)} sub="Current model month" trend="neutral" icon="⌁"/><Metric label="Month 18 cash" value={money(baseSummary.endingCash, currency)} sub="Base case forecast" trend="neutral" icon="◈"/></div><button className="button-primary" onClick={()=>{const rows=['Month,Revenue,COGS,Payroll,Operating expenses,Net cash flow,Closing cash',...base.map(r=>[r.month,r.revenue,r.cogs,r.payroll,r.nonPayrollOpex,r.netCashFlow,r.closingCash].join(','))];const blob=new Blob([rows.join('\n')],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='financeos-18-month-forecast.csv';a.click();URL.revokeObjectURL(url);}}>Export 18-month forecast CSV ↓</button></section>}
+        {view === 'Investor reporting' && <section className="surface ledger-surface">
+          <div className="section-kicker">INVESTOR REPORTING</div>
+          <h2>Monthly financial snapshot</h2>
+          <p className="form-intro">Prepare a concise update from your current plan, CFO signals and saved decisions. Figures remain forecasts until verified against company records.</p>
+          <div className="metric-grid">
+            <Metric label="Monthly revenue" value={money(revenue, currency)} sub="Model assumption" trend="neutral" icon="↗"/>
+            <Metric label="Gross margin" value={`${((1-cogs/100)*100).toFixed(1)}%`} sub="Sales less direct costs" trend="neutral" icon="%"/>
+            <Metric label="Monthly net cash flow" value={money(base[0].netCashFlow, currency)} sub="Current model month" trend="neutral" icon="⌁"/>
+            <Metric label="Month 18 cash" value={money(baseSummary.endingCash, currency)} sub="Base case forecast" trend="neutral" icon="◈"/>
+          </div>
+          <div className="button-row">
+            <button className="button-primary" onClick={() => {
+              const report = buildInvestorUpdateMarkdown({
+                companyName: organizationName || 'Your company',
+                currency,
+                generatedAt: new Date(),
+                openingCash: cash,
+                monthlyRevenue: revenue,
+                grossMarginPct: (1 - cogs / 100) * 100,
+                monthlyNetCashFlow: base[0].netCashFlow,
+                forecastEndingCash: baseSummary.endingCash,
+                forecast: base.map((row) => ({
+                  month: row.month,
+                  revenue: row.revenue,
+                  cogs: row.cogs,
+                  payroll: row.payroll,
+                  operatingExpenses: row.nonPayrollOpex,
+                  netCashFlow: row.netCashFlow,
+                  closingCash: row.closingCash,
+                })),
+                alerts: (cfoBrief?.alerts ?? []).map((alert) => ({
+                  severity: alert.severity,
+                  title: alert.title,
+                  description: alert.description,
+                })),
+                decisions: saved.map((decision) => ({
+                  title: decision.title,
+                  status: decision.status,
+                  owner: decision.owner,
+                  reviewDate: decision.reviewDate,
+                  actualOutcomeNote: decision.actualOutcomeNote,
+                })),
+              });
+              const blob = new Blob([report], { type: 'text/markdown;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const anchor = document.createElement('a');
+              anchor.href = url;
+              anchor.download = `avenor-investor-update-${new Date().toISOString().slice(0, 10)}.md`;
+              anchor.click();
+              URL.revokeObjectURL(url);
+            }}>Download investor update ↓</button>
+            <button className="button-secondary" onClick={() => {
+              const rows = ['Month,Revenue,COGS,Payroll,Operating expenses,Net cash flow,Closing cash', ...base.map((row) =>
+                [row.month, row.revenue, row.cogs, row.payroll, row.nonPayrollOpex, row.netCashFlow, row.closingCash].join(','),
+              )];
+              const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const anchor = document.createElement('a');
+              anchor.href = url;
+              anchor.download = 'avenor-18-month-forecast.csv';
+              anchor.click();
+              URL.revokeObjectURL(url);
+            }}>Export forecast CSV ↓</button>
+          </div>
+        </section>}
 
         {view === 'Plan & billing' && <section className="surface billing-surface">
           <div className="section-kicker">ACCOUNT & SUBSCRIPTION</div>
