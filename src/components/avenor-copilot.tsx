@@ -31,6 +31,20 @@ type CopilotEvidence = {
     missingData?: string[];
   };
   calculations?: Array<{ title: string; summary: string; detail?: unknown }>;
+  decisionComparison?: {
+    currency: string;
+    scenarios: Array<{ name: string; endingCash: number; endingCashDelta: number; minimumCash: number; firstNegativeCashMonth: number | null; firstBelowSixMonthsRunway: number | null }>;
+    interpretationNote: string;
+  } | null;
+  combinedDecision?: {
+    currency: string;
+    actions: Array<{ name: string; startMonth: number; durationMonths: number; revenueChangePct?: number; monthlyOpexChange?: number; monthlyPayrollChange?: number; hiring?: { headcount: number; grossAnnualSalary: number; employerCostRate: number; benefitsMonthlyPerPerson?: number; recruitingCostPerPerson?: number; equipmentCostPerPerson?: number }; grossMarginChangePp?: number; monthlyOtherCashFlowChange?: number; oneTimeCashImpact?: number; oneTimeMonth: number }>;
+    assumptions: { horizonMonths: number; targetRunwayMonths: number };
+    base: { endingCash: number; minimumForecastCash: number; firstMonthCashNegative: number | null };
+    scenario: { endingCash: number; minimumForecastCash: number; firstMonthCashNegative: number | null };
+    impact: { endingCashDelta: number; minimumCashDelta: number; firstNegativeCashMonth: number | null; firstBelowTargetRunwayMonth: number | null };
+    caveats: string[];
+  } | null;
   saveableScenario?: SaveableScenario | null;
 };
 
@@ -173,14 +187,14 @@ export function AvenorCopilot({
 
   const suggestions = useMemo(() => [
     `Could we spend ${currencySymbol}30k on this and still cover the next 12 months?`,
-    'Why are we spending more than we bring in, and what could we reduce?',
+    'Compare two growth plans: add €5,000 in monthly marketing spend for a 10% revenue uplift, versus a €20,000 one-off campaign for the same uplift. What are the cash and runway trade-offs?',
     'What happens if sales are 20% lower for the next six months?',
     'How much do we need to sell each month to cover our costs?',
     'Would a 10% price increase offset a 5% drop in customers?',
     'What if customers start paying us 30 days later?',
     'Are we spending too much to win new customers?',
     'Are we losing customers faster than we are replacing them?',
-    'Can we hire two people and still preserve 12 months of runway?',
+    'Can we combine three hires with an extra ' + currencySymbol + '5,000 in monthly marketing and still preserve 12 months of runway?',
     'How much should we raise, and what dilution would it imply?',
   ], [currencySymbol]);
 
@@ -453,6 +467,64 @@ export function AvenorCopilot({
                                     ))}
                                   </div>
                                 </div>
+                              )}
+                              {evidence.combinedDecision && (
+                                <section className={styles.decisionComparison} aria-label="Combined financial decision analysis">
+                                  <div className={styles.comparisonHeading}>
+                                    <strong>Combined plan impact</strong>
+                                    <span>{evidence.combinedDecision.assumptions.horizonMonths}-month forecast</span>
+                                  </div>
+                                  <div className={styles.metricEvidence}>
+                                    <div><span>Base-case ending cash</span><strong>{formatMoney(evidence.combinedDecision.base.endingCash, evidence.combinedDecision.currency)}</strong></div>
+                                    <div><span>Combined-plan ending cash</span><strong>{formatMoney(evidence.combinedDecision.scenario.endingCash, evidence.combinedDecision.currency)}</strong></div>
+                                    <div><span>Change vs base case</span><strong className={evidence.combinedDecision.impact.endingCashDelta < 0 ? styles.comparisonNegative : styles.comparisonPositive}>{evidence.combinedDecision.impact.endingCashDelta > 0 ? '+' : ''}{formatMoney(evidence.combinedDecision.impact.endingCashDelta, evidence.combinedDecision.currency)}</strong></div>
+                                    <div><span>First breach of runway target</span><strong>{evidence.combinedDecision.impact.firstBelowTargetRunwayMonth === null ? 'Not within horizon' : 'Month ' + evidence.combinedDecision.impact.firstBelowTargetRunwayMonth}</strong></div>
+                                  </div>
+                                  <div className={styles.comparisonTableWrap}>
+                                    <table className={styles.comparisonTable}>
+                                      <thead><tr><th>Action</th><th>Starts</th><th>Duration</th><th>Recurring monthly change</th><th>One-off cash impact</th></tr></thead>
+                                      <tbody>
+                                        {evidence.combinedDecision.actions.map((action, index) => (
+                                          <tr key={action.name + index}>
+                                            <td>{action.name}</td>
+                                            <td>Month {action.startMonth}</td>
+                                            <td>{action.durationMonths} mo.</td>
+                                            <td>{formatMoney((action.monthlyOpexChange ?? 0) + (action.monthlyPayrollChange ?? 0) + (action.monthlyOtherCashFlowChange ?? 0) + (action.hiring ? action.hiring.headcount * (action.hiring.grossAnnualSalary * (1 + action.hiring.employerCostRate) / 12 + (action.hiring.benefitsMonthlyPerPerson ?? 0)) : 0), evidence.combinedDecision!.currency)} / mo.</td>
+                                            <td>{formatMoney((action.oneTimeCashImpact ?? 0) - (action.hiring ? action.hiring.headcount * ((action.hiring.recruitingCostPerPerson ?? 0) + (action.hiring.equipmentCostPerPerson ?? 0)) : 0), evidence.combinedDecision!.currency)}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                  <p>Modeled against the same saved baseline. All assumptions are supplied by the founder; no productivity uplift is inferred. {evidence.combinedDecision.impact.firstNegativeCashMonth === null ? 'The scenario does not show negative closing cash within the forecast.' : 'Negative closing cash is first projected in month ' + evidence.combinedDecision.impact.firstNegativeCashMonth + '.'}</p>
+                                </section>
+                              )}
+                              {evidence.decisionComparison && (
+                                <section className={styles.decisionComparison} aria-label="Side-by-side financial scenario comparison">
+                                  <div className={styles.comparisonHeading}>
+                                    <strong>Scenario comparison</strong>
+                                    <span>Ranked by projected ending cash</span>
+                                  </div>
+                                  <div className={styles.comparisonTableWrap}>
+                                    <table className={styles.comparisonTable}>
+                                      <thead><tr><th>Scenario</th><th>Ending cash</th><th>Change vs plan</th><th>Lowest cash</th><th>First negative month</th></tr></thead>
+                                      <tbody>
+                                        {evidence.decisionComparison.scenarios.map((item) => (
+                                          <tr key={item.name}>
+                                            <td>{item.name}</td>
+                                            <td>{formatMoney(item.endingCash, evidence.decisionComparison!.currency)}</td>
+                                            <td className={item.endingCashDelta < 0 ? styles.comparisonNegative : styles.comparisonPositive}>
+                                              {item.endingCashDelta > 0 ? '+' : ''}{formatMoney(item.endingCashDelta, evidence.decisionComparison!.currency)}
+                                            </td>
+                                            <td>{formatMoney(item.minimumCash, evidence.decisionComparison!.currency)}</td>
+                                            <td>{item.firstNegativeCashMonth === null ? 'Not within horizon' : 'Month ' + item.firstNegativeCashMonth}</td>
+                                          </tr>
+                                        ))}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                  <p>{evidence.decisionComparison.interpretationNote}</p>
+                                </section>
                               )}
                               {evidence.calculations?.length ? (
                                 <details className={styles.evidenceDetails}>

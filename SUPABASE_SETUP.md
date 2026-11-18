@@ -7,15 +7,16 @@ Supabase hosts the PostgreSQL database and authentication. It does **not** host 
 1. Open the Supabase project and SQL Editor.
 2. Create a new query.
 3. Paste the full contents of `supabase/FINANCEOS_SETUP_ALL.sql`.
-4. Run it once on a fresh project. If it errors, stop and inspect the exact error; do not repeatedly run partial SQL.
-5. Verify the tables and policies in Table Editor / Authentication.
+4. Run it once on a fresh project. It provides the baseline through migration 011. If it errors, stop and inspect the exact error; do not repeatedly run partial SQL.
+5. Then apply migrations `012_api_rate_limits.sql` through `018_optimize_financial_operations_rls_and_indexes.sql` in numerical order. On an existing project already through migration 011, apply only migrations 012–018. On an existing project already through 016, apply only migrations 017–018. Never rerun a migration that is already recorded in migration history.
+6. Verify the tables, RLS policies and service-role-only permissions in Table Editor / Authentication.
 
 ## Application environment variables
 Set these in the hosting provider's environment-variable settings (and in a local `.env.local` only for local development):
 - `NEXT_PUBLIC_SUPABASE_URL`
 - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (preferred; legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` remains supported)
 - `NEXT_PUBLIC_APP_URL`
-- `OPENAI_API_KEY` (server-side only, optional until Copilot is enabled)
+- `AI_GATEWAY_API_KEY` (server-side only; optional for local development outside Vercel. Vercel deployments use platform OIDC for AI Gateway)\n- `AI_GATEWAY_MODEL` (optional; defaults to `anthropic/claude-sonnet-4.6`)
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID` (server-side only, only when billing is configured)
 - `SUPABASE_SERVICE_ROLE_KEY` (server-side only; never expose it to the browser)
 

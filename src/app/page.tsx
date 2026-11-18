@@ -144,6 +144,38 @@ export default function MarketingHome() {
         </div>
       </section>
 
+      <section className="a-demo-invite" id="interactive-demo">
+        <div className="a-demo-invite-copy">
+          <div className="a-section-label">TRY THE INTERACTIVE DEMO · NO SIGN-UP</div>
+          <h2>Explore a real decision flow.<br /><em>Before you create an account.</em></h2>
+          <p>Choose a hire, a revenue downside, a price change or a funding round. Watch the same 18-month cash model update instantly, with the assumptions kept in view.</p>
+          <div className="a-demo-invite-steps">
+            <span><b>01</b> Pick a founder question</span>
+            <span><b>02</b> Compare cash outcomes</span>
+            <span><b>03</b> Review the assumptions</span>
+          </div>
+          <Link className="a-button a-button-dark" href="/demo">Explore the Avenor demo <span>↗</span></Link>
+        </div>
+        <div className="a-demo-invite-preview">
+          <div className="a-demo-preview-top">
+            <span><i /> NORTHSTAR SOFTWARE</span>
+            <small>FICTIONAL WORKSPACE</small>
+          </div>
+          <div className="a-demo-preview-question">Can we hire two engineers and protect our runway?</div>
+          <div className="a-demo-preview-metrics">
+            <div><span>Opening cash</span><b>€650k</b></div>
+            <div><span>Monthly revenue</span><b>€120k</b></div>
+            <div><span>Gross margin</span><b>78%</b></div>
+          </div>
+          <div className="a-demo-preview-result">
+            <div><span>ILLUSTRATIVE SCENARIO OUTPUT</span><b>Compare the decision before you commit.</b></div>
+            <div className="a-demo-preview-impact"><small>Month 18 cash impact</small><strong>−€243k</strong></div>
+          </div>
+          <div className="a-demo-preview-foot"><span>✓ Deterministic cash calculations</span><span>Assumptions visible</span></div>
+          <small className="a-demo-preview-disclaimer">Example figures only · No account or data upload required</small>
+        </div>
+      </section>
+
       <section className="a-intro" id="copilot">
         <div className="a-section-label">THE PRODUCT IS THE COPILOT</div>
         <div className="a-intro-grid">

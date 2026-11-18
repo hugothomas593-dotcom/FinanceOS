@@ -1,0 +1,256 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import styles from './founder-pulse.module.css';
+
+type FounderBrief = {
+  generatedAt?: string;
+  alerts?: Array<{ id: string; severity: 'critical' | 'warning' | 'info'; title: string; description: string }>;
+  forecast?: {
+    endingCash: number;
+    monthlyBurn?: number;
+    firstMonthCashNegative: number | null;
+    firstMonthBelowTargetRunway: number | null;
+    targetRunwayMonths: number;
+  } | null;
+  historical?: {
+    records: number;
+    monthsCovered: number;
+    inflowTrendPct: number | null;
+    outflowTrendPct: number | null;
+  };
+};
+
+type CashPosition = { balance: number | string; as_of_date: string; currency: string; source: string; updated_at: string } | null;
+type BankConnection = { status: string; last_synced_at: string | null };
+
+type Reconciliation = {
+  months?: Array<{
+    month: string;
+    forecastNetCashFlow: number;
+    actualNetCashFlow: number;
+    variance: number;
+    records: number;
+  }>;
+  note?: string;
+};
+
+function formatMoney(value: number, currency: string) {
+  try {
+    return new Intl.NumberFormat('en-GB', {
+      style: 'currency',
+      currency,
+      maximumFractionDigits: 0,
+    }).format(value);
+  } catch {
+    return Math.round(value).toLocaleString('en-GB') + ' ' + currency;
+  }
+}
+
+function formatMonth(value: string) {
+  const date = new Date(value.slice(0, 7) + '-01T00:00:00Z');
+  return Number.isNaN(date.getTime())
+    ? value
+    : new Intl.DateTimeFormat('en-GB', { month: 'short', year: 'numeric', timeZone: 'UTC' }).format(date);
+}
+
+export function FounderPulse({
+  organizationId,
+  currency,
+  brief,
+  refreshKey,
+}: {
+  organizationId: string;
+  currency: string;
+  brief: FounderBrief | null;
+  refreshKey: number;
+}) {
+  const [reconciliation, setReconciliation] = useState<Reconciliation | null>(null);
+  const [reconciliationLoading, setReconciliationLoading] = useState(true);
+  const [reconciliationError, setReconciliationError] = useState('');
+  const [cashPosition, setCashPosition] = useState<CashPosition>(null);
+  const [cashPositionLoaded, setCashPositionLoaded] = useState(false);
+  const [latestBankSync, setLatestBankSync] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    setReconciliationLoading(true);
+    setReconciliationError('');
+
+    fetch('/api/reconciliation?organizationId=' + encodeURIComponent(organizationId), { cache: 'no-store' })
+      .then(async (response) => {
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Could not load forecast comparison');
+        if (active) setReconciliation(data.reconciliation ?? null);
+      })
+      .catch((error) => {
+        if (active) setReconciliationError(error instanceof Error ? error.message : 'Could not load forecast comparison');
+      })
+      .finally(() => {
+        if (active) setReconciliationLoading(false);
+      });
+
+    return () => { active = false; };
+  }, [organizationId, refreshKey]);
+
+  useEffect(() => {
+    let active = true;
+    setCashPositionLoaded(false);
+    Promise.all([
+      fetch('/api/cash-position?organizationId=' + encodeURIComponent(organizationId), { cache: 'no-store' }),
+      fetch('/api/connections?organizationId=' + encodeURIComponent(organizationId), { cache: 'no-store' }),
+    ]).then(async ([cashResponse, connectionsResponse]) => {
+      const [cashData, connectionsData] = await Promise.all([cashResponse.json(), connectionsResponse.json()]);
+      if (!cashResponse.ok) throw new Error(cashData.error || 'Could not load current cash position');
+      if (!connectionsResponse.ok) throw new Error(connectionsData.error || 'Could not load bank synchronization status');
+      if (!active) return;
+      setCashPosition(cashData.cashPosition ?? null);
+      const connections = (connectionsData.connections ?? []) as BankConnection[];
+      const syncedAt = connections.map((connection) => connection.last_synced_at).filter((value): value is string => Boolean(value)).sort().at(-1) ?? null;
+      setLatestBankSync(syncedAt);
+    }).catch(() => {
+      if (active) {
+        setCashPosition(null);
+        setLatestBankSync(null);
+      }
+    }).finally(() => {
+      if (active) setCashPositionLoaded(true);
+    });
+    return () => { active = false; };
+  }, [organizationId, refreshKey]);
+
+  const alerts = brief?.alerts ?? [];
+  const priorityAlerts = useMemo(
+    () => alerts.filter((alert) => alert.severity !== 'info').slice(0, 3),
+    [alerts],
+  );
+  const latestMonth = reconciliation?.months?.[0] ?? null;
+  const forecast = brief?.forecast ?? null;
+  const history = brief?.historical;
+
+  return (
+    <section className={styles.panel} aria-labelledby="founder-pulse-title">
+      <div className={styles.header}>
+        <div>
+          <span className={styles.eyebrow}>FOUNDER PULSE</span>
+          <h2 id="founder-pulse-title">What needs your attention</h2>
+          <p>Signals from your saved financial plan and imported company data.</p>
+        </div>
+        <span className={priorityAlerts.some((alert) => alert.severity === 'critical') ? styles.critical : priorityAlerts.length > 0 ? styles.attention : styles.neutral}>
+          {!brief ? 'Loading signals' : priorityAlerts.some((alert) => alert.severity === 'critical') ? 'Critical risk' : priorityAlerts.length > 0 ? 'Needs attention' : 'No priority warnings'}
+        </span>
+      </div>
+
+      <div className={styles.summaryGrid}>
+        <article className={styles.summaryCard}>
+          <span className={styles.summaryLabel}>CURRENT CASH POSITION</span>
+          {!cashPositionLoaded ? (
+            <><strong className={styles.loading}>Loading…</strong><p>Checking the latest saved bank or manual balance.</p></>
+          ) : cashPosition ? (
+            <>
+              <strong>{formatMoney(Number(cashPosition.balance), cashPosition.currency || currency)}</strong>
+              <p>{cashPosition.source === 'powens' ? 'Bank balance' : 'Manually entered balance'} · as of {new Date(cashPosition.as_of_date + 'T00:00:00Z').toLocaleDateString('en-GB', { timeZone: 'UTC' })}</p>
+              <p>{latestBankSync ? 'Last bank sync ' + new Date(latestBankSync).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'No bank sync recorded'}</p>
+            </>
+          ) : (
+            <>
+              <strong>Not recorded</strong>
+              <p>Connect a bank or add a current cash balance in Financial Operations.</p>
+            </>
+          )}
+        </article>
+        <article className={styles.summaryCard}>
+          <span className={styles.summaryLabel}>RUNWAY WATCH</span>
+          {!brief ? (
+            <><strong className={styles.loading}>Loading signals…</strong><p>Your latest company analysis is being prepared.</p></>
+          ) : forecast ? (
+            <>
+              <strong>{forecast.firstMonthBelowTargetRunway === null ? 'On track' : 'Review the plan'}</strong>
+              <p>
+                {forecast.firstMonthBelowTargetRunway === null
+                  ? 'No breach of your ' + forecast.targetRunwayMonths + '-month target is flagged in the current 18-month model.'
+                  : 'The model falls below your ' + forecast.targetRunwayMonths + '-month target in month ' + forecast.firstMonthBelowTargetRunway + '.'}
+              </p>
+            </>
+          ) : (
+            <>
+              <strong>Plan needed</strong>
+              <p>Save your starting cash, revenue and operating costs to activate runway monitoring.</p>
+            </>
+          )}
+        </article>
+
+        <article className={styles.summaryCard}>
+          <span className={styles.summaryLabel}>ACTUAL VS FORECAST</span>
+          {reconciliationLoading ? (
+            <strong className={styles.loading}>Loading comparison…</strong>
+          ) : latestMonth ? (
+            <>
+              <strong className={latestMonth.variance < 0 ? styles.negative : styles.positive}>
+                {latestMonth.variance > 0 ? '+' : ''}{formatMoney(latestMonth.variance, currency)}
+              </strong>
+              <p>{formatMonth(latestMonth.month)} net cash-flow variance · {latestMonth.records} classified transaction(s)</p>
+            </>
+          ) : (
+            <>
+              <strong>Baseline building</strong>
+              <p>No completed month has both a prior approved forecast and classified actuals yet.</p>
+            </>
+          )}
+          {reconciliationError && <small className={styles.error}>{reconciliationError}</small>}
+        </article>
+
+        <article className={styles.summaryCard}>
+          <span className={styles.summaryLabel}>MONTHLY NET BURN</span>
+          {!brief ? (
+            <strong className={styles.loading}>Loading…</strong>
+          ) : forecast ? (
+            <>
+              <strong>{formatMoney(forecast.monthlyBurn ?? 0, currency)}</strong>
+              <p>{(forecast.monthlyBurn ?? 0) > 0 ? 'Net cash consumed in the first forecast month.' : 'The first forecast month is not modeled as cash-consuming.'}</p>
+            </>
+          ) : (
+            <><strong>Plan needed</strong><p>Save a financial model to calculate projected net cash burn.</p></>
+          )}
+        </article>
+      </div>
+
+      <div className={styles.alertSection}>
+        <div className={styles.alertHeading}>
+          <b>Priority signals</b>
+          <span>{brief?.generatedAt ? 'Updated ' + new Date(brief.generatedAt).toLocaleString('en-GB', { dateStyle: 'medium', timeStyle: 'short' }) : 'Awaiting financial data'}</span>
+        </div>
+        {priorityAlerts.length > 0 ? (
+          <div className={styles.alertList}>
+            {priorityAlerts.map((alert) => (
+              <article className={styles.alertRow} key={alert.id}>
+                <span className={alert.severity === 'critical' ? styles.criticalDot : styles.warningDot} />
+                <div>
+                  <b>{alert.title}</b>
+                  <p>{alert.description}</p>
+                </div>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className={styles.empty}>
+            {!brief ? 'Loading your latest financial signals…' : alerts.find((alert) => alert.severity === 'info')?.description
+              ?? 'No priority warning is identified in the latest saved data. Keep your assumptions and actuals up to date.'}
+          </p>
+        )}
+      </div>
+
+      <div className={styles.footer}>
+        <span>Planning signals only · {history?.records ?? 0} transactions across {history?.monthsCovered ?? 0} month(s) · verify source data before acting.</span>
+        <button
+          type="button"
+          onClick={() => window.dispatchEvent(new CustomEvent('avenor:open-copilot', {
+            detail: { message: 'Review my latest financial signals and actual-versus-forecast performance. Explain the three most important actions I should consider, using only the data available in this workspace.', newConversation: true },
+          }))}
+        >
+          Ask Avenor to review →
+        </button>
+      </div>
+    </section>
+  );
+}

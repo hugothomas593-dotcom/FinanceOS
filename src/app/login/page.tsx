@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { getSupabasePublicConfig } from '@/lib/supabase/config';
+import { meetsMinimumPasswordPolicy } from '@/lib/password-policy';
 
 export default function LoginPage() {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -18,6 +19,10 @@ export default function LoginPage() {
 
   async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    if (mode === 'signup' && !meetsMinimumPasswordPolicy(password)) {
+      setMessage('Use at least 12 characters with lowercase and uppercase letters, a number and a symbol.');
+      return;
+    }
     setBusy(true);
     setMessage('');
 
@@ -86,13 +91,14 @@ export default function LoginPage() {
           <input
             type="password"
             required
-            minLength={8}
+            minLength={mode === 'login' ? 8 : 12}
             autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            placeholder="At least 8 characters"
+            placeholder={mode === 'login' ? 'Your password' : '12+ characters, upper/lowercase, number and symbol'}
           />
         </label>
+        {mode === 'signup' && <p className="auth-help">Use 12+ characters, including uppercase and lowercase letters, a number and a symbol.</p>}
 
         <button className="button-primary" disabled={busy}>
           {busy ? 'Please wait...' : mode === 'login' ? 'Sign in' : 'Create account'}

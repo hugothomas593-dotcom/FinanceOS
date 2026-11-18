@@ -12,6 +12,8 @@ import {
   calculatePricingImpact,
   calculateWorkingCapitalImpact,
   calculateUnitEconomics,
+  compareFinancialScenarios,
+  simulateCombinedFinancialDecision,
   type CompanyKpis,
   simulateFinancialDecision,
   simulateHiringDecision,
@@ -20,6 +22,7 @@ import {
 import { validateModelInputs, type HireInput, type ModelInputs } from '@/lib/finance';
 import { buildCopilotFallback } from '@/lib/copilot-fallback';
 import { CompanyContextSchema, EMPTY_COMPANY_CONTEXT, type CompanyContext } from '@/lib/company-context';
+import { enforceApiRateLimit } from '@/lib/rate-limit';
 
 export const maxDuration = 60;
 
@@ -59,6 +62,8 @@ WORKING RULES
 - Use the workspace currency ${currency} for every monetary figure. Never label a number EUR unless the workspace currency is EUR.
 - Use the deterministic tools for all financial calculations. Never do authoritative arithmetic from memory when a tool can calculate it.
 - For a financial decision, identify the baseline, model the proposed change, compare the outcomes, name the key drivers, explain downside risks, and propose practical next steps.
+- When the founder asks to compare options, use compare_financial_scenarios for two to four clearly specified alternatives. Compare them side by side on ending cash, minimum cash and any negative-cash month. State that ranking by ending cash is not a complete strategic recommendation; explain the trade-offs and assumptions.
+- When a founder combines multiple changes in one plan (for example hiring plus higher marketing spend), use simulate_combined_decision so every action is modeled together against the same baseline. Require explicit values for salaries, employer costs, revenue uplift and any other unknowns; ask for missing inputs instead of inventing them. Use the structured hiring assumptions when headcount, salary and employer cost are known; otherwise ask for the missing loaded monthly payroll amount. Use startMonth and durationMonths to model timing.
 - You may analyze hiring, payroll, revenue, growth, pricing, discounts, churn assumptions, marketing, operating expenses, capex, equipment, offices, product investment, fundraising, dilution, working capital, runway, break-even, and combinations of decisions. Use the generic simulation tool for decisions that do not have a dedicated tool.
 - You do not have authority to execute transfers, change a company's books, send payments, alter payroll, approve spend, or change the underlying model. You only analyze and simulate.
 - Never invent revenue, customers, margins, payroll taxes, VAT, tax treatment, market data, customer churn, CAC, LTV, retention, payment terms, debt terms, or valuation. Treat user-provided values as assumptions and label them.
@@ -106,6 +111,14 @@ export async function POST(request: Request) {
       .maybeSingle();
     if (!membership) {
       return NextResponse.json({ error: 'Workspace access denied' }, { status: 403 });
+    }
+
+    const rateLimit = await enforceApiRateLimit(user.id, 'copilot');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Copilot message limit reached. Please wait before sending another message.' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } },
+      );
     }
 
     const { data: approvedModel } = await supabase
@@ -247,6 +260,8 @@ export async function POST(request: Request) {
 
     const toolEvidence: Array<{ title: string; summary: string; detail?: unknown }> = [];
     let saveableScenario: SaveableScenario | null = null;
+    const decisionComparison: { value: ReturnType<typeof compareFinancialScenarios> | null } = { value: null };
+    const combinedDecision: { value: ReturnType<typeof simulateCombinedFinancialDecision> | null } = { value: null };
 
     const unavailable = { available: false, reason: 'A saved and valid financial model is required for this calculation. Save company assumptions and approve a model version first.' };
     const modelOrUnavailable = () => inputs ?? null;
@@ -319,6 +334,87 @@ export async function POST(request: Request) {
             assumptions: { modelVersionId: latestModel?.id, change },
             outputs: { ...result, currency },
           };
+          return result;
+        },
+      }),
+
+      compare_financial_scenarios: tool({
+        description: 'Compare two to four alternative financial decisions side by side against the same saved company baseline. Use when the founder asks which of several options is financially safer or wants to compare timing, hiring, marketing or spending choices. Every scenario must contain explicit assumptions; never invent missing inputs.',
+        inputSchema: z.object({
+          scenarios: z.array(z.object({
+            name: z.string().trim().min(2).max(120),
+            revenueChangePct: z.number().min(-100).max(500).optional(),
+            monthlyOpexChange: z.number().min(-10_000_000).max(10_000_000).optional(),
+            monthlyPayrollChange: z.number().min(-10_000_000).max(10_000_000).optional(),
+            grossMarginChangePp: z.number().min(-100).max(100).optional(),
+            monthlyOtherCashFlowChange: z.number().min(-10_000_000).max(10_000_000).optional(),
+            oneTimeCashImpact: z.number().min(-100_000_000).max(100_000_000).optional(),
+            oneTimeMonth: z.number().int().min(1).max(36).optional(),
+            horizonMonths: z.number().int().min(1).max(36).optional(),
+          })).min(2).max(4),
+        }),
+        execute: async ({ scenarios }) => {
+          const model = modelOrUnavailable();
+          if (!model) return unavailable;
+          const result = compareFinancialScenarios(model, scenarios);
+          decisionComparison.value = result;
+          saveableScenario = {
+            name: 'Comparison of ' + scenarios.length + ' options',
+            scenarioType: 'comparison',
+            assumptions: { modelVersionId: latestModel?.id ?? null, scenarios },
+            outputs: { ...result, currency },
+          };
+          toolEvidence.push({
+            title: 'Side-by-side decision comparison',
+            summary: scenarios.length + ' alternatives compared against the same saved baseline over their stated forecast horizons.',
+            detail: result,
+          });
+          return result;
+        },
+      }),
+
+      simulate_combined_decision: tool({
+        description: 'Model two to eight linked actions together in one cash forecast, such as several hires plus higher marketing spend. Each action needs an explicit start month. Supply only known or founder-confirmed assumptions; never invent salaries, employer costs, revenue uplift or savings.',
+        inputSchema: z.object({
+          horizonMonths: z.number().int().min(1).max(36).default(18),
+          targetRunwayMonths: z.number().min(1).max(36).default(12),
+          actions: z.array(z.object({
+            name: z.string().trim().min(2).max(120),
+            startMonth: z.number().int().min(1).max(36),
+            durationMonths: z.number().int().min(1).max(36).optional(),
+            revenueChangePct: z.number().min(-100).max(500).optional(),
+            monthlyOpexChange: z.number().min(-10_000_000).max(10_000_000).optional(),
+            monthlyPayrollChange: z.number().min(-10_000_000).max(10_000_000).optional(),
+            hiring: z.object({
+              headcount: z.number().int().min(1).max(500),
+              grossAnnualSalary: z.number().nonnegative(),
+              employerCostRate: z.number().min(0).max(3),
+              benefitsMonthlyPerPerson: z.number().nonnegative().default(0),
+              recruitingCostPerPerson: z.number().nonnegative().default(0),
+              equipmentCostPerPerson: z.number().nonnegative().default(0),
+            }).optional(),
+            grossMarginChangePp: z.number().min(-100).max(100).optional(),
+            monthlyOtherCashFlowChange: z.number().min(-10_000_000).max(10_000_000).optional(),
+            oneTimeCashImpact: z.number().min(-100_000_000).max(100_000_000).optional(),
+            oneTimeMonth: z.number().int().min(1).max(36).optional(),
+          })).min(2).max(8),
+        }),
+        execute: async ({ actions, horizonMonths, targetRunwayMonths }) => {
+          const model = modelOrUnavailable();
+          if (!model) return unavailable;
+          const result = simulateCombinedFinancialDecision(model, actions, horizonMonths, targetRunwayMonths);
+          combinedDecision.value = result;
+          saveableScenario = {
+            name: 'Combined plan: ' + actions.map((action) => action.name).slice(0, 3).join(' + '),
+            scenarioType: 'combined',
+            assumptions: { modelVersionId: latestModel?.id ?? null, actions, horizonMonths, targetRunwayMonths },
+            outputs: { ...result, currency },
+          };
+          toolEvidence.push({
+            title: 'Combined decision simulation',
+            summary: actions.length + ' linked actions modeled together over ' + horizonMonths + ' months. Ending-cash change: ' + Math.round(result.impact.endingCashDelta).toLocaleString('en-GB') + ' ' + currency + '.',
+            detail: result,
+          });
           return result;
         },
       }),
@@ -544,6 +640,8 @@ export async function POST(request: Request) {
         ],
       },
       calculations: toolEvidence,
+      decisionComparison: decisionComparison.value ? { ...decisionComparison.value, currency } : null,
+      combinedDecision: combinedDecision.value ? { ...combinedDecision.value, currency } : null,
       saveableScenario,
     };
 

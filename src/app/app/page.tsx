@@ -6,13 +6,26 @@ import { getSupabasePublicConfig } from '@/lib/supabase/config';
 import { forecast, summarize, type ModelInputs, type MonthResult } from '@/lib/finance';
 import { AvenorCopilot } from '@/components/avenor-copilot';
 import { CfoBrief } from '@/components/cfo-brief';
+import { FinancialOperations } from '@/components/financial-operations';
+import { FinancialOperationsHub } from '@/components/financial-operations-hub';
+import { FounderPulse } from '@/components/founder-pulse';
+import { FinancialPlanning } from '@/components/financial-planning';
 import { EMPTY_COMPANY_CONTEXT, companyContextCompletion, type CompanyContext } from '@/lib/company-context';
+import { buildInvestorUpdateMarkdown } from '@/lib/investor-update';
 
-type View = 'Overview' | 'CFO Brief' | 'Financial overview' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
+type FounderBriefData = {
+  generatedAt?: string;
+  alerts?: Array<{ id: string; severity: 'critical' | 'warning' | 'info'; title: string; description: string }>;
+  forecast?: { endingCash: number; monthlyBurn?: number; firstMonthCashNegative: number | null; firstMonthBelowTargetRunway: number | null; targetRunwayMonths: number } | null;
+  historical?: { records: number; monthsCovered: number; inflowTrendPct: number | null; outflowTrendPct: number | null };
+};
+
+type View = 'Overview' | 'CFO Brief' | 'Financial overview' | 'Financial planning' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
 const viewTitles: Record<View, string> = {
-  Overview: 'Copilot',
+  Overview: 'Avenor Intelligence',
   'CFO Brief': 'CFO Brief',
   'Financial overview': 'Financial overview',
+  'Financial planning': 'Financial planning',
   'Decision ledger': 'Saved decisions',
   'Company assumptions': 'Company setup',
   'Business metrics': 'Growth metrics',
@@ -27,7 +40,7 @@ const compact = (v: number) => new Intl.NumberFormat('en-GB', { notation: 'compa
 const initial: ModelInputs = { openingCash: 0, monthlyRevenue: 0, monthlyRevenueGrowth: 0, monthlyOpexExPayroll: 0, monthlyOpexGrowth: 0, cogsRatio: 0, existingMonthlyPayroll: 0, existingOtherNetCashAdjustments: 0 };
 const months = 18;
 
-type SavedDecision = { id: string; title: string; detail: string; cashImpact: number | null; cashImpactLabel?: string; created: string };
+type SavedDecision = { id: string; title: string; detail: string; cashImpact: number | null; cashImpactLabel?: string; created: string; owner: string; reviewDate: string; status: 'planned' | 'in_progress' | 'reviewed' | 'completed' | 'paused'; actualEndingCash: number | null; actualOutcomeNote: string; forecastEndingCash: number | null };
 type WorkspaceMembership = {
   organization_id: string;
   role: string;
@@ -63,6 +76,9 @@ function scenarioCashImpact(outputs: Record<string, unknown>) {
   const legacyCashImpact = typeof outputs.cashImpact === 'number' && Number.isFinite(outputs.cashImpact)
     ? -Math.abs(outputs.cashImpact)
     : undefined;
+  if (Array.isArray(outputs.scenarios)) {
+    return { value: null, label: `${outputs.scenarios.length} options compared` };
+  }
   const candidates: Array<{ value: unknown; label: string }> = [
     { value: directImpact?.endingCash, label: '18-month closing-cash difference' },
     { value: directImpact?.endingCashDelta, label: '18-month closing-cash difference' },
@@ -82,6 +98,14 @@ function scenarioCashImpact(outputs: Record<string, unknown>) {
 
 function toSavedDecision(scenario: ScenarioRow): SavedDecision {
   const impact = scenarioCashImpact(scenario.outputs);
+  const tracking = asRecord(asRecord(scenario.assumptions)?.decisionTracking);
+  const forecast = asRecord(scenario.outputs.scenario);
+  const forecastEndingCash = typeof forecast?.endingCash === 'number' && Number.isFinite(forecast.endingCash)
+    ? forecast.endingCash
+    : null;
+  const status = ['planned', 'in_progress', 'reviewed', 'completed', 'paused'].includes(String(tracking?.status))
+    ? tracking!.status as SavedDecision['status']
+    : 'planned';
   return {
     id: scenario.id,
     title: scenario.name,
@@ -89,11 +113,17 @@ function toSavedDecision(scenario: ScenarioRow): SavedDecision {
     cashImpact: impact.value,
     cashImpactLabel: impact.label,
     created: new Date(scenario.created_at).toLocaleDateString('en-GB'),
+    owner: typeof tracking?.owner === 'string' ? tracking.owner : '',
+    reviewDate: typeof tracking?.reviewDate === 'string' ? tracking.reviewDate : '',
+    status,
+    actualEndingCash: typeof tracking?.actualEndingCash === 'number' && Number.isFinite(tracking.actualEndingCash) ? tracking.actualEndingCash : null,
+    actualOutcomeNote: typeof tracking?.actualOutcomeNote === 'string' ? tracking.actualOutcomeNote : '',
+    forecastEndingCash,
   };
 }
 
 export default function Home() {
-  const [view, setView] = useState<View>('Overview');
+  const [view, setView] = useState<View>('Financial overview');
   const [organizationId, setOrganizationId] = useState('');
   const [workspaceMemberships, setWorkspaceMemberships] = useState<WorkspaceMembership[]>([]);
   const [organizationName, setOrganizationName] = useState('');
@@ -113,6 +143,8 @@ export default function Home() {
   const [modelUpdatedAt, setModelUpdatedAt] = useState('');
   const [actualsCount, setActualsCount] = useState(0);
   const [insightCount, setInsightCount] = useState(0);
+  const [financialDataVersion, setFinancialDataVersion] = useState(0);
+  const [cfoBrief, setCfoBrief] = useState<FounderBriefData | null>(null);
   const [cash, setCash] = useState(initial.openingCash);
   const [revenue, setRevenue] = useState(initial.monthlyRevenue);
   const [payroll, setPayroll] = useState(initial.existingMonthlyPayroll);
@@ -123,6 +155,10 @@ export default function Home() {
   const [toast, setToast] = useState('');
   const [signOutBusy, setSignOutBusy] = useState(false);
   const [signOutError, setSignOutError] = useState('');
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const [deleteWorkspaceBusy, setDeleteWorkspaceBusy] = useState(false);
+  const [deleteWorkspaceError, setDeleteWorkspaceError] = useState('');
 
   useEffect(() => {
     const handleDecisionSaved = (event: Event) => {
@@ -166,6 +202,22 @@ export default function Home() {
     canManageBilling: boolean;
     trialDays?: number | null;
   } | null>(null);
+
+  useEffect(() => {
+    const refreshFinancialData = () => {
+      setFinancialDataVersion((version) => version + 1);
+      if (!organizationId) return;
+      fetch(`/api/actuals?organizationId=${encodeURIComponent(organizationId)}`, { cache: 'no-store' })
+        .then(async (response) => {
+          if (!response.ok) return;
+          const data = await response.json();
+          setActualsCount(((data.actuals ?? []) as unknown[]).length);
+        })
+        .catch(() => undefined);
+    };
+    window.addEventListener('avenor:financial-data-updated', refreshFinancialData);
+    return () => window.removeEventListener('avenor:financial-data-updated', refreshFinancialData);
+  }, [organizationId]);
 
   useEffect(() => {
     const navigateToCopilot = () => setView('Overview');
@@ -289,17 +341,21 @@ export default function Home() {
   useEffect(() => {
     if (!organizationId) return;
     let active = true;
+    setCfoBrief(null);
+    setInsightCount(0);
     fetch(`/api/brief?organizationId=${encodeURIComponent(organizationId)}`, { cache: 'no-store' })
       .then(async (response) => {
         const data = await response.json();
         if (!response.ok) throw new Error(data.error || 'Could not load proactive insights');
         if (!active) return;
-        const alerts = (data.brief?.alerts ?? []) as { severity?: string }[];
+        const brief = (data.brief ?? null) as FounderBriefData | null;
+        setCfoBrief(brief);
+        const alerts = brief?.alerts ?? [];
         setInsightCount(alerts.filter((alert) => alert.severity === 'critical' || alert.severity === 'warning').length);
       })
       .catch(() => { if (active) setInsightCount(0); });
     return () => { active = false; };
-  }, [organizationId, contextUpdatedAt, hasModel, actualsCount, kpiHasData]);
+  }, [organizationId, financialDataVersion]);
 
   useEffect(() => {
     if (!organizationId) return;
@@ -423,6 +479,7 @@ export default function Home() {
       setModelName(data.model.name);
       setModelUpdatedAt(new Date(data.model.created_at).toLocaleString('en-GB'));
       setToast(status === 'approved' ? 'Financial model approved and saved' : 'Draft model saved to your workspace');
+      window.dispatchEvent(new CustomEvent('avenor:financial-data-updated'));
       window.setTimeout(() => setToast(''), 2600);
     } catch (error) {
       setWorkspaceError(error instanceof Error ? error.message : 'Could not save the financial model');
@@ -455,6 +512,7 @@ export default function Home() {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not save business metrics');
       setKpiHasData(true);
+      window.dispatchEvent(new CustomEvent('avenor:financial-data-updated'));
       setToast(`Business metrics saved for ${kpiPeriod}`);
       window.setTimeout(() => setToast(''), 2600);
     } catch (error) {
@@ -484,6 +542,71 @@ export default function Home() {
     }
   }
 
+  async function exportWorkspaceData() {
+    if (!organizationId || exportBusy) return;
+    setExportBusy(true);
+    setExportError('');
+    try {
+      const response = await fetch(`/api/privacy/export?organizationId=${encodeURIComponent(organizationId)}`, { cache: 'no-store' });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || 'Could not export workspace data');
+      }
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `avenor-workspace-${organizationId}-export.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Could not export workspace data');
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  async function deleteWorkspaceData() {
+    if (!organizationId || deleteWorkspaceBusy) return;
+    const membership = workspaceMemberships.find((item) => item.organization_id === organizationId);
+    if (membership?.role !== 'owner') {
+      setDeleteWorkspaceError('Only the workspace owner can delete this workspace.');
+      return;
+    }
+    const exactName = membership.organizations?.name ?? organizationName;
+    if (!exactName || !window.confirm(`Delete ${exactName} and permanently remove its active workspace data? All workspace members will lose access. Export the data first if you need a copy.`)) return;
+    const typedName = window.prompt(`Type the exact workspace name to continue:\n${exactName}`);
+    if (typedName !== exactName) {
+      setDeleteWorkspaceError('Workspace name did not match. Nothing was deleted.');
+      return;
+    }
+    const typedPhrase = window.prompt('Final confirmation: type DELETE WORKSPACE');
+    if (typedPhrase !== 'DELETE WORKSPACE') {
+      setDeleteWorkspaceError('Confirmation phrase did not match. Nothing was deleted.');
+      return;
+    }
+
+    setDeleteWorkspaceBusy(true);
+    setDeleteWorkspaceError('');
+    try {
+      const response = await fetch('/api/privacy/delete-workspace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId, confirmationName: exactName, confirmationPhrase: typedPhrase }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || 'Workspace deletion failed');
+      window.localStorage.removeItem('financeos.organizationId');
+      document.cookie = 'avenor_organization_id=; Path=/; Max-Age=0; SameSite=Lax';
+      window.location.replace('/onboarding');
+    } catch (error) {
+      setDeleteWorkspaceError(error instanceof Error ? error.message : 'Workspace deletion failed');
+      setDeleteWorkspaceBusy(false);
+    }
+  }
+
   async function openBillingAction(endpoint: '/api/billing/checkout' | '/api/billing/portal') {
     if (!organizationId) return;
     setBillingBusy(true);
@@ -507,9 +630,10 @@ export default function Home() {
 
   const navGroups: { title: string; items: { label: View; title: string; icon: string }[] }[] = [
     { title: 'WORKSPACE', items: [
-      { label: 'Overview', title: 'Copilot', icon: '✳' },
+      { label: 'Overview', title: 'Avenor Intelligence', icon: '✳' },
       { label: 'CFO Brief', title: 'CFO Brief', icon: '◷' },
       { label: 'Financial overview', title: 'Financial overview', icon: '▦' },
+      { label: 'Financial planning', title: 'Forecast & unit economics', icon: '◈' },
     ] },
     { title: 'OPERATIONS', items: [
       { label: 'Business metrics', title: 'Growth metrics', icon: '↗' },
@@ -556,6 +680,10 @@ export default function Home() {
           <div className="profile-avatar">A</div>
           <div><b>Workspace account</b><small>Signed-in user</small></div>
         </div>
+        {['owner', 'admin'].includes(workspaceMemberships.find((item) => item.organization_id === organizationId)?.role ?? '') && <button className="signout-button" type="button" onClick={() => void exportWorkspaceData()} disabled={exportBusy || workspaceLoading}>
+          {exportBusy ? 'Preparing export…' : 'Export workspace data'}
+        </button>}
+        {exportError && <p className="signout-error" role="alert">{exportError}</p>}
         <button className="signout-button" type="button" onClick={() => void signOut()} disabled={signOutBusy}>
           {signOutBusy ? 'Signing out…' : 'Sign out'}
         </button>
@@ -566,7 +694,7 @@ export default function Home() {
     <section className="main-area">
       <header className="topbar"><div className="breadcrumb">{organizationName || 'Your company'} <span>/</span> {viewTitles[view]}</div><div className="top-actions"><span className="sync-status"><i/> {workspaceLoading ? 'Loading workspace' : hasModel ? (modelStatus === 'approved' ? 'Plan approved' : 'Plan needs review') : 'Company setup needed'}</span><div className="top-avatar">{organizationName.slice(0,1).toUpperCase() || 'A'}</div></div></header>
       <div className={`page-content ${view === 'Overview' ? 'copilot-page' : ''}`}>
-        {view !== 'Overview' && <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{viewTitles[view]}</h1><p>{view === 'CFO Brief' ? 'A clear management review of cash, performance, risks and recommended actions.' : view === 'Financial overview' ? 'Explore your cash position, operating forecast and the main signals in your financial plan.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit company setup <span>↗</span></button></div></div>}
+        {view !== 'Overview' && <div className="page-heading"><div><div className="overline">FINANCIAL WORKSPACE <span className="live-dot"/></div><h1>{viewTitles[view]}</h1><p>{view === 'CFO Brief' ? 'A clear management review of cash, performance, risks and recommended actions.' : view === 'Financial planning' ? 'Compare three cash trajectories, understand unit economics and prepare an investor-ready financial update.' : view === 'Financial overview' ? 'Explore your cash position, operating forecast and the main signals in your financial plan.' : view === 'Decision ledger' ? 'Review scenarios you have saved and the assumptions behind them.' : view === 'Business metrics' ? 'Track the customer and revenue metrics behind your unit economics.' : view === 'Data import' ? 'Bring transactions into your workspace for historical analysis.' : view === 'Fundraising planner' ? 'Explore dilution and the cash impact of a potential round.' : view === 'Investor reporting' ? 'Review and export a snapshot of your current financial model.' : view === 'Plan & billing' ? 'Manage your subscription and payment details securely.' : 'Maintain the assumptions used in your company forecast.'}</p></div><div className="heading-actions"><span className="period-select">Last model update <b>{modelUpdatedAt || 'Not set'}</b></span><button className="button-secondary" onClick={() => setView('Company assumptions')}>Edit company setup <span>↗</span></button></div></div>}
 
         <div className={`copilot-host ${view === 'Overview' ? 'active' : 'inactive'}`}>
           <AvenorCopilot
@@ -582,6 +710,8 @@ export default function Home() {
         </div>
 
         {view === 'CFO Brief' && organizationId && <CfoBrief organizationId={organizationId} />}
+        {view === 'Financial planning' && organizationId && hasModel && <FinancialPlanning organizationId={organizationId} organizationName={organizationName} currency={currency} inputs={inputs} modelStatus={modelStatus} />}
+        {view === 'Financial planning' && !hasModel && <section className="surface empty-state large-empty"><b>Save your financial model first</b><p>Financial planning uses your saved company assumptions. Add opening cash, revenue and operating costs before comparing the three trajectories.</p><button className="button-primary" onClick={() => setView('Company assumptions')}>Set up company assumptions →</button></section>}
         
         {view === 'Financial overview' && <>
           {workspaceLoading ? <section className="surface empty-state large-empty"><b>Loading your financial workspace…</b></section>
@@ -594,7 +724,9 @@ export default function Home() {
              <Metric label="Monthly revenue" value={money(base[0].revenue, currency)} sub={`${growth.toFixed(1)}% assumed monthly growth`} trend="positive" icon="↗" />
              <Metric label="Monthly spending" value={money(monthlyOperatingCosts, currency)} sub="Direct costs, team and other running costs" trend="neutral" icon="⌁" />
              <Metric label="How long cash may last" value={baseRunway === null ? 'Cash-flow positive' : `${baseRunway.toFixed(1)} months`} sub={baseRunway === null ? 'The current plan is not using cash each month' : 'Estimated at the current monthly cash burn'} trend={baseRunway !== null && baseRunway < 6 ? 'warning' : 'positive'} icon="◷" />
-           </div><section className="decision-intro">
+           </div>
+          <FounderPulse organizationId={organizationId} currency={currency} brief={cfoBrief} refreshKey={financialDataVersion} />
+          <section className="decision-intro">
             <div className="decision-intro-copy">
               <div className="section-kicker">THE AVENOR DIFFERENCE</div>
               <h2>Know what a decision will cost before you commit.</h2>
@@ -650,10 +782,25 @@ export default function Home() {
             <section className="surface decision-card"><div className="surface-heading"><div><div className="section-kicker">YOUR NEXT MOVES</div><h2>Decisions you have explored</h2></div><button className="text-button" onClick={() => setView('Decision ledger')}>View all →</button></div>{saved.length === 0 ? <div className="empty-state"><div className="empty-icon">⌁</div><b>No saved decisions yet</b><p>Try a hiring or growth decision. Save it here to compare options later.</p><button className="button-secondary" onClick={() => setView('Overview')}>Plan your first decision</button></div> : saved.slice(0,2).map(item => <DecisionRow key={item.id} item={item} currency={currency}/>)}</section>
           </div>
           <section className="surface table-panel cash-table-panel"><div className="surface-heading"><div><div className="section-kicker">THE NEXT SIX MONTHS</div><h2>How your cash could move month by month</h2><p>Use this breakdown to see the steps behind the forecast</p></div><button className="text-button" onClick={() => setView('Overview')}>Try a decision →</button></div><div className="table-scroll"><table><thead><tr><th>MONTH</th><th>REVENUE</th><th>NET CASH CHANGE</th><th>CASH LEFT</th><th>RUNWAY</th></tr></thead><tbody>{base.slice(0,6).map(row => <tr key={row.month}><td>Month {row.month}</td><td>{money(row.revenue, currency)}</td><td className={row.netCashFlow >= 0 ? 'positive-text' : 'negative-text'}>{row.netCashFlow > 0 ? '+' : ''}{money(row.netCashFlow, currency)}</td><td className="strong-cell">{money(row.closingCash, currency)}</td><td>{row.runwayMonths === null ? 'Cash-flow positive' : `${row.runwayMonths.toFixed(1)} mo.`}</td></tr>)}</tbody></table></div></section>
+          <FinancialOperationsHub
+            organizationId={organizationId}
+            currency={currency}
+            onOpenImport={() => setView('Data import')}
+          />
+          <FinancialOperations
+            organizationId={organizationId}
+            currency={currency}
+            forecastRows={base.slice(0, 6)}
+            decisions={saved.slice(0, 3)}
+            insightCount={insightCount}
+            onOpenImport={() => setView('Data import')}
+            onOpenBrief={() => setView('CFO Brief')}
+            onOpenDecisions={() => setView('Decision ledger')}
+          />
           </>}
         </>}
 
-        {view === 'Decision ledger' && <section className="surface ledger-surface"><div className="surface-heading"><div><div className="section-kicker">DECISION HISTORY</div><h2>Your decision ledger</h2><p>Scenarios saved for review. Saving a scenario never changes the approved base plan.</p></div><button className="button-primary" onClick={() => setView('Overview')}>＋ New scenario</button></div>{saved.length === 0 ? <div className="empty-state large-empty"><div className="empty-icon">▤</div><b>Your ledger is ready</b><p>Once you save a scenario, it will appear here with its assumptions and projected cash impact.</p><button className="button-primary" onClick={() => setView('Overview')}>Build your first scenario →</button></div> : <div className="ledger-list">{saved.map(item => <DecisionRow key={item.id} item={item} detailed currency={currency}/>)}</div>}</section>}
+        {view === 'Decision ledger' && <section className="surface ledger-surface"><div className="surface-heading"><div><div className="section-kicker">DECISION HISTORY</div><h2>Your decision ledger</h2><p>Scenarios saved for review. Saving a scenario never changes the approved base plan.</p></div><button className="button-primary" onClick={() => setView('Overview')}>＋ New scenario</button></div>{saved.length === 0 ? <div className="empty-state large-empty"><div className="empty-icon">▤</div><b>Your ledger is ready</b><p>Once you save a scenario, it will appear here with its assumptions and projected cash impact.</p><button className="button-primary" onClick={() => setView('Overview')}>Build your first scenario →</button></div> : <div className="ledger-list">{saved.map(item => <DecisionRow key={item.id} item={item} detailed currency={currency} organizationId={organizationId}/>)}</div>}</section>}
 
         {view === 'Company assumptions' && <>
           <section className="surface assumptions-surface company-context-surface">
@@ -722,11 +869,75 @@ export default function Home() {
           </div>
         </section>}
 
-        {view === 'Data import' && <section className="surface assumptions-surface"><div className="section-kicker">FINANCIAL DATA INGESTION</div><h2>Import your transactions</h2><p className="form-intro">{actualsCount} records are currently stored in this workspace. Imported actuals are kept separately and are not yet included in the forecast.</p><p className="form-intro">Upload a bank or accounting CSV export. Supported formats: comma, semicolon or tab separated; dates in YYYY-MM-DD or DD/MM/YYYY format; either Amount or separate Debit/Credit columns. Optional: Description, Category and Currency/Devise. If no currency is supplied, the workspace currency is used.</p><label className="number-field"><span>CSV file</span><input type="file" accept=".csv,text/csv" onChange={async e=>{setImportError('');setImportRows([]);const f=e.target.files?.[0];if(!f)return;try{if(f.size>2_000_000)throw new Error('Maximum file size is 2 MB');const {normalizeActuals}=await import('@/lib/csv');setImportRows(normalizeActuals(await f.text(),f.name));}catch(err){setImportError(err instanceof Error?err.message:'Could not parse CSV');}}}/></label>{importError&&<p className="warning-text">{importError}</p>}{importRows.length>0&&<><p><b>{importRows.length}</b> records ready for import · {importTotalsByCurrency.map((total) => `${money(total.inflows, total.currency)} inflows · ${money(total.outflows, total.currency)} outflows`).join(' · ')}</p><div className="ledger-list">{importRows.slice(0,5).map((r,i)=><div className="decision-row" key={`${r.period}-${i}`}><div className="decision-icon">{r.direction==='inflow'?'↗':'↘'}</div><div className="decision-copy"><b>{r.description||r.category}</b><span>{r.period} · {r.category}</span></div><div className="decision-impact"><b>{money(r.amount, r.currency ?? currency)}</b><small>{r.direction} · {r.currency ?? currency}</small></div></div>)}</div><button className="button-primary" disabled={importBusy} onClick={async()=>{setImportBusy(true);try{const organizationId=localStorage.getItem('financeos.organizationId');if(!organizationId)throw new Error('Create or select an authenticated workspace first.');const csvText=await new Promise<string>((resolve,reject)=>{const f=(document.querySelector('input[type=file]') as HTMLInputElement)?.files?.[0];if(!f){reject(new Error('Select a CSV file'));return;}f.text().then(resolve,reject);});const res=await fetch('/api/actuals/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({organizationId,csv:csvText})});const data=await res.json();if(!res.ok)throw new Error(data.error||'Import failed');setToast(`${data.imported} records imported · ${data.skipped} duplicates skipped`);const actualsResponse=await fetch(`/api/actuals?organizationId=${encodeURIComponent(organizationId)}`,{cache:'no-store'});if(actualsResponse.ok){const actualsData=await actualsResponse.json();setActualsCount((actualsData.actuals??[]).length);}setImportRows([]);}catch(err){setImportError(err instanceof Error?err.message:'Import failed');}finally{setImportBusy(false);}}}>{importBusy?'Importing…':'Import records to workspace →'}</button></>}</section>}
+        {view === 'Data import' && <section className="surface assumptions-surface"><div className="section-kicker">FINANCIAL DATA INGESTION</div><h2>Import your transactions</h2><p className="form-intro">{actualsCount} records are currently stored in this workspace. Imported actuals are kept separately and are not yet included in the forecast.</p><p className="form-intro">Upload a bank or accounting CSV export. Supported formats: comma, semicolon or tab separated; dates in YYYY-MM-DD or DD/MM/YYYY format; either Amount or separate Debit/Credit columns. Optional: Description, Category and Currency/Devise. If no currency is supplied, the workspace currency is used.</p><label className="number-field"><span>CSV file</span><input type="file" accept=".csv,text/csv" onChange={async e=>{setImportError('');setImportRows([]);const f=e.target.files?.[0];if(!f)return;try{if(f.size>2_000_000)throw new Error('Maximum file size is 2 MB');const {normalizeActuals}=await import('@/lib/csv');setImportRows(normalizeActuals(await f.text(),f.name));}catch(err){setImportError(err instanceof Error?err.message:'Could not parse CSV');}}}/></label>{importError&&<p className="warning-text">{importError}</p>}{importRows.length>0&&<><p><b>{importRows.length}</b> records ready for import · {importTotalsByCurrency.map((total) => `${money(total.inflows, total.currency)} inflows · ${money(total.outflows, total.currency)} outflows`).join(' · ')}</p><div className="ledger-list">{importRows.slice(0,5).map((r,i)=><div className="decision-row" key={`${r.period}-${i}`}><div className="decision-icon">{r.direction==='inflow'?'↗':'↘'}</div><div className="decision-copy"><b>{r.description||r.category}</b><span>{r.period} · {r.category}</span></div><div className="decision-impact"><b>{money(r.amount, r.currency ?? currency)}</b><small>{r.direction} · {r.currency ?? currency}</small></div></div>)}</div><button className="button-primary" disabled={importBusy} onClick={async()=>{setImportBusy(true);try{const organizationId=localStorage.getItem('financeos.organizationId');if(!organizationId)throw new Error('Create or select an authenticated workspace first.');const csvText=await new Promise<string>((resolve,reject)=>{const f=(document.querySelector('input[type=file]') as HTMLInputElement)?.files?.[0];if(!f){reject(new Error('Select a CSV file'));return;}f.text().then(resolve,reject);});const res=await fetch('/api/actuals/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({organizationId,csv:csvText})});const data=await res.json();if(!res.ok)throw new Error(data.error||'Import failed');setToast(`${data.imported} records imported · ${data.skipped} duplicates skipped`);const actualsResponse=await fetch(`/api/actuals?organizationId=${encodeURIComponent(organizationId)}`,{cache:'no-store'});if(actualsResponse.ok){const actualsData=await actualsResponse.json();setActualsCount((actualsData.actuals??[]).length);}window.dispatchEvent(new CustomEvent('avenor:financial-data-updated'));setImportRows([]);}catch(err){setImportError(err instanceof Error?err.message:'Import failed');}finally{setImportBusy(false);}}}>{importBusy?'Importing…':'Import records to workspace →'}</button></>}</section>}
 
         {view === 'Fundraising planner' && <section className="surface assumptions-surface"><div className="section-kicker">FUNDRAISING INTELLIGENCE</div><h2>Model your next round</h2><p className="form-intro">Estimate dilution and cash runway after a hypothetical equity raise. This is a simplified planning calculator, not a valuation opinion.</p><div className="form-grid"><NumberField label="Amount to raise" value={raiseAmount} set={setRaiseAmount} min={0} max={100000000} step={50000} prefix={currencySymbol}/><NumberField label="Company value before investment" value={preMoney} set={setPreMoney} min={1} max={1000000000} step={250000} prefix={currencySymbol}/></div><div className="metric-grid"><Metric label="Estimated company value after investment" value={money(preMoney+raiseAmount, currency)} sub="Value before investment + new capital" trend="neutral" icon="◇"/><Metric label="Share owned by new investors" value={`${(raiseAmount/(preMoney+raiseAmount)*100).toFixed(1)}%`} sub="Before option-pool adjustments" trend="neutral" icon="%"/><Metric label="Cash after funding" value={money(cash+raiseAmount, currency)} sub="Excludes fees and other financing" trend="positive" icon="↗"/><Metric label="How long cash could last" value={base[0].netCashFlow<0?`${((cash+raiseAmount)/Math.abs(base[0].netCashFlow)).toFixed(1)} months`:'Cash positive'} sub="Flat current monthly net burn assumption" trend="neutral" icon="◷"/></div><p className="form-intro">This calculation assumes a simple priced equity round, no convertibles, no option-pool increase, no fees and no other dilution. Validate with legal and finance advisers.</p></section>}
 
-        {view === 'Investor reporting' && <section className="surface ledger-surface"><div className="section-kicker">INVESTOR REPORTING</div><h2>Monthly financial snapshot</h2><p className="form-intro">A simple export from the current model assumptions. Do not share as actual company reporting until connected to verified company data.</p><div className="metric-grid"><Metric label="Monthly revenue" value={money(revenue, currency)} sub="Model assumption" trend="neutral" icon="↗"/><Metric label="Gross margin" value={`${((1-cogs/100)*100).toFixed(1)}%`} sub="Sales less direct costs" trend="neutral" icon="%"/><Metric label="Monthly net cash flow" value={money(base[0].netCashFlow, currency)} sub="Current model month" trend="neutral" icon="⌁"/><Metric label="Month 18 cash" value={money(baseSummary.endingCash, currency)} sub="Base case forecast" trend="neutral" icon="◈"/></div><button className="button-primary" onClick={()=>{const rows=['Month,Revenue,COGS,Payroll,Operating expenses,Net cash flow,Closing cash',...base.map(r=>[r.month,r.revenue,r.cogs,r.payroll,r.nonPayrollOpex,r.netCashFlow,r.closingCash].join(','))];const blob=new Blob([rows.join('\n')],{type:'text/csv'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='financeos-18-month-forecast.csv';a.click();URL.revokeObjectURL(url);}}>Export 18-month forecast CSV ↓</button></section>}
+        {view === 'Investor reporting' && <section className="surface ledger-surface">
+          <div className="section-kicker">INVESTOR REPORTING</div>
+          <h2>Monthly financial snapshot</h2>
+          <p className="form-intro">Prepare a concise update from your current plan, CFO signals and saved decisions. Figures remain forecasts until verified against company records.</p>
+          <div className="metric-grid">
+            <Metric label="Monthly revenue" value={money(revenue, currency)} sub="Model assumption" trend="neutral" icon="↗"/>
+            <Metric label="Gross margin" value={`${((1-cogs/100)*100).toFixed(1)}%`} sub="Sales less direct costs" trend="neutral" icon="%"/>
+            <Metric label="Monthly net cash flow" value={money(base[0].netCashFlow, currency)} sub="Current model month" trend="neutral" icon="⌁"/>
+            <Metric label="Month 18 cash" value={money(baseSummary.endingCash, currency)} sub="Base case forecast" trend="neutral" icon="◈"/>
+          </div>
+          <div className="billing-actions">
+            <button className="button-primary" onClick={() => {
+              const report = buildInvestorUpdateMarkdown({
+                companyName: organizationName || 'Your company',
+                currency,
+                generatedAt: new Date(),
+                openingCash: cash,
+                monthlyRevenue: revenue,
+                grossMarginPct: (1 - cogs / 100) * 100,
+                monthlyNetCashFlow: base[0].netCashFlow,
+                forecastEndingCash: baseSummary.endingCash,
+                forecast: base.map((row) => ({
+                  month: row.month,
+                  revenue: row.revenue,
+                  cogs: row.cogs,
+                  payroll: row.payroll,
+                  operatingExpenses: row.nonPayrollOpex,
+                  netCashFlow: row.netCashFlow,
+                  closingCash: row.closingCash,
+                })),
+                alerts: (cfoBrief?.alerts ?? []).map((alert) => ({
+                  severity: alert.severity,
+                  title: alert.title,
+                  description: alert.description,
+                })),
+                decisions: saved.map((decision) => ({
+                  title: decision.title,
+                  status: decision.status,
+                  owner: decision.owner,
+                  reviewDate: decision.reviewDate,
+                  actualOutcomeNote: decision.actualOutcomeNote,
+                })),
+              });
+              const blob = new Blob([report], { type: 'text/markdown;charset=utf-8' });
+              const url = URL.createObjectURL(blob);
+              const anchor = document.createElement('a');
+              anchor.href = url;
+              anchor.download = `avenor-investor-update-${new Date().toISOString().slice(0, 10)}.md`;
+              anchor.click();
+              URL.revokeObjectURL(url);
+            }}>Download investor update ↓</button>
+            <button className="button-secondary" onClick={() => {
+              const rows = ['Month,Revenue,COGS,Payroll,Operating expenses,Net cash flow,Closing cash', ...base.map((row) =>
+                [row.month, row.revenue, row.cogs, row.payroll, row.nonPayrollOpex, row.netCashFlow, row.closingCash].join(','),
+              )];
+              const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+              const url = URL.createObjectURL(blob);
+              const anchor = document.createElement('a');
+              anchor.href = url;
+              anchor.download = 'avenor-18-month-forecast.csv';
+              anchor.click();
+              URL.revokeObjectURL(url);
+            }}>Export forecast CSV ↓</button>
+          </div>
+        </section>}
 
         {view === 'Plan & billing' && <section className="surface billing-surface">
           <div className="section-kicker">ACCOUNT & SUBSCRIPTION</div>
@@ -758,6 +969,16 @@ export default function Home() {
           </>}
           {billingError && <p className="warning-text" role="alert">{billingError}</p>}
           <p className="billing-footnote">No payment is taken from this screen. You will be redirected to Stripe to review and confirm any payment.</p>
+          {workspaceMemberships.find((item) => item.organization_id === organizationId)?.role === 'owner' && <section className="surface danger-zone">
+            <div className="section-kicker">DATA CONTROL</div>
+            <h3>Export or delete this workspace</h3>
+            <p className="form-intro">Export a JSON copy before deletion. Deleting a workspace cancels any linked Stripe subscription and removes the workspace's active records, models, scenarios, Copilot history and team memberships. Provider backups and legally required billing records may remain until their separate retention periods expire.</p>
+            <div className="billing-actions">
+              <button className="button-secondary" disabled={exportBusy || deleteWorkspaceBusy} onClick={() => void exportWorkspaceData()}>{exportBusy ? 'Preparing export…' : 'Export workspace data'}</button>
+              <button className="button-secondary" disabled={deleteWorkspaceBusy || workspaceLoading} onClick={() => void deleteWorkspaceData()}>{deleteWorkspaceBusy ? 'Deleting workspace…' : 'Delete workspace and data'}</button>
+            </div>
+            {deleteWorkspaceError && <p className="warning-text" role="alert">{deleteWorkspaceError}</p>}
+          </section>}
         </section>}
 
         {view !== 'Overview' && <footer className="app-footer"><span>Avenor <b>·</b> Private beta</span><span>{hasModel ? (modelStatus === 'approved' ? 'Approved financial model' : 'Draft financial model') : 'Financial model not configured'} · Not accounting or tax advice</span></footer>}
@@ -772,13 +993,64 @@ function Metric({label,value,sub,trend,icon}:{label:string;value:string;sub:stri
 function KpiField({label,value,set,min,max,step}:{label:string;value:string;set:(v:string)=>void;min?:string;max?:string;step?:string}) { return <label className="number-field"><span>{label}</span><div className="number-input"><input type="number" min={min} max={max} step={step} value={value} placeholder="Not provided" onChange={e=>set(e.target.value)}/></div></label>; }
 function NumberField({label,value,set,min,max,step=1,prefix,suffix}:{label:string;value:number;set:(n:number)=>void;min:number;max:number;step?:number;prefix?:string;suffix?:string}) { return <label className="number-field"><span>{label}</span><div className="number-input">{prefix && <i>{prefix}</i>}<input type="number" min={min} max={max} step={step} value={value} onChange={e=>set(Math.max(min,Math.min(max,Number(e.target.value))))}/>{suffix && <i>{suffix}</i>}</div></label>; }
 function CompareBar({label,value,max,currency="EUR"}:{label:string;value:number;max:number;currency?:string}) { return <div className="compare-row"><div><span>{label}</span><b>{money(value,currency)}</b></div><div className="bar-track"><i style={{width:`${Math.max(0,Math.min(100,value/max*100))}%`}}/></div></div>; }
-function DecisionRow({item,detailed=false,currency="EUR"}:{item:SavedDecision;detailed?:boolean;currency?:string}) {
+function DecisionRow({item,detailed=false,currency="EUR",organizationId=""}:{item:SavedDecision;detailed?:boolean;currency?:string;organizationId?:string}) {
   const amount = item.cashImpact;
+  const [owner,setOwner] = useState(item.owner);
+  const [reviewDate,setReviewDate] = useState(item.reviewDate);
+  const [status,setStatus] = useState<SavedDecision['status']>(item.status);
+  const [actualEndingCash,setActualEndingCash] = useState(item.actualEndingCash === null ? '' : String(item.actualEndingCash));
+  const [actualOutcomeNote,setActualOutcomeNote] = useState(item.actualOutcomeNote);
+  const [trackingBusy,setTrackingBusy] = useState(false);
+  const [trackingError,setTrackingError] = useState('');
+  const [trackingSaved,setTrackingSaved] = useState(false);
+  async function saveTracking() {
+    if (!organizationId) return;
+    setTrackingBusy(true); setTrackingError(''); setTrackingSaved(false);
+    try {
+      const response = await fetch('/api/scenarios', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          organizationId,
+          scenarioId: item.id,
+          owner,
+          reviewDate: reviewDate || null,
+          status,
+          actualEndingCash: actualEndingCash.trim() === '' ? null : Number(actualEndingCash),
+          actualOutcomeNote,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || 'Could not update this decision');
+      setTrackingSaved(true);
+    } catch (error) {
+      setTrackingError(error instanceof Error ? error.message : 'Could not update this decision');
+    } finally { setTrackingBusy(false); }
+  }
+  const actualDelta = actualEndingCash.trim() !== '' && item.forecastEndingCash !== null
+    ? Number(actualEndingCash) - item.forecastEndingCash
+    : null;
   return <div className="decision-row">
     <div className="decision-icon">⌁</div>
     <div className="decision-copy">
       <b>{item.title}</b><span>{item.detail}</span>
-      {detailed && <small>Saved {item.created} · Scenario preserved independently of base plan</small>}
+      {detailed && <>
+        <small>Saved {item.created} · Scenario preserved independently of base plan</small>
+        <div className="form-grid" style={{marginTop:12,gridTemplateColumns:'repeat(2,minmax(0,1fr))'}}>
+          <label className="number-field"><span>Owner</span><input maxLength={120} value={owner} onChange={event=>setOwner(event.target.value)} placeholder="Assign a responsible person"/></label>
+          <label className="number-field"><span>Review date</span><input type="date" value={reviewDate} onChange={event=>setReviewDate(event.target.value)}/></label>
+          <label className="number-field"><span>Decision status</span><select value={status} onChange={event=>setStatus(event.target.value as SavedDecision['status'])}><option value="planned">Planned</option><option value="in_progress">In progress</option><option value="reviewed">Reviewed</option><option value="completed">Completed</option><option value="paused">Paused</option></select></label>
+          <label className="number-field"><span>Actual ending cash at review horizon ({currency})</span><input type="number" value={actualEndingCash} onChange={event=>setActualEndingCash(event.target.value)} placeholder="Add when known"/></label>
+        </div>
+        {actualDelta !== null && Number.isFinite(actualDelta) && <small className={actualDelta < 0 ? 'negative-text' : 'positive-text'}>Actual vs scenario forecast: {actualDelta > 0 ? '+' : ''}{money(actualDelta,currency)}</small>}
+        <small>Enter actual cash for the same forecast horizon as the saved scenario to make the comparison meaningful.</small>
+        <label className="number-field" style={{display:'block',marginTop:8}}><span>Outcome / review notes</span><textarea rows={2} maxLength={1000} value={actualOutcomeNote} onChange={event=>setActualOutcomeNote(event.target.value)} placeholder="What happened compared with the original assumptions?"/></label>
+        <div className="assumption-actions" style={{marginTop:8}}>
+          <button className="button-secondary" type="button" disabled={trackingBusy} onClick={()=>void saveTracking()}>{trackingBusy?'Saving…':'Save review details'}</button>
+          {trackingSaved && <span>Review details saved</span>}
+        </div>
+        {trackingError && <small className="warning-text" role="alert">{trackingError}</small>}
+      </>}
     </div>
     <div className="decision-impact">
       {amount === null ? (
