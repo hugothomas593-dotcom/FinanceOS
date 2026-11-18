@@ -22,7 +22,7 @@ export async function GET(request: Request) {
     if (error) return NextResponse.json({ error: 'Could not load financial connections' }, { status: 500 });
     const configured = Boolean(process.env.POWENS_DOMAIN && process.env.POWENS_CLIENT_ID && process.env.POWENS_CLIENT_SECRET
       && process.env.AVENOR_CONNECTION_ENCRYPTION_KEY && process.env.SUPABASE_SERVICE_ROLE_KEY);
-    return NextResponse.json({ connections: data ?? [], provider: 'powens', configured });
+    return NextResponse.json({ connections: data ?? [], provider: 'powens', configured, scheduledSyncConfigured: Boolean(process.env.CRON_SECRET?.trim()) });
   } catch (error) {
     const message = error instanceof Error ? error.message : '';
     const unauthenticated = message === 'UNAUTHENTICATED';

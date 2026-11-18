@@ -18,7 +18,7 @@ Avenor has one subscription only: **Avenor Founder — €59/month**. Eligible f
 1. Use Node.js 22 or later (the current AI SDK tool-loop runtime is validated with Node 22).
 2. Create a Supabase project.
 3. Copy `.env.example` to `.env.local` and configure Supabase URL and anon key.
-4. On a fresh Supabase project, run `supabase/FINANCEOS_SETUP_ALL.sql` once (baseline through migration 011), then apply migrations `012_api_rate_limits.sql` through `015_one_approved_model_per_workspace.sql` in numerical order. For an existing project already migrated through 011, apply only migrations 012–015. Do not rerun the setup-all script on an existing database.
+4. On a fresh Supabase project, run `supabase/FINANCEOS_SETUP_ALL.sql` once (baseline through migration 011), then apply migrations `012_api_rate_limits.sql` through `018_optimize_financial_operations_rls_and_indexes.sql` in numerical order. The current release branch includes financial operations (`016`) and least-privilege and financial-operation hardening (`017`–`018`). For an existing project already migrated through 011, apply only migrations 012–018; if it is already through 016, apply only 017–018. Do not rerun the setup-all script on an existing database.
 5. Run `npm install`, then `npm run dev`.
 6. Open `/login`, create an account, confirm the email, and create a company at `/onboarding`.
 

@@ -774,3 +774,16 @@
 .proactiveNudge b { color:#6f592e; font-size:10px; }
 .proactiveNudge small { color:#927d56; font-size:8px; line-height:1.4; }
 .proactiveNudge>strong { flex:none; color:#856831; font-size:9px; }
+
+.decisionComparison{display:grid;gap:8px;margin-top:12px;padding:12px;border:1px solid #e1e9e1;border-radius:8px;background:#fbfdfb}
+.comparisonHeading{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.comparisonHeading strong{color:#294534;font-size:10px}
+.comparisonHeading span{color:#89968e;font-size:8px}
+.comparisonTableWrap{width:100%;overflow-x:auto}
+.comparisonTable{width:100%;border-collapse:collapse;white-space:nowrap}
+.comparisonTable th{padding:8px 7px;border-bottom:1px solid #e7eee8;color:#8a978e;font-size:8px;text-align:left}
+.comparisonTable td{padding:8px 7px;border-bottom:1px solid #edf2ee;color:#5b6d60;font-size:9px;text-align:left}
+.comparisonTable tr:last-child td{border-bottom:0}
+.comparisonPositive{color:#347451!important;font-weight:700}
+.comparisonNegative{color:#b24e46!important;font-weight:700}
+.decisionComparison>p{margin:0;color:#89968e;font-size:8px;line-height:1.5}

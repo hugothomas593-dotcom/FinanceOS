@@ -202,6 +202,181 @@ export function simulateFinancialDecision(inputs: ModelInputs, change: DecisionC
   };
 }
 
+export function compareFinancialScenarios(inputs: ModelInputs, scenarios: DecisionChange[]) {
+  if (scenarios.length < 2 || scenarios.length > 4) {
+    throw new Error('Compare between two and four financial scenarios.');
+  }
+
+  const results = scenarios.map((scenario) => simulateFinancialDecision(inputs, scenario));
+  const comparison = results.map((result) => ({
+    name: result.name,
+    assumptionsApplied: result.assumptionsApplied,
+    endingCash: result.scenario.endingCash,
+    endingCashDelta: result.impact.endingCash,
+    minimumCash: result.scenario.minimumForecastCash,
+    firstNegativeCashMonth: result.impact.firstNegativeCashMonth,
+    firstBelowSixMonthsRunway: result.impact.firstBelowSixMonthsRunway,
+  }));
+  const rankedByEndingCash = [...comparison]
+    .sort((left, right) => right.endingCash - left.endingCash)
+    .map((item, index) => ({ name: item.name, rank: index + 1, endingCash: item.endingCash }));
+
+  return {
+    baseline: results[0].base,
+    scenarios: comparison,
+    rankedByEndingCash,
+    interpretationNote: 'The ranking uses ending cash only. It is not a complete ranking of strategic merit, execution risk, customer impact or long-term value.',
+    caveats: results[0].caveats,
+  };
+}
+
+
+export type CombinedDecisionAction = {
+  name: string;
+  startMonth: number;
+  durationMonths?: number;
+  revenueChangePct?: number;
+  monthlyOpexChange?: number;
+  monthlyPayrollChange?: number;
+  hiring?: {
+    headcount: number;
+    grossAnnualSalary: number;
+    employerCostRate: number;
+    benefitsMonthlyPerPerson?: number;
+    recruitingCostPerPerson?: number;
+    equipmentCostPerPerson?: number;
+  };
+  grossMarginChangePp?: number;
+  monthlyOtherCashFlowChange?: number;
+  oneTimeCashImpact?: number;
+  oneTimeMonth?: number;
+};
+
+export function simulateCombinedFinancialDecision(
+  inputs: ModelInputs,
+  actions: CombinedDecisionAction[],
+  horizonMonths = 18,
+  targetRunwayMonths = 12,
+) {
+  if (actions.length < 2 || actions.length > 8) {
+    throw new Error('A combined decision must contain between two and eight actions.');
+  }
+  if (!Number.isInteger(horizonMonths) || horizonMonths < 1 || horizonMonths > 36) {
+    throw new Error('Forecast horizon must be an integer between 1 and 36 months.');
+  }
+  if (!Number.isFinite(targetRunwayMonths) || targetRunwayMonths < 1 || targetRunwayMonths > 36) {
+    throw new Error('Target runway must be between 1 and 36 months.');
+  }
+
+  const normalized = actions.map((action, index) => {
+    const startMonth = action.startMonth;
+    const durationMonths = action.durationMonths ?? (horizonMonths - startMonth + 1);
+    if (!action.name.trim() || !Number.isInteger(startMonth) || startMonth < 1 || startMonth > horizonMonths) {
+      throw new Error(`Action ${index + 1} needs a name and a start month within the forecast horizon.`);
+    }
+    if (!Number.isInteger(durationMonths) || durationMonths < 1 || startMonth + durationMonths - 1 > horizonMonths) {
+      throw new Error(`Action ${index + 1} has a duration outside the forecast horizon.`);
+    }
+    const oneTimeMonth = action.oneTimeMonth ?? startMonth;
+    if (!Number.isInteger(oneTimeMonth) || oneTimeMonth < 1 || oneTimeMonth > horizonMonths) {
+      throw new Error(`Action ${index + 1} has a one-off cash month outside the forecast horizon.`);
+    }
+    const revenueMultiplier = 1 + (action.revenueChangePct ?? 0) / 100;
+    if (revenueMultiplier < 0 || revenueMultiplier > 10) {
+      throw new Error(`Action ${index + 1} revenue multiplier must remain between 0x and 10x.`);
+    }
+    if (action.hiring && (!Number.isInteger(action.hiring.headcount) || action.hiring.headcount < 1 || action.hiring.headcount > 500
+      || action.hiring.grossAnnualSalary < 0 || action.hiring.employerCostRate < 0 || action.hiring.employerCostRate > 3
+      || (action.hiring.benefitsMonthlyPerPerson ?? 0) < 0 || (action.hiring.recruitingCostPerPerson ?? 0) < 0
+      || (action.hiring.equipmentCostPerPerson ?? 0) < 0)) {
+      throw new Error(`Action ${index + 1} has invalid hiring assumptions.`);
+    }
+    const hiringMonthlyCost = action.hiring
+      ? action.hiring.headcount * (action.hiring.grossAnnualSalary * (1 + action.hiring.employerCostRate) / 12 + (action.hiring.benefitsMonthlyPerPerson ?? 0))
+      : 0;
+    const hiringOneOffCost = action.hiring
+      ? action.hiring.headcount * ((action.hiring.recruitingCostPerPerson ?? 0) + (action.hiring.equipmentCostPerPerson ?? 0))
+      : 0;
+    return { ...action, startMonth, durationMonths, oneTimeMonth, revenueMultiplier, hiringMonthlyCost, hiringOneOffCost };
+  });
+
+  const baseRows = forecast(inputs, [], horizonMonths);
+  let closingCash = inputs.openingCash;
+  const scenarioRows: MonthResult[] = baseRows.map((baseRow) => {
+    const active = normalized.filter((action) =>
+      baseRow.month >= action.startMonth &&
+      baseRow.month < action.startMonth + action.durationMonths,
+    );
+    const revenueMultiplier = active.reduce((multiplier, action) => multiplier * action.revenueMultiplier, 1);
+    if (revenueMultiplier > 10) throw new Error('Combined revenue uplift cannot exceed 10x the baseline.');
+    const grossMargin = (1 - inputs.cogsRatio) + active.reduce((sum, action) => sum + (action.grossMarginChangePp ?? 0) / 100, 0);
+    if (grossMargin < 0 || grossMargin > 1) {
+      throw new Error(`Combined gross-margin assumptions produce an invalid margin in month ${baseRow.month}.`);
+    }
+    const revenue = baseRow.revenue * revenueMultiplier;
+    const cogs = revenue * (1 - grossMargin);
+    const nonPayrollOpex = baseRow.nonPayrollOpex + active.reduce((sum, action) => sum + (action.monthlyOpexChange ?? 0), 0);
+    const payroll = baseRow.payroll + active.reduce((sum, action) => sum + (action.monthlyPayrollChange ?? 0) + action.hiringMonthlyCost, 0);
+    if (nonPayrollOpex < 0 || payroll < 0) {
+      throw new Error(`Combined decisions reduce operating costs below zero in month ${baseRow.month}; check the supplied assumptions.`);
+    }
+    const oneOffCashImpact = normalized.reduce(
+      (sum, action) => sum + (action.oneTimeMonth === baseRow.month ? (action.oneTimeCashImpact ?? 0) - action.hiringOneOffCost : 0),
+      0,
+    );
+    const monthlyOtherCashFlowChange = active.reduce((sum, action) => sum + (action.monthlyOtherCashFlowChange ?? 0), 0);
+    const netCashFlow = revenue - cogs - nonPayrollOpex - payroll - baseRow.hiringOneOffCosts
+      + inputs.existingOtherNetCashAdjustments + monthlyOtherCashFlowChange + oneOffCashImpact;
+    closingCash += netCashFlow;
+    const burn = Math.max(0, -netCashFlow);
+    return {
+      ...baseRow,
+      revenue,
+      cogs,
+      grossProfit: revenue - cogs,
+      grossMargin: revenue > 0 ? grossMargin : null,
+      nonPayrollOpex,
+      payroll,
+      netCashFlow,
+      closingCash,
+      burn,
+      runwayMonths: burn > 0 ? Math.max(0, closingCash) / burn : null,
+    };
+  });
+
+  const base = summarize(baseRows);
+  const scenario = summarize(scenarioRows);
+  const firstBelowTargetRunway = scenarioRows.find(
+    (row) => row.runwayMonths !== null && row.runwayMonths < targetRunwayMonths,
+  )?.month ?? null;
+
+  return {
+    actions: normalized.map(({ revenueMultiplier, hiringMonthlyCost, hiringOneOffCost, ...action }) => action),
+    assumptions: { horizonMonths, targetRunwayMonths },
+    base,
+    scenario,
+    impact: {
+      endingCashDelta: scenario.endingCash - base.endingCash,
+      minimumCashDelta: scenario.minimumForecastCash - base.minimumForecastCash,
+      firstNegativeCashMonth: scenario.firstMonthCashNegative,
+      firstBelowTargetRunwayMonth: firstBelowTargetRunway,
+    },
+    monthlyComparison: scenarioRows.map((row, index) => ({
+      month: row.month,
+      baseClosingCash: baseRows[index].closingCash,
+      scenarioClosingCash: row.closingCash,
+      cashDifference: row.closingCash - baseRows[index].closingCash,
+      scenarioNetCashFlow: row.netCashFlow,
+      scenarioRunwayMonths: row.runwayMonths,
+    })),
+    caveats: [
+      'Combined actions are modeled together against the same saved baseline, with monthly changes applied from each action start month.',
+      'Revenue uplift, gross-margin changes and all cost assumptions are user-supplied; no productivity or growth benefit is inferred from hiring.',
+      'This simplified cash forecast excludes tax, VAT timing, debt schedules, working capital, deferred revenue, capex depreciation and FX unless explicitly included in supplied cash-flow adjustments.',
+    ],
+  };
+}
+
 export function simulateHiringDecision(inputs: ModelInputs, hire: HireInput, horizonMonths = 18) {
   const baseRows = forecast(inputs, [], horizonMonths);
   const scenarioRows = forecast(inputs, [hire], horizonMonths);

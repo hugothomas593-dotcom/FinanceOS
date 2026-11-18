@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   analyzeHistoricalActuals,
+  compareFinancialScenarios,
+  simulateCombinedFinancialDecision,
   calculateAffordableInvestment,
   calculateBreakEven,
   calculateFundraisingImpact,
@@ -11,6 +13,7 @@ import {
   simulateHiringDecision,
 } from '../src/lib/finance-intelligence';
 import type { ModelInputs } from '../src/lib/finance';
+import { buildCfoBrief } from '../src/lib/cfo-brief';
 
 const inputs: ModelInputs = {
   openingCash: 1_000_000,
@@ -34,6 +37,72 @@ describe('Avenor financial intelligence', () => {
     expect(result.impact.endingCash).toBe(-115_000);
     expect(result.monthlyComparison[0].cashDifference).toBe(-5_000);
     expect(result.monthlyComparison[1].cashDifference).toBe(-35_000);
+  });
+
+  it('compares two to four scenarios against the same financial baseline', () => {
+    const result = compareFinancialScenarios(inputs, [
+      { name: 'Keep current plan' },
+      { name: 'Hire two engineers', monthlyPayrollChange: 13_700 },
+      { name: 'Delay hiring', oneTimeCashImpact: -7_000, oneTimeMonth: 4 },
+    ]);
+
+    expect(result.scenarios).toHaveLength(3);
+    expect(result.scenarios[0].endingCashDelta).toBe(0);
+    expect(result.scenarios[1].endingCashDelta).toBeLessThan(result.scenarios[0].endingCashDelta);
+    expect(result.rankedByEndingCash[0].name).toBe('Keep current plan');
+    expect(result.interpretationNote).toContain('ending cash only');
+  });
+
+  it('rejects scenario comparisons outside the two-to-four option range', () => {
+    expect(() => compareFinancialScenarios(inputs, [{ name: 'Only one option' }])).toThrow('Compare between two and four');
+    expect(() => compareFinancialScenarios(inputs, Array.from({ length: 5 }, (_, index) => ({ name: 'Option ' + index })))).toThrow('Compare between two and four');
+  });
+
+  it('models linked hiring and marketing actions together with their own start dates', () => {
+    const result = simulateCombinedFinancialDecision(inputs, [
+      { name: 'Increase marketing', startMonth: 1, monthlyOpexChange: 5_000 },
+      { name: 'Hire two engineers', startMonth: 2, durationMonths: 3, monthlyPayrollChange: 10_000, oneTimeCashImpact: -20_000 },
+    ], 18, 12);
+
+    expect(result.actions).toHaveLength(2);
+    expect(result.monthlyComparison[0].cashDifference).toBe(-5_000);
+    expect(result.monthlyComparison[1].cashDifference).toBe(-40_000);
+    expect(result.monthlyComparison[3].cashDifference).toBe(-70_000);
+    expect(result.monthlyComparison[4].cashDifference).toBe(-75_000);
+    expect(result.impact.endingCashDelta).toBe(-140_000);
+  });
+
+  it('derives fully loaded hiring and one-off recruitment costs in a combined plan', () => {
+    const result = simulateCombinedFinancialDecision(inputs, [
+      { name: 'Increase marketing', startMonth: 1, monthlyOpexChange: 5_000 },
+      {
+        name: 'Hire two engineers',
+        startMonth: 2,
+        hiring: {
+          headcount: 2,
+          grossAnnualSalary: 60_000,
+          employerCostRate: 0.35,
+          benefitsMonthlyPerPerson: 100,
+          recruitingCostPerPerson: 2_000,
+          equipmentCostPerPerson: 1_500,
+        },
+      },
+    ], 18, 12);
+
+    expect(result.monthlyComparison[0].cashDifference).toBe(-5_000);
+    expect(result.monthlyComparison[1].cashDifference).toBe(-30_700);
+    expect(result.impact.endingCashDelta).toBe(-329_900);
+  });
+
+  it('rejects combined plans with impossible cost or gross-margin assumptions', () => {
+    expect(() => simulateCombinedFinancialDecision(inputs, [
+      { name: 'Cut all costs', startMonth: 1, monthlyOpexChange: -50_000 },
+      { name: 'Another action', startMonth: 1 },
+    ])).toThrow('below zero');
+    expect(() => simulateCombinedFinancialDecision(inputs, [
+      { name: 'Margin uplift', startMonth: 1, grossMarginChangePp: 120 },
+      { name: 'Marketing', startMonth: 1, monthlyOpexChange: 1_000 },
+    ])).toThrow('invalid margin');
   });
 
   it('computes operating break-even revenue', () => {
@@ -100,6 +169,44 @@ describe('Avenor financial intelligence', () => {
     expect(historical.totalInflows).toBe(100_000);
     expect(historical.totalOutflows).toBe(40_000);
     expect(historical.currencies).toEqual(['EUR']);
+  });
+
+  it('flags a material payroll increase using two consecutive completed months of imported actuals', () => {
+    const latest = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 1, 1));
+    const previous = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth() - 2, 1));
+    const latestMonth = latest.toISOString().slice(0, 7);
+    const previousMonth = previous.toISOString().slice(0, 7);
+    const brief = buildCfoBrief({
+      inputs: null,
+      modelStatus: 'none',
+      currency: 'EUR',
+      actuals: [
+        { period: previousMonth + '-05', metric_key: 'outflow:payroll', amount: -10_000, currency: 'EUR' },
+        { period: latestMonth + '-05', metric_key: 'outflow:payroll', amount: -13_000, currency: 'EUR' },
+      ],
+    });
+    const alert = brief.alerts.find((item) => item.id === 'payroll-spend-increase');
+    expect(brief.alerts[0].id).toBe('model-missing');
+    expect(alert?.severity).toBe('warning');
+    expect(alert?.title).toContain('30.0%');
+    expect(alert?.description).toContain(previousMonth);
+    expect(alert?.description).toContain(latestMonth);
+  });
+
+  it('does not treat an incomplete current month as a completed-month spend trend', () => {
+    const now = new Date();
+    const currentMonth = now.toISOString().slice(0, 7);
+    const previousMonth = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 1)).toISOString().slice(0, 7);
+    const brief = buildCfoBrief({
+      inputs: null,
+      modelStatus: 'none',
+      currency: 'EUR',
+      actuals: [
+        { period: previousMonth + '-05', metric_key: 'outflow:marketing', amount: -10_000, currency: 'EUR' },
+        { period: currentMonth + '-05', metric_key: 'outflow:marketing', amount: -20_000, currency: 'EUR' },
+      ],
+    });
+    expect(brief.alerts.some((item) => item.id === 'marketing-spend-increase')).toBe(false);
   });
 
   it('summarizes monthly actuals and expense categories', () => {

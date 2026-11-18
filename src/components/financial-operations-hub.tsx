@@ -36,11 +36,12 @@ const dateLabel = (value: string | null) => {
 };
 const currentDate = () => new Date().toISOString().slice(0, 10);
 
-export function FinancialOperationsHub({ organizationId, currency }: {
-  organizationId: string; currency: string;
+export function FinancialOperationsHub({ organizationId, currency, onOpenImport }: {
+  organizationId: string; currency: string; onOpenImport: () => void;
 }) {
   const [connections, setConnections] = useState<Connection[]>([]);
   const [bankConfigured, setBankConfigured] = useState(false);
+  const [scheduledSyncConfigured, setScheduledSyncConfigured] = useState(false);
   const [bankLoading, setBankLoading] = useState(true);
   const [bankBusy, setBankBusy] = useState(false);
   const [syncing, setSyncing] = useState('');
@@ -86,6 +87,7 @@ export function FinancialOperationsHub({ organizationId, currency }: {
       if (!response.ok) throw new Error(data.error || 'Could not load bank connections');
       setConnections(data.connections ?? []);
       setBankConfigured(Boolean(data.configured));
+      setScheduledSyncConfigured(Boolean(data.scheduledSyncConfigured));
     } catch (error) {
       setBankError(error instanceof Error ? error.message : 'Could not load bank connections');
     } finally { setBankLoading(false); }
@@ -171,8 +173,12 @@ export function FinancialOperationsHub({ organizationId, currency }: {
       const response = await fetch('/api/connections/' + encodeURIComponent(id) + '/sync', { method: 'POST' });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Bank synchronization failed');
-      setBankMessage(String(data.importedTransactions || 0) + ' transactions synchronized.');
+      const syncNotes = [String(data.importedTransactions || 0) + ' transactions synchronized.'];
+      if (data.truncated) syncNotes.push('The provider response reached the pagination limit; older transactions may still need a later sync.');
+      if (!data.bankBalanceUpdated) syncNotes.push('The consolidated bank balance was not updated because a single base-currency balance was unavailable.');
+      setBankMessage(syncNotes.join(' '));
       await Promise.all([loadBank(), loadCash(), loadReconciliation()]);
+      window.dispatchEvent(new CustomEvent('avenor:financial-data-updated'));
     } catch (error) {
       setBankError(error instanceof Error ? error.message : 'Bank synchronization failed');
       await loadBank();
@@ -264,6 +270,7 @@ export function FinancialOperationsHub({ organizationId, currency }: {
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || 'Could not save category mapping');
       await loadReconciliation();
+      window.dispatchEvent(new CustomEvent('avenor:financial-data-updated'));
     } catch (error) { setReconError(error instanceof Error ? error.message : 'Could not save mapping'); }
     finally { setReconBusy(''); }
   }
@@ -293,28 +300,37 @@ export function FinancialOperationsHub({ organizationId, currency }: {
       <header className={styles.hubHeader}>
         <div className={styles.eyebrow}>FINANCIAL CONTROL</div>
         <h2 id="financial-operations-hub-title">Plan cash, understand performance.</h2>
-        <p>Connected data, monthly performance reviews and a clear view of upcoming cash commitments.</p>
+        <p>Imported financial data, monthly performance reviews and a clear view of upcoming cash commitments.</p>
       </header>
 
-      <section className={styles.card}>
-        <div className={styles.cardHeading}>
-          <div><span>01 · DATA CONNECTIONS</span><h3>Bank connections</h3><p>Connect a bank securely. CSV imports remain available at any time.</p></div>
-          <button className={styles.primary} type="button" onClick={() => void connectBank()} disabled={!bankConfigured || bankBusy}>{bankBusy ? 'Opening…' : '＋ Connect bank'}</button>
+      <section className={styles.card} aria-labelledby="avenor-data-connect-title">
+        <div className={styles.eyebrow}>GET STARTED · FINANCIAL DATA</div>
+        <h3 className={styles.connectTitle} id="avenor-data-connect-title">Connect your financial data</h3>
+        <p className={styles.connectIntro}>One simple starting point for your company finances. Choose the method that works best for you.</p>
+        <div className={styles.sourceChoices}>
+          <button className={styles.sourceChoice} type="button" onClick={onOpenImport}>
+            <span className={styles.sourceIcon} aria-hidden="true">↥</span>
+            <span className={styles.sourceCopy}><b>Import your financial data</b><small>Upload a bank statement or accounting export. Avenor will classify and analyse your historical cash movements.</small><span className={styles.sourceMeta}>Available now · CSV from your existing bank or accounting tool</span></span>
+            <span className={styles.sourceArrow} aria-hidden="true">→</span>
+          </button>
         </div>
-        {!bankConfigured && <p className={styles.notice}>Open Banking is not configured in this environment. A Powens business account, server credentials and encryption key are required.</p>}
-        {bankError && <p className={styles.error}>{bankError}</p>}
-        {bankMessage && <p className={styles.success}>{bankMessage}</p>}
-        {bankLoading ? <p className={styles.muted}>Loading connections…</p> : connections.length === 0 ? <p className={styles.empty}>No bank accounts connected yet.</p> : connections.map((item) => (
-          <div className={styles.connection} key={item.id}>
-            <div><b>{item.institution_name}</b><small>{item.account_count} account(s) · {item.last_synced_at ? 'Last sync ' + dateLabel(item.last_synced_at) : 'Not synchronized'}</small>{item.last_sync_error && <small className={styles.error}>{item.last_sync_error}</small>}</div>
-            <div className={styles.connectionRight}>
-              <span className={item.status === 'connected' ? styles.good : styles.warning}>{item.status.replaceAll('_', ' ')}</span>
-              {['action_required','error'].includes(item.status) && <button className={styles.link} type="button" onClick={() => void reconnectBank(item.id)} disabled={reconnecting === item.id}>{reconnecting === item.id ? 'Opening bank…' : 'Reconnect'}</button>}
-              {item.status !== 'disconnected' && <button className={styles.link} type="button" onClick={() => void syncBank(item.id)} disabled={syncing === item.id || reconnecting === item.id}>{syncing === item.id ? 'Syncing…' : 'Sync now'}</button>}
-              {item.status !== 'disconnected' && <button className={styles.disconnect} type="button" onClick={() => void disconnectBank(item.id)} disabled={disconnecting === item.id}>{disconnecting === item.id ? 'Disconnecting…' : 'Disconnect'}</button>}
+        <p className={styles.notice}>Automatic bank synchronisation is not available yet. CSV imports and manual cash-balance updates are fully supported; your forecasts and CFO analysis work without a bank connection.</p>
+        {bankError && <p className={styles.error} role="alert">{bankError}</p>}
+        {bankMessage && <p className={styles.success} role="status">{bankMessage}</p>}
+        {connections.length > 0 && <div className={styles.connectedAccounts}>
+          <div className={styles.connectedHeading}><b>Your connected banks</b><small>{scheduledSyncConfigured ? 'Automatic daily sync configured' : 'Manual sync available'}</small></div>
+          {connections.map((item) => (
+            <div className={styles.connection} key={item.id}>
+              <div><b>{item.institution_name}</b><small>{item.account_count} account(s) · {item.last_synced_at ? 'Last sync ' + dateLabel(item.last_synced_at) : 'Not synchronized'}</small>{item.last_sync_error && <small className={styles.error}>{item.last_sync_error}</small>}</div>
+              <div className={styles.connectionRight}>
+                <span className={item.status === 'connected' ? styles.good : styles.warning}>{item.status.replaceAll('_', ' ')}</span>
+                {['action_required','error'].includes(item.status) && <button className={styles.link} type="button" onClick={() => void reconnectBank(item.id)} disabled={reconnecting === item.id}>{reconnecting === item.id ? 'Opening bank…' : 'Reconnect'}</button>}
+                {item.status !== 'disconnected' && <button className={styles.link} type="button" onClick={() => void syncBank(item.id)} disabled={syncing === item.id || reconnecting === item.id}>{syncing === item.id ? 'Syncing…' : 'Sync now'}</button>}
+                {item.status !== 'disconnected' && <button className={styles.disconnect} type="button" onClick={() => void disconnectBank(item.id)} disabled={disconnecting === item.id}>{disconnecting === item.id ? 'Disconnecting…' : 'Disconnect'}</button>}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>}
       </section>
 
       <section className={styles.card}>

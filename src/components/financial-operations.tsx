@@ -216,7 +216,7 @@ export function FinancialOperations({
                 <div className={styles.healthLine}><span>Records in currency</span><b>{loading ? '—' : summary.compatibleRecords.toLocaleString('en-GB')}</b></div>
                 <div className={styles.healthLine}><span>Generic categories</span><b>{loading ? '—' : summary.uncategorisedRecords}</b></div>
                 <div className={styles.healthLine}><span>Last import</span><b>{loading ? '—' : dateTimeLabel(summary.latestImportedAt)}</b></div>
-                <div className={styles.healthNote}>Current source: CSV imports. Live bank and accounting connections are not enabled yet.</div>
+                <div className={styles.healthNote}>Imported activity is historical cash movement. Bank connections and CSV imports are managed above.</div>
               </div>
 
               <div className={styles.sideCard}>
