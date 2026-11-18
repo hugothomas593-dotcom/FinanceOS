@@ -1,80 +1,116 @@
-
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { getSupabasePublicConfig } from '@/lib/supabase/config';
 
 export async function middleware(request: NextRequest) {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   const pathname = request.nextUrl.pathname;
+  const isAppPage = pathname === '/app' || pathname.startsWith('/app/');
+  const isOnboarding = pathname === '/onboarding' || pathname.startsWith('/onboarding');
+  const isSubscribe = pathname === '/subscribe' || pathname.startsWith('/subscribe/');
+  const isProtectedPage = isAppPage || isOnboarding || isSubscribe;
+  const supabaseConfig = getSupabasePublicConfig();
 
-  if (!url || !key) {
-    if (pathname === '/' || pathname.startsWith('/onboarding')) {
-      return NextResponse.redirect(
-        new URL('/login?configuration=missing', request.url)
-      );
+  // The public marketing site must remain accessible even before setup.
+  if (!supabaseConfig) {
+    if (isProtectedPage) {
+      return NextResponse.redirect(new URL('/login?configuration=missing', request.url));
     }
     return NextResponse.next();
   }
 
-  let response = NextResponse.next({ request });
+  // Do not make public landing-page requests depend on an Auth round trip.
+  if (pathname === '/') return NextResponse.next();
 
-  const supabase = createServerClient(url, key, {
+  // Only resolve an Auth session on routes whose destination depends on it.
+  if (!isProtectedPage && pathname !== '/login') return NextResponse.next();
+
+  let response = NextResponse.next({ request });
+  const supabase = createServerClient(supabaseConfig.url, supabaseConfig.key, {
     cookies: {
       getAll: () => request.cookies.getAll(),
-
-      setAll: (
-        items: Array<{
-          name: string;
-          value: string;
-          options?: any;
-        }>
-      ) => {
-        items.forEach(({ name, value }) => {
-          request.cookies.set(name, value);
-        });
-
+      setAll: (cookiesToSet, headers) => {
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
-
-        items.forEach(({ name, value, options }) => {
-          response.cookies.set(name, value, options);
-        });
+        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
+        Object.entries(headers ?? {}).forEach(([key, value]) => response.headers.set(key, value));
       },
     },
   });
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const claimsResult = await supabase.auth.getClaims();
+  const claims = claimsResult.data?.claims ?? null;
+  const userId = typeof claims?.sub === 'string' ? claims.sub : null;
 
-  const protectedPage =
-    pathname === '/' || pathname.startsWith('/onboarding');
+  const redirectWithCookies = (destination: string) => {
+    const redirectResponse = NextResponse.redirect(new URL(destination, request.url));
+    response.cookies.getAll().forEach((cookie) => redirectResponse.cookies.set(cookie));
+    response.headers.forEach((value, key) => {
+      if (['cache-control', 'expires', 'pragma'].includes(key.toLowerCase())) {
+        redirectResponse.headers.set(key, value);
+      }
+    });
+    return redirectResponse;
+  };
 
-  if (protectedPage && !user) {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
+  if (isProtectedPage && !userId) return redirectWithCookies('/login');
 
-  if (
-    user &&
-    (pathname === '/' ||
-      pathname.startsWith('/onboarding') ||
-      pathname === '/login')
-  ) {
-    const { data: membership } = await supabase
+  if (userId && (isAppPage || isOnboarding || isSubscribe || pathname === '/login')) {
+    const requestedOrganizationId = isSubscribe
+      ? request.nextUrl.searchParams.get('organizationId')
+      : null;
+    const cookieOrganizationId = request.cookies.get('avenor_organization_id')?.value ?? null;
+    const preferredOrganizationId = requestedOrganizationId || cookieOrganizationId;
+    const isUuid = (value: string | null): value is string =>
+      Boolean(value && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value));
+
+    let membershipQuery = supabase
       .from('organization_members')
       .select('organization_id')
-      .eq('user_id', user.id)
-      .limit(1)
-      .maybeSingle();
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true })
+      .limit(1);
 
-    if (!membership && pathname !== '/onboarding') {
-      return NextResponse.redirect(new URL('/onboarding', request.url));
+    if (isUuid(preferredOrganizationId)) {
+      membershipQuery = membershipQuery.eq('organization_id', preferredOrganizationId);
     }
 
-    if (
-      membership &&
-      (pathname === '/onboarding' || pathname === '/login')
-    ) {
-      return NextResponse.redirect(new URL('/', request.url));
+    let { data: membership, error: membershipError } = await membershipQuery.maybeSingle();
+    if (!membership && !membershipError && isUuid(preferredOrganizationId)) {
+      const fallback = await supabase
+        .from('organization_members')
+        .select('organization_id')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      membership = fallback.data;
+      membershipError = fallback.error;
+    }
+
+    if (membershipError) {
+      if (pathname === '/login' || isOnboarding) return response;
+      return redirectWithCookies('/login?error=workspace_verification');
+    }
+
+    if (!membership) {
+      if (isAppPage || isSubscribe) return redirectWithCookies('/onboarding');
+      if (isOnboarding || pathname === '/login') return response;
+    }
+
+    if (membership) {
+      // This public RPC returns only a boolean. It does not expose Stripe IDs or
+      // other billing metadata to ordinary workspace members.
+      const { data: hasAccess, error: entitlementError } = await supabase.rpc(
+        'has_organization_access',
+        { org_id: membership.organization_id },
+      );
+      const entitled = !entitlementError && hasAccess === true;
+      const organizationQuery = '?organizationId=' + encodeURIComponent(membership.organization_id);
+
+      if (isAppPage && !entitled) return redirectWithCookies('/subscribe' + organizationQuery);
+      if (isOnboarding) return redirectWithCookies(entitled ? '/app' : '/subscribe' + organizationQuery);
+      if (pathname === '/login') return redirectWithCookies(entitled ? '/app' : '/subscribe' + organizationQuery);
+      if (isSubscribe && entitled) return redirectWithCookies('/app');
     }
   }
 

@@ -1,0 +1,110 @@
+# Avenor — technical audit
+
+**Audit date:** 14 November 2026  
+**Repository:** `hugothomas593-dotcom/FinanceOS`  
+**Scope:** GitHub source, application routes, finance engine, Supabase schema and Vercel deployment configuration.  
+**Release verdict:** NOT PRODUCTION READY.
+
+## Executive findings
+
+The repository is a prototype foundation, not yet a commercial MVP. It contains a Next.js App Router application, authenticated API routes, a deterministic TypeScript forecasting engine, CSV parsing, Stripe scaffolding, SQL migrations and unit tests. The dashboard now loads a workspace's latest saved model and persisted scenarios; end-to-end acceptance, reconciliation and several product workflows remain incomplete.
+
+## Application gaps confirmed
+
+1. The main dashboard now loads a workspace's latest model version from the authenticated models API and supports saving draft/approved model versions. The simulator still calculates locally and requires a saved base model.
+2. Saved Decision Ledger scenarios now load from and persist to Supabase, including a model-version reference and deterministic output snapshot. This workflow has passed build/typecheck but still needs browser end-to-end and tenant-isolation testing.
+3. A Gmail-style persistent Avenor Intelligence side panel now calls a server-side ToolLoopAgent using Vercel AI Gateway. It has creator-private thread history, deterministic financial tools, evidence and limitations, and the ability to save a modeled analysis to the Decision Ledger. The code builds and types, but a live authenticated browser request to AI Gateway has not yet been verified.
+4. CSV actuals can be written through an authenticated API. The import path uses stable row references and workspace currency; actuals are still not reconciled into forecast assumptions. Transaction cash inflows are not assumed to be operating revenue.
+5. A monthly Business Metrics screen now stores MRR, customer counts, marketing/sales spend and gross margin in the existing financial_actuals table under separate KPI metric keys. The Copilot calculates ARPA, blended CAC, monthly logo churn, payback, simplified gross-profit LTV and LTV/CAC only when inputs are present. These are manually supplied, period-based estimates, not cohort analysis.
+6. Fundraising and investor-reporting views are simplified calculators, not validated financial reporting.
+7. Password reset screens and a hardened auth callback have been added in the hardening branch; these flows still require end-to-end verification.
+8. Branding has been aligned to Avenor in the screens touched by this branch.
+
+## Supabase — confirmed production project and schema
+
+- The user confirmed that Supabase project `qeitvqzujytiiupmkmyp` (workspace label `cleardesk.pro@gmail.com's Project`, region `eu-west-1`) is the intended Avenor project.
+- The project's original application schema was empty after a prior cleanup. A controlled recovery script was added at `supabase/recovery/2026-11-14_restore_avenor_after_manual_rollback.sql` and applied to the confirmed project.
+- The restored schema contains 10 public application tables: organizations, organization_members, financial_actuals, model_versions, scenarios, copilot_threads, copilot_messages, audit_events, subscriptions and stripe_webhook_events.
+- RLS is enabled on all 10 tables. A database check confirmed 21 policies assigned to authenticated users; the public onboarding wrapper is SECURITY INVOKER, anonymous users cannot execute it, and authenticated users can.
+- All ten tables currently contain zero business rows. No customer financial data was present or deleted.
+- The Supabase security advisor reports one informational finding: `stripe_webhook_events` has RLS enabled with no client-facing policies. This table is deliberately server-only; privileges are revoked from public/anon/authenticated and granted to service_role. No warning-level security finding was returned.
+- Performance advisor "unused index" notices are expected at this stage because this is a newly initialized database with no application activity.
+
+## Vercel — project and environment state
+
+- Three Vercel projects had been linked to the same Git repository: `financeos`, `financeoss` and `financeosss`.
+- The user-facing domain `financeosss.vercel.app` belongs to `financeosss` and remains verified and attached.
+- The duplicate projects `financeos` and `financeoss` have previews disabled. The canonical `financeosss` project has previews enabled and its Preview environment targets only the isolated `avenor-staging` project.
+- All three projects were aligned to Next.js, automatic output-directory detection and Node 22.x. The former `financeos` project had been forcing a static `public` output directory, causing `STATIC_BUILD_NO_OUT_DIR` notifications.
+- The failed preview build for commit `09a82dc` was caused by a nullable Supabase `getClaims()` type access in middleware. This was corrected in the hardening branch; subsequent GitHub CI builds pass.
+- Vercel Production environment variables were verified against the user-confirmed Supabase project:
+  - `NEXT_PUBLIC_SUPABASE_URL` matches `https://qeitvqzujytiiupmkmyp.supabase.co`.
+  - `NEXT_PUBLIC_SUPABASE_ANON_KEY` matches that project's legacy anon key.
+  - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` is set to that project's publishable key.
+- Environment variable changes apply to the next deployment/build. The currently active Production deployment remains on the old `main` commit; no Production redeployment has been triggered.
+- Preview deployments are enabled only on `financeosss` and use Preview-only variables for `avenor-staging`; neither duplicate project can start previews. Production variables remain separately mapped to the production Supabase project.
+
+## CI and repository
+
+- Added `.gitignore`, `.env.example`, shared Supabase public-key config, auth callback hardening, forgot/reset password pages, stable CSV import references, regression tests, technical audit and GitHub Actions CI.
+- The latest CI run on commit `b826a2b1b2c6cb88679dee0dc0c9eecaccd89454` passed 15/15 Vitest tests, Next.js production build and TypeScript.
+- The original repository had no `package-lock.json`; dependency resolution should be made reproducible before release.
+- CI does not replace browser end-to-end testing, multi-tenant RLS tests, a Stripe test-mode acceptance test or Production smoke testing.
+
+## Work completed in this hardening pass
+
+- Added repository hygiene files and environment-variable guidance.
+- Connected the dashboard to authenticated workspace/model APIs and persisted Decision Ledger scenarios with model-version snapshots.
+- Upgraded `@supabase/ssr` to 0.12.7, centralized the public Supabase key, and updated middleware to use `getClaims()` and preserve refreshed cookies/cache headers.
+- Hardened the auth callback and added password reset request/update screens.
+- Made CSV imports idempotent at the transaction-row level and use workspace currency.
+- Added deterministic import-reference tests.
+- Aligned visible app branding and metadata to Avenor.
+- Added CI for unit tests, production build and type checking.
+- Restored the confirmed Supabase schema and verified RLS/privileges.
+- Corrected Vercel Production Supabase URL and keys, created isolated `avenor-staging`, added Preview-only Vercel credentials and enabled previews only on the canonical project.
+
+## Prioritized remaining work
+
+### P0 — before customer financial data
+1. Run authenticated browser smoke tests against the first staging Preview and create a dedicated staging test user/workspace.
+2. Test RLS with at least two users across at least two organizations, including read/insert/update/delete attempts.
+3. Verify sign-up, email confirmation, sign-in, password reset, session refresh, sign-out and workspace onboarding end-to-end.
+4. Finish the model workflow: model editing/version selection, review controls, and clear draft-versus-approved semantics across all screens.
+5. Complete CSV import preview, validation, error reporting, duplicate feedback and actuals-to-forecast reconciliation.
+6. Connect the Copilot UI to the authenticated Copilot API and persist threads.
+7. Only then merge and redeploy to Production; run authenticated smoke tests on the canonical domain.
+
+### P1 — before charging customers
+1. Perform authenticated browser acceptance of the Copilot: sign in, ask a cash question, ask a mixed strategic decision, verify the deterministic tool evidence, reopen history, and save a scenario.
+2. Confirm Vercel AI Gateway OIDC works in the deployed runtime and inspect the first request's model/provider, EU region, usage and cost. No live AI request has yet been verified.
+3. Complete Stripe entitlements, customer portal, cancellation, failed payments, invoices, tax and webhook reconciliation.
+4. Add rate limiting, origin/CSRF protections, observability, error tracking, backup/restore tests and incident procedures.
+5. Complete GDPR notices, terms, DPA, data deletion/export, retention and subprocessor review.
+6. Validate payroll, tax, VAT, working capital, debt, FX and other modelling assumptions with qualified specialists.
+
+### P2 — product differentiation
+1. Build "What Can I Afford?" as a constrained decision engine.
+2. Add downside/base/upside comparisons, decision thresholds and cash alerts.
+3. Expand European hiring assumptions only with dated, source-backed and reviewable data.
+4. Validate willingness to pay with French Pre-Seed and Seed founders.
+
+## Limitations
+
+This is a source/configuration audit, not an independent penetration test, financial-model validation, legal review or proof that the application is ready for public launch. The production database schema is now initialized, but the current app deployment has not been updated and end-to-end acceptance remains incomplete.
+
+
+## Additional security note
+Supabase Auth advisor warns that leaked-password protection is disabled. Enable compromised-password checks before public registration. This setting was not changed from the integration.
+
+
+## Copilot acceptance state — 14 November 2026
+- The latest source commit `343fecba6823af3d61e2ea3aa6d6a6008d90a896` passed GitHub Actions: 25 tests, Next.js production build and TypeScript.
+- Vercel did not create a fresh Preview for the Copilot source due to HTTP 402 `api-deployments-free-per-day`; the existing READY Preview belongs to a prior commit and must not be used to validate the new Copilot.
+- No authenticated browser request to the Copilot or AI Gateway has been completed. OIDC/model configuration is code/build-validated only. Do not claim the assistant is live until the first authenticated test succeeds.
+- The Copilot is an analytical assistant, not an autonomous employee: it cannot perform accounting entries, transfer funds, execute payroll, approve expenditure, or provide accountable legal/tax decisions.
+
+## Server compute region alignment — 15 November 2026
+- The inspected Vercel Preview deployment `dpl_5SZKnSSskgW1P1z1Q2fpQtLVxYF4` for commit `f86407ea15bd0aa7cef56bc5f7d8aaed366b361c` reported region `iad1` (Washington, D.C.).
+- Supabase staging `fozwtnfzzancgdwjxopy` is in `eu-west-1` (Dublin). A `vercel.json` setting now pins Vercel Functions to `dub1` (Dublin) to avoid running server-side data queries in the US by default.
+- This is source-configured but not yet deployment-verified. The existing Preview predates the change; verify the region field on a fresh deployment before making a data-residency statement.

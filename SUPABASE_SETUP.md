@@ -1,4 +1,4 @@
-# FinanceOS setup
+# Avenor setup
 
 ## Important distinction
 Supabase hosts the PostgreSQL database and authentication. It does **not** host the Next.js website. The SQL file in `supabase/` is what you paste into Supabase SQL Editor. The application source is deployed separately (for example, to Vercel, usually from a Git repository).
@@ -13,7 +13,7 @@ Supabase hosts the PostgreSQL database and authentication. It does **not** host 
 ## Application environment variables
 Set these in the hosting provider's environment-variable settings (and in a local `.env.local` only for local development):
 - `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY` (the Supabase publishable key is accepted here)
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` (preferred; legacy `NEXT_PUBLIC_SUPABASE_ANON_KEY` remains supported)
 - `NEXT_PUBLIC_APP_URL`
 - `OPENAI_API_KEY` (server-side only, optional until Copilot is enabled)
 - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID` (server-side only, only when billing is configured)
