@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/supabase/server';
 import { billingPortalReturnUrl } from '@/lib/stripe-billing';
+import { enforceApiRateLimit } from '@/lib/rate-limit';
 
 export async function POST(request: Request) {
   try {
@@ -17,6 +18,14 @@ export async function POST(request: Request) {
       .maybeSingle();
     if (!member || !['owner', 'admin'].includes(member.role)) {
       return NextResponse.json({ error: 'Billing permission required' }, { status: 403 });
+    }
+
+    const rateLimit = await enforceApiRateLimit(user.id, 'billingPortal');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many billing portal requests. Please try again later.' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } },
+      );
     }
 
     const secret = process.env.STRIPE_SECRET_KEY;

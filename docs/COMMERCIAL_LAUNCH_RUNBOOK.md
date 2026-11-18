@@ -12,7 +12,7 @@ This is the operational checklist for moving Avenor from private Preview to a sm
 
 **Initial plan:** Avenor Founder — €59/month, one plan, no feature tiers.
 
-Do not add a free trial, annual discount or tiered pricing until customer interviews validate the €59 willingness to pay and the cost of AI usage per active workspace. The public demo is free and uses synthetic data; it is not a free customer workspace.
+**Trial policy:** eligible first-time users receive a 30-day trial after providing a payment method; the subscription then renews at €59/month unless canceled. Stripe is configured to cancel at trial end when no payment method is available. The public demo remains free and uses synthetic data; it is not a free customer workspace.
 
 ## 2. Current implementation in this repository
 
@@ -23,18 +23,19 @@ Do not add a free trial, annual discount or tiered pricing until customer interv
 - Copilot uses the Vercel AI Gateway for open-ended explanation, with bounded deterministic fallback calculations if inference is unavailable.
 - Stripe Checkout, Customer Portal and signed webhook scaffolding exist. Checkout now verifies that the configured Price is active, EUR 59 and recurring monthly; it blocks a second subscription while one is already linked and uses Stripe idempotency for short retry windows.
 - KPI reads cover the full calendar month, including transactions stored on month-end dates.
-- None of the above proves a live AI request or Stripe payment has succeeded.
+- The Stripe test-mode product/price and webhook endpoint are configured. A synthetic EUR 59/month, 30-day test subscription successfully exercised signed `customer.subscription.created`, `customer.subscription.updated` and `customer.subscription.deleted` webhooks. Staging persisted the subscription, granted access during the trial, then revoked access on cancellation; the temporary subscription row was removed. No live charge was made. The signed-in browser Checkout and Customer Portal journey remains untested.
+- GitHub CI passes unit tests, production build and TypeScript; the latest Vercel Preview is READY. Staging entitlement and rate-limit permissions have been simulated. A live AI inference has not been verified.
 
 ## 3. External account setup
 
 ### Vercel / AI Gateway
 
-1. Complete the Vercel AI Gateway customer verification/payment-method step for the team.
-2. Confirm the Vercel deployment receives its OIDC token and that the selected model `anthropic/claude-sonnet-4.6` can serve tool use in the EU region.
+1. 1. Confirm that the Vercel team has AI Gateway enabled and a payment method / billing setup for model inference.
+2. Confirm the deployed Preview receives its OIDC token; Vercel supports OIDC on deployments, but this alone does not prove inference works.
 3. Run a live Copilot request on Preview using the synthetic Northstar Demo workspace.
 4. Verify a successful request in AI Gateway Logs and check model, provider, input/output tokens, cost, duration and EU routing.
-5. Test the failure path as well: invalid credentials, provider unavailable, timeout and rate limit. The deterministic fallback must clearly identify itself as local analysis; do not imply the LLM was available.
-6. Set a team/project spend budget and alert before inviting beta users. Confirm that average cost per active workspace leaves enough gross margin at €59/month.
+5. Test the failure path as well: provider unavailable, timeout and rate limit. The deterministic fallback must clearly identify itself as local analysis; do not imply the LLM was available.
+6. Set a team/project spend budget and alert before inviting beta users. Confirm that average cost per active workspace leaves enough gross margin at €59/month. The observed seven-day AI Gateway usage query returned no requests as of 16 November 2026; a controlled inference is still outstanding.
 
 ### Stripe — test mode first
 
@@ -77,7 +78,7 @@ Do not add live keys until the test flow is green and a human has reviewed the l
 ### Supabase
 
 - Keep staging and production projects strictly separate.
-- Enable leaked-password protection in Supabase Auth before public registration.
+- The current Supabase organization is on the Free plan. Leaked-password protection and automatic backups are not included on Free. Supabase Pro is currently listed at USD 25/month (compute may add costs); upgrading is a paid decision and has not been authorized. Before public registration or customer financial data, upgrade the organization, enable leaked-password protection in Auth → Sign In / Providers → Email, verify the advisor clears, and confirm backup retention/restore options.
 - Test signup, email confirmation, login, password reset, callback redirects and session refresh.
 - Create two unrelated test users with two workspaces each. Attempt cross-workspace SELECT, INSERT, UPDATE and DELETE on models, actuals, scenarios, Copilot threads/messages, context, subscriptions and audit records. Every unauthorized attempt must fail.
 - Keep `stripe_webhook_events` server-only, protected by RLS with no client policy; only the server service-role webhook can access it.
@@ -154,7 +155,7 @@ Production must remain unchanged until all are true:
 - Financial-model limitations and professional-advice boundaries are shown in product copy.
 - The founder explicitly approves promotion to Production and live Stripe keys.
 
-## 7. Still not automated / not yet proven
+## 7. Current candidate safeguards and remaining evidence gaps\n\nImplemented on the correction branch: cross-origin browser mutations are rejected (except Stripe webhooks, which use signed payloads); authenticated Copilot, CSV import, Checkout, Billing Portal and CFO Brief calls have shared Postgres-backed per-user rate limits. Rate-limit state is server-only and inaccessible to anon/authenticated roles. These safeguards require the Preview deployment and migration 012 to be present together.\n\nThe staging migration and database function are applied and the rate-limit table is denied to authenticated users. End-to-end route verification and browser acceptance are still required.\n\n## 8. Still not automated / not yet proven
 
 - Live AI Gateway verification and successful inference.
 - Stripe product/price creation and test-mode end-to-end payment.

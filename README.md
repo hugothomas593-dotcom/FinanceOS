@@ -5,7 +5,7 @@ Avenor is an early SaaS codebase for European Seed-stage startups. It combines a
 > **Honest release status:** this repository is not certified production-ready and must not be used with paying customers or sensitive live financial data until the deployment checklist below is completed. The dashboard still contains illustrative demo assumptions. External integrations require credentials and account setup.
 
 ## Commercial offer
-Avenor has one subscription only: **Avenor Founder — €59/month**. There are no feature tiers. Before enabling checkout, `STRIPE_PRICE_ID` must reference the single recurring EUR 59 price created in the Stripe account. The visible price in the application does not mean Stripe checkout is connected; configure and test the Stripe product, price, webhook and server credentials first.
+Avenor has one subscription only: **Avenor Founder — €59/month**. Eligible first-time users receive a 30-day trial after entering a payment method; the first €59 monthly charge is due after the trial unless canceled. A returning user cannot claim another trial by creating another workspace. The current Stripe product/price and webhook are configured in test mode only; Production billing is not enabled. A synthetic 30-day test subscription exercised signed subscription-created, updated and deleted webhooks; it was canceled and removed from the staging workspace. This did not exercise the authenticated browser Checkout or Customer Portal.
 
 ## Stack
 - Next.js 15 App Router, React 19, TypeScript
@@ -18,7 +18,7 @@ Avenor has one subscription only: **Avenor Founder — €59/month**. There are 
 1. Use Node.js 22 or later (the current AI SDK tool-loop runtime is validated with Node 22).
 2. Create a Supabase project.
 3. Copy `.env.example` to `.env.local` and configure Supabase URL and anon key.
-4. Apply migrations in order: `001_initial_schema.sql`, `002_product_completion.sql`, `003_rls_policy_hardening.sql`, `004_stripe_webhook_idempotency.sql`. Alternatively, use `supabase/FINANCEOS_SETUP_ALL.sql` once on a fresh project; do not run both paths.
+4. On a fresh Supabase project, run `supabase/FINANCEOS_SETUP_ALL.sql` once (baseline through migration 011), then apply migrations `012_api_rate_limits.sql` through `015_one_approved_model_per_workspace.sql` in numerical order. For an existing project already migrated through 011, apply only migrations 012–015. Do not rerun the setup-all script on an existing database.
 5. Run `npm install`, then `npm run dev`.
 6. Open `/login`, create an account, confirm the email, and create a company at `/onboarding`.
 
@@ -37,7 +37,7 @@ Avenor has one subscription only: **Avenor Founder — €59/month**. There are 
 
 ## API outline
 - `POST /api/organizations` — create organization + owner membership.
-- `GET|POST /api/models` — list and save model versions; approval archives previous approved version.
+- `GET|POST /api/models` — list and save model versions; approval archives the previous approved version atomically, with one approved model per workspace enforced by Postgres.
 - `GET|POST /api/scenarios` — list and save scenarios.
 - `GET /api/actuals` — list actuals for a member organization.
 - `POST /api/actuals/import` — import CSV with Date and Amount columns; requires owner/admin/finance role.
@@ -46,7 +46,7 @@ Avenor has one subscription only: **Avenor Founder — €59/month**. There are 
 - `POST /api/billing/webhook` — verifies Stripe signature and configured server credentials, synchronizes subscription state and records event receipts.
 - `GET /api/health` — reports whether key services are configured; not a security audit.
 - `GET /api/brief?organizationId=...` — authenticated, deterministic Weekly CFO Brief for the selected workspace; on-demand, not a scheduled email or push alert.
-- `GET|POST /api/kpis` — reads and saves KPI records by full calendar month, including month-end dates.
+- `GET|POST /api/kpis` — reads and saves KPI records by full calendar month, including month-end dates.\n- `GET /api/privacy/export?organizationId=...` — owner/admin-only JSON archive of workspace members, financial actuals, models, scenarios, company context, Copilot history, audit events and non-sensitive subscription status. The response flags any row limit reached.\n- `POST /api/privacy/delete-workspace` — owner-only destructive action. Requires the exact workspace name and `DELETE WORKSPACE`, blocks pending Checkout, cancels any linked Stripe subscription, then deletes workspace records from the active database. Provider backups and statutory billing records follow separate retention periods.
 - `GET /demo` — public interactive decision demo using fictional, synthetic financial data; no account or database write required.
 
 ## CSV format
@@ -55,7 +55,7 @@ Supports comma-, semicolon- and tab-delimited files. Use either `Date,Amount` / 
 ## Required environment variables
 See `.env.example`. `SUPABASE_SERVICE_ROLE_KEY`, `AI_GATEWAY_API_KEY`, `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, and `STRIPE_PRICE_ID` are server-only. Vercel deployments use the platform-provided OIDC token for AI Gateway; a private `AI_GATEWAY_API_KEY` is only needed for local development outside a linked Vercel environment. `AI_GATEWAY_MODEL` defaults to `anthropic/claude-sonnet-4.6`.
 
-## Before a commercial launch — mandatory
+## Current security safeguards on the correction branch\n- Cookie-authenticated mutating API requests reject cross-origin browser requests; Stripe webhooks instead verify signed raw payloads.\n- Postgres-backed, per-user rate limits apply to Copilot, CSV import, Checkout, Billing Portal and CFO Brief generation. Rate-limit state is service-role-only.\n- Workspace owners/admins can export a workspace archive from the application sidebar; this export is workspace-wide and should be handled as confidential financial data.\n\n## Before a commercial launch — mandatory
 - Configure production Supabase, email confirmation, allowed redirect URLs, backups, and database access policies.
 - Test RLS with at least two separate users and two organizations. Verify no cross-tenant read/write is possible.
 - Complete company onboarding, organization switching, account settings, password reset, invitation flows, and role management UI.
@@ -63,7 +63,7 @@ See `.env.example`. `SUPABASE_SERVICE_ROLE_KEY`, `AI_GATEWAY_API_KEY`, `STRIPE_S
 - Implement CSV preview, duplicate detection, idempotency, currency handling, mapping, rollback, and reconciliation. Current import is a minimal ingestion route, not a complete accounting connector.
 - Verify all financial model assumptions with a qualified accountant/payroll specialist for each jurisdiction. Current forecast excludes VAT timing, taxes, debt, working capital, deferred revenue, capex, FX, payroll timing, and many industry-specific effects.
 - Build and test accounting/banking integrations under the relevant provider agreements; do not store bank credentials.
-- Complete Stripe customer portal, plan/entitlement enforcement, failed-payment handling, cancellations, refunds, tax/VAT handling, and webhook replay/idempotency.
+- Complete and verify Stripe Checkout, Customer Portal, plan/entitlement enforcement, failed-payment handling, cancellations, refunds, tax/VAT handling, webhook replay/idempotency and the 30-day trial → €59/month flow.
 - Add rate limiting, CSRF/origin protections where applicable, abuse monitoring, structured logs, error tracking, security headers, secrets rotation, incident response, and a privacy/data-retention process.
 - Complete GDPR review: privacy notice, terms, DPA, subprocessors, retention/deletion, data export, lawful basis, and processor contracts.
 - Run automated unit/integration/e2e tests, load tests, dependency/security scans, accessibility checks, and manual acceptance testing on staging.

@@ -1,7 +1,119 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { requireUser } from '@/lib/supabase/server';
-const Inputs = z.object({ openingCash:z.number().nonnegative(),monthlyRevenue:z.number().nonnegative(),monthlyRevenueGrowth:z.number().min(-.99).max(2),monthlyOpexExPayroll:z.number().nonnegative(),monthlyOpexGrowth:z.number().min(-.99).max(2),cogsRatio:z.number().min(0).max(1),existingMonthlyPayroll:z.number().nonnegative(),existingOtherNetCashAdjustments:z.number() });
-const Schema=z.object({organizationId:z.string().uuid(),name:z.string().trim().min(2).max(100),status:z.enum(['draft','approved']).default('draft'),assumptions:Inputs});
-export async function GET(req:Request){try{const{supabase,user}=await requireUser();const org=new URL(req.url).searchParams.get('organizationId');if(!org)return NextResponse.json({error:'organizationId required'},{status:400});const{data:member}=await supabase.from('organization_members').select('role').eq('organization_id',org).eq('user_id',user.id).maybeSingle();if(!member)return NextResponse.json({error:'Organization access denied'},{status:403});const{data,error}=await supabase.from('model_versions').select('id,name,status,assumptions,created_at').eq('organization_id',org).order('created_at',{ascending:false}).limit(50);if(error)return NextResponse.json({error:'Could not load models'},{status:500});return NextResponse.json({models:data});}catch(e){const m=e instanceof Error?e.message:'';return NextResponse.json({error:m==='UNAUTHENTICATED'?'Authentication required':'Service unavailable'},{status:m==='UNAUTHENTICATED'?401:503});}}
-export async function POST(req:Request){try{const{supabase,user}=await requireUser();const parsed=Schema.safeParse(await req.json());if(!parsed.success)return NextResponse.json({error:'Invalid model assumptions',details:parsed.error.flatten()},{status:400});const p=parsed.data;const{data:member}=await supabase.from('organization_members').select('role').eq('organization_id',p.organizationId).eq('user_id',user.id).maybeSingle();if(!member)return NextResponse.json({error:'Organization access denied'},{status:403});if(!['owner','admin','finance'].includes(member.role))return NextResponse.json({error:'Insufficient permissions'},{status:403});if(p.status==='approved')await supabase.from('model_versions').update({status:'archived'}).eq('organization_id',p.organizationId).eq('status','approved');const{data,error}=await supabase.from('model_versions').insert({organization_id:p.organizationId,name:p.name,status:p.status,assumptions:p.assumptions,created_by:user.id}).select('id,name,status,created_at').single();if(error)return NextResponse.json({error:'Could not save model version'},{status:500});await supabase.from('audit_events').insert({organization_id:p.organizationId,actor_id:user.id,event_type:'model_version.created',entity_type:'model_version',entity_id:data.id,after_state:{name:p.name,status:p.status}});return NextResponse.json({model:data},{status:201});}catch(e){const m=e instanceof Error?e.message:'';return NextResponse.json({error:m==='UNAUTHENTICATED'?'Authentication required':'Service unavailable'},{status:m==='UNAUTHENTICATED'?401:503});}}
+
+const Inputs = z.object({
+  openingCash: z.number().nonnegative(),
+  monthlyRevenue: z.number().nonnegative(),
+  monthlyRevenueGrowth: z.number().min(-0.99).max(2),
+  monthlyOpexExPayroll: z.number().nonnegative(),
+  monthlyOpexGrowth: z.number().min(-0.99).max(2),
+  cogsRatio: z.number().min(0).max(1),
+  existingMonthlyPayroll: z.number().nonnegative(),
+  existingOtherNetCashAdjustments: z.number(),
+});
+
+const Schema = z.object({
+  organizationId: z.string().uuid(),
+  name: z.string().trim().min(2).max(100),
+  status: z.enum(['draft', 'approved']).default('draft'),
+  assumptions: Inputs,
+});
+
+export async function GET(request: Request) {
+  try {
+    const { supabase, user } = await requireUser();
+    const organizationId = z.string().uuid().safeParse(
+      new URL(request.url).searchParams.get('organizationId'),
+    );
+    if (!organizationId.success) {
+      return NextResponse.json({ error: 'A valid organizationId is required' }, { status: 400 });
+    }
+
+    const { data: member, error: membershipError } = await supabase
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', organizationId.data)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (membershipError) {
+      return NextResponse.json({ error: 'Could not verify workspace access' }, { status: 500 });
+    }
+    if (!member) {
+      return NextResponse.json({ error: 'Organization access denied' }, { status: 403 });
+    }
+
+    const { data, error } = await supabase
+      .from('model_versions')
+      .select('id,name,status,assumptions,created_at')
+      .eq('organization_id', organizationId.data)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      return NextResponse.json({ error: 'Could not load models' }, { status: 500 });
+    }
+    return NextResponse.json({ models: data ?? [] });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const unauthenticated = message === 'UNAUTHENTICATED';
+    return NextResponse.json(
+      { error: unauthenticated ? 'Authentication required' : 'Service unavailable' },
+      { status: unauthenticated ? 401 : 503 },
+    );
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const { supabase, user } = await requireUser();
+    const parsed = Schema.safeParse(await request.json().catch(() => null));
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: 'Invalid model assumptions', details: parsed.error.flatten() },
+        { status: 400 },
+      );
+    }
+
+    const payload = parsed.data;
+    const { data: member, error: membershipError } = await supabase
+      .from('organization_members')
+      .select('role')
+      .eq('organization_id', payload.organizationId)
+      .eq('user_id', user.id)
+      .maybeSingle();
+
+    if (membershipError) {
+      return NextResponse.json({ error: 'Could not verify workspace access' }, { status: 500 });
+    }
+    if (!member) {
+      return NextResponse.json({ error: 'Organization access denied' }, { status: 403 });
+    }
+    if (!['owner', 'admin', 'finance'].includes(member.role)) {
+      return NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 });
+    }
+
+    // The database function archives the former approved version and inserts
+    // the new version in one transaction, serialised per workspace.
+    const { data, error } = await supabase.rpc('save_model_version', {
+      p_organization_id: payload.organizationId,
+      p_name: payload.name,
+      p_status: payload.status,
+      p_assumptions: payload.assumptions,
+    });
+
+    if (error || !data || typeof data !== 'object') {
+      return NextResponse.json({ error: 'Could not save model version' }, { status: 500 });
+    }
+
+    return NextResponse.json({ model: data }, { status: 201 });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    const unauthenticated = message === 'UNAUTHENTICATED';
+    return NextResponse.json(
+      { error: unauthenticated ? 'Authentication required' : 'Service unavailable' },
+      { status: unauthenticated ? 401 : 503 },
+    );
+  }
+}

@@ -6,6 +6,8 @@ import { getSupabasePublicConfig } from '@/lib/supabase/config';
 import { forecast, summarize, type ModelInputs, type MonthResult } from '@/lib/finance';
 import { AvenorCopilot } from '@/components/avenor-copilot';
 import { CfoBrief } from '@/components/cfo-brief';
+import { FinancialOperations } from '@/components/financial-operations';
+import { FinancialOperationsHub } from '@/components/financial-operations-hub';
 import { EMPTY_COMPANY_CONTEXT, companyContextCompletion, type CompanyContext } from '@/lib/company-context';
 
 type View = 'Overview' | 'CFO Brief' | 'Financial overview' | 'Decision ledger' | 'Company assumptions' | 'Business metrics' | 'Data import' | 'Fundraising planner' | 'Investor reporting' | 'Plan & billing';
@@ -123,6 +125,10 @@ export default function Home() {
   const [toast, setToast] = useState('');
   const [signOutBusy, setSignOutBusy] = useState(false);
   const [signOutError, setSignOutError] = useState('');
+  const [exportBusy, setExportBusy] = useState(false);
+  const [exportError, setExportError] = useState('');
+  const [deleteWorkspaceBusy, setDeleteWorkspaceBusy] = useState(false);
+  const [deleteWorkspaceError, setDeleteWorkspaceError] = useState('');
 
   useEffect(() => {
     const handleDecisionSaved = (event: Event) => {
@@ -484,6 +490,71 @@ export default function Home() {
     }
   }
 
+  async function exportWorkspaceData() {
+    if (!organizationId || exportBusy) return;
+    setExportBusy(true);
+    setExportError('');
+    try {
+      const response = await fetch(`/api/privacy/export?organizationId=${encodeURIComponent(organizationId)}`, { cache: 'no-store' });
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.error || 'Could not export workspace data');
+      }
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      link.download = `avenor-workspace-${organizationId}-export.json`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      setExportError(error instanceof Error ? error.message : 'Could not export workspace data');
+    } finally {
+      setExportBusy(false);
+    }
+  }
+
+  async function deleteWorkspaceData() {
+    if (!organizationId || deleteWorkspaceBusy) return;
+    const membership = workspaceMemberships.find((item) => item.organization_id === organizationId);
+    if (membership?.role !== 'owner') {
+      setDeleteWorkspaceError('Only the workspace owner can delete this workspace.');
+      return;
+    }
+    const exactName = membership.organizations?.name ?? organizationName;
+    if (!exactName || !window.confirm(`Delete ${exactName} and permanently remove its active workspace data? All workspace members will lose access. Export the data first if you need a copy.`)) return;
+    const typedName = window.prompt(`Type the exact workspace name to continue:\n${exactName}`);
+    if (typedName !== exactName) {
+      setDeleteWorkspaceError('Workspace name did not match. Nothing was deleted.');
+      return;
+    }
+    const typedPhrase = window.prompt('Final confirmation: type DELETE WORKSPACE');
+    if (typedPhrase !== 'DELETE WORKSPACE') {
+      setDeleteWorkspaceError('Confirmation phrase did not match. Nothing was deleted.');
+      return;
+    }
+
+    setDeleteWorkspaceBusy(true);
+    setDeleteWorkspaceError('');
+    try {
+      const response = await fetch('/api/privacy/delete-workspace', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ organizationId, confirmationName: exactName, confirmationPhrase: typedPhrase }),
+      });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(data?.error || 'Workspace deletion failed');
+      window.localStorage.removeItem('financeos.organizationId');
+      document.cookie = 'avenor_organization_id=; Path=/; Max-Age=0; SameSite=Lax';
+      window.location.replace('/onboarding');
+    } catch (error) {
+      setDeleteWorkspaceError(error instanceof Error ? error.message : 'Workspace deletion failed');
+      setDeleteWorkspaceBusy(false);
+    }
+  }
+
   async function openBillingAction(endpoint: '/api/billing/checkout' | '/api/billing/portal') {
     if (!organizationId) return;
     setBillingBusy(true);
@@ -556,6 +627,10 @@ export default function Home() {
           <div className="profile-avatar">A</div>
           <div><b>Workspace account</b><small>Signed-in user</small></div>
         </div>
+        {['owner', 'admin'].includes(workspaceMemberships.find((item) => item.organization_id === organizationId)?.role ?? '') && <button className="signout-button" type="button" onClick={() => void exportWorkspaceData()} disabled={exportBusy || workspaceLoading}>
+          {exportBusy ? 'Preparing export…' : 'Export workspace data'}
+        </button>}
+        {exportError && <p className="signout-error" role="alert">{exportError}</p>}
         <button className="signout-button" type="button" onClick={() => void signOut()} disabled={signOutBusy}>
           {signOutBusy ? 'Signing out…' : 'Sign out'}
         </button>
@@ -650,6 +725,20 @@ export default function Home() {
             <section className="surface decision-card"><div className="surface-heading"><div><div className="section-kicker">YOUR NEXT MOVES</div><h2>Decisions you have explored</h2></div><button className="text-button" onClick={() => setView('Decision ledger')}>View all →</button></div>{saved.length === 0 ? <div className="empty-state"><div className="empty-icon">⌁</div><b>No saved decisions yet</b><p>Try a hiring or growth decision. Save it here to compare options later.</p><button className="button-secondary" onClick={() => setView('Overview')}>Plan your first decision</button></div> : saved.slice(0,2).map(item => <DecisionRow key={item.id} item={item} currency={currency}/>)}</section>
           </div>
           <section className="surface table-panel cash-table-panel"><div className="surface-heading"><div><div className="section-kicker">THE NEXT SIX MONTHS</div><h2>How your cash could move month by month</h2><p>Use this breakdown to see the steps behind the forecast</p></div><button className="text-button" onClick={() => setView('Overview')}>Try a decision →</button></div><div className="table-scroll"><table><thead><tr><th>MONTH</th><th>REVENUE</th><th>NET CASH CHANGE</th><th>CASH LEFT</th><th>RUNWAY</th></tr></thead><tbody>{base.slice(0,6).map(row => <tr key={row.month}><td>Month {row.month}</td><td>{money(row.revenue, currency)}</td><td className={row.netCashFlow >= 0 ? 'positive-text' : 'negative-text'}>{row.netCashFlow > 0 ? '+' : ''}{money(row.netCashFlow, currency)}</td><td className="strong-cell">{money(row.closingCash, currency)}</td><td>{row.runwayMonths === null ? 'Cash-flow positive' : `${row.runwayMonths.toFixed(1)} mo.`}</td></tr>)}</tbody></table></div></section>
+          <FinancialOperations
+            organizationId={organizationId}
+            currency={currency}
+            forecastRows={base.slice(0, 6)}
+            decisions={saved.slice(0, 3)}
+            insightCount={insightCount}
+            onOpenImport={() => setView('Data import')}
+            onOpenBrief={() => setView('CFO Brief')}
+            onOpenDecisions={() => setView('Decision ledger')}
+          />
+          <FinancialOperationsHub
+            organizationId={organizationId}
+            currency={currency}
+          />
           </>}
         </>}
 
@@ -758,6 +847,16 @@ export default function Home() {
           </>}
           {billingError && <p className="warning-text" role="alert">{billingError}</p>}
           <p className="billing-footnote">No payment is taken from this screen. You will be redirected to Stripe to review and confirm any payment.</p>
+          {workspaceMemberships.find((item) => item.organization_id === organizationId)?.role === 'owner' && <section className="surface danger-zone">
+            <div className="section-kicker">DATA CONTROL</div>
+            <h3>Export or delete this workspace</h3>
+            <p className="form-intro">Export a JSON copy before deletion. Deleting a workspace cancels any linked Stripe subscription and removes the workspace's active records, models, scenarios, Copilot history and team memberships. Provider backups and legally required billing records may remain until their separate retention periods expire.</p>
+            <div className="billing-actions">
+              <button className="button-secondary" disabled={exportBusy || deleteWorkspaceBusy} onClick={() => void exportWorkspaceData()}>{exportBusy ? 'Preparing export…' : 'Export workspace data'}</button>
+              <button className="button-secondary" disabled={deleteWorkspaceBusy || workspaceLoading} onClick={() => void deleteWorkspaceData()}>{deleteWorkspaceBusy ? 'Deleting workspace…' : 'Delete workspace and data'}</button>
+            </div>
+            {deleteWorkspaceError && <p className="warning-text" role="alert">{deleteWorkspaceError}</p>}
+          </section>}
         </section>}
 
         {view !== 'Overview' && <footer className="app-footer"><span>Avenor <b>·</b> Private beta</span><span>{hasModel ? (modelStatus === 'approved' ? 'Approved financial model' : 'Draft financial model') : 'Financial model not configured'} · Not accounting or tax advice</span></footer>}

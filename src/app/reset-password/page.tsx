@@ -3,6 +3,7 @@
 import { useState, type FormEvent } from 'react';
 import { createBrowserClient } from '@supabase/ssr';
 import { getSupabasePublicConfig } from '@/lib/supabase/config';
+import { meetsMinimumPasswordPolicy } from '@/lib/password-policy';
 
 export default function ResetPasswordPage() {
   const [password, setPassword] = useState('');
@@ -14,6 +15,10 @@ export default function ResetPasswordPage() {
     event.preventDefault();
     setMessage('');
 
+    if (!meetsMinimumPasswordPolicy(password)) {
+      setMessage('Use at least 12 characters with lowercase and uppercase letters, a number and a symbol.');
+      return;
+    }
     if (password !== confirmation) {
       setMessage('The passwords do not match.');
       return;
@@ -42,14 +47,14 @@ export default function ResetPasswordPage() {
       <form className="login-card" onSubmit={submit}>
         <div className="brand"><span className="brand-mark">A</span><span>avenor</span></div>
         <h1>Choose a new password</h1>
-        <p>Use at least eight characters.</p>
+        <p>Use 12+ characters, including uppercase and lowercase letters, a number and a symbol.</p>
         <label>
           New password
-          <input type="password" minLength={8} required autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input type="password" minLength={12} maxLength={128} required autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
         <label>
           Confirm new password
-          <input type="password" minLength={8} required autoComplete="new-password" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} />
+          <input type="password" minLength={12} maxLength={128} required autoComplete="new-password" value={confirmation} onChange={(e) => setConfirmation(e.target.value)} />
         </label>
         <button className="button-primary" disabled={busy}>{busy ? 'Updating...' : 'Update password'}</button>
         {message && <p role="status">{message}</p>}

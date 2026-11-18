@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { verifyStripeSignature } from '@/lib/stripe-webhook';
+import { stripeSubscriptionPeriodEnd, verifyStripeSignature } from '@/lib/stripe-webhook';
 
 type StripeSubscription = {
   id?: string;
@@ -92,9 +92,24 @@ export async function POST(request: Request) {
     }
     if (!organizationId) throw new Error('Subscription is missing its Avenor workspace reference');
 
+    const { data: workspace, error: workspaceError } = await admin
+      .from('organizations')
+      .select('id')
+      .eq('id', organizationId)
+      .maybeSingle();
+    if (workspaceError) throw workspaceError;
+    // A workspace owner may delete a workspace immediately after canceling its
+    // Stripe subscription. A delayed signed cancellation webhook should still
+    // be acknowledged rather than retried forever against a deleted FK target.
+    if (!workspace) {
+      if (subscription.status === 'canceled' || subscription.status === 'incomplete_expired') return;
+      throw new Error('The referenced Avenor workspace no longer exists');
+    }
+
     const customerId = typeof subscription.customer === 'string'
       ? subscription.customer
       : subscription.customer?.id ?? null;
+    const periodEnd = stripeSubscriptionPeriodEnd(subscription);
 
     const { error: subscriptionError } = await admin
       .from('subscriptions')
@@ -103,8 +118,8 @@ export async function POST(request: Request) {
         stripe_customer_id: customerId,
         stripe_subscription_id: subscription.id,
         status: String(subscription.status ?? 'unknown'),
-        current_period_end: subscription.current_period_end
-          ? new Date(subscription.current_period_end * 1000).toISOString()
+        current_period_end: periodEnd
+          ? new Date(periodEnd * 1000).toISOString()
           : null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'organization_id' });

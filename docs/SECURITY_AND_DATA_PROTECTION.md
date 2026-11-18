@@ -7,15 +7,15 @@
 
 Avenor has meaningful access controls in its application and staging database. In particular, customer workspaces are scoped by organization membership, sensitive financial tables use PostgreSQL Row Level Security (RLS), and paid product data is now additionally gated on a live, unexpired Stripe trial or subscription.
 
-This is not a guarantee of perfect security. No independent penetration test, full two-customer isolation test, production backup-restore exercise or complete incident-response exercise has been completed. Supabase's certifications apply to Supabase's service boundary, not automatically to Avenor.
+This is not a guarantee of perfect security. No independent penetration test, full two-customer CRUD isolation test, production backup-restore exercise or complete incident-response exercise has been completed. Supabase's certifications apply to Supabase's service boundary, not automatically to Avenor.
 
 Do not tell customers that Avenor is SOC 2 certified, ISO 27001 certified, penetration-tested or “100% secure”. The accurate description today is that Avenor uses Supabase Auth and PostgreSQL RLS, enforces organization-level data access and has passed a limited staging paywall test.
 
 ## Current architecture and data flow
 
 1. A founder signs in through Supabase Auth. The browser receives a Supabase session and uses only the public publishable key.
-2. The Next.js application and server routes run on Vercel. The known Preview deployment used the Dublin `dub1` function region.
-3. Workspace records are held in Supabase Postgres. The staging project is in `eu-west-1`. The production project's region must be independently confirmed before making a data-residency statement.
+2. The Next.js application and server routes run on Vercel. The tested Preview deployment uses the Dublin `dub1` function region. The Production deployment remains on its existing `main` build and has not been modified by the correction branch.
+3. Workspace records are held in Supabase Postgres. The staging project is in `eu-west-1`. The Production Supabase project `qeitvqzujytiiupmkmyp` was checked read-only and is also in `eu-west-1`. This identifies the database region, but does not by itself establish the end-to-end location or retention of every processor.
 4. Stripe Checkout and Billing Portal are intended to handle subscription payment details. Avenor stores the Stripe customer/subscription identifiers and subscription state, not raw card details.
 5. Avenor Copilot is designed to use Vercel AI Gateway. The intended model in the code is Anthropic Claude Sonnet 4.6. Successful model inference and provider-side retention/data processing terms have not been verified in this launch pass. Do not upload real customer financial records to the live Copilot until its data path and processor terms are confirmed.
 
@@ -34,7 +34,7 @@ Do not tell customers that Avenor is SOC 2 certified, ISO 27001 certified, penet
 
 RLS is enabled on the application tables in staging. Policies are applied per operation rather than assuming that authentication alone is sufficient.
 
-The staging database now contains an entitlement function that returns only a boolean to authenticated users. It checks that the current user belongs to the organization and that the linked Stripe subscription is either `trialing` or `active`, with a non-expired current period. The trial-claim table and Stripe webhook receipt table have RLS enabled, no client-facing policies and no table privileges for `anon` or `authenticated`; they are intended for server-side service-role access only.
+The staging database now contains an entitlement function that returns only a boolean to authenticated users. It checks that the current user belongs to the organization and that the linked Stripe subscription is either `trialing` or `active`, with a non-expired current period. Migration 014 saves approved model versions atomically, and migration 015 adds a database-enforced unique index allowing at most one approved model per workspace. The trial-claim table, API rate-limit table and Stripe webhook receipt table have RLS enabled, no client-facing policies and no table privileges for `anon` or `authenticated`; they are intended for server-side service-role access only. A user's one-time trial claim survives workspace deletion: its workspace reference is set to NULL rather than deleting the per-user claim.
 
 ### Stripe subscription and access controls
 
@@ -43,7 +43,7 @@ The staging database now contains an entitlement function that returns only a bo
 - Trial eligibility is reserved per authenticated user and retained after the trial is used, so a returning user cannot claim another free trial by creating a second workspace.
 - Stripe webhooks verify the signature and record event IDs for idempotency.
 - Workspace access is granted only while the Stripe subscription is `trialing` or `active` and its current period has not ended.
-- Failed-payment, cancellation and expiry states are synchronized from Stripe webhooks. The live Checkout/webhook integration has not yet been exercised with a real Stripe test-mode flow.
+- Failed-payment, cancellation and expiry states are synchronized from Stripe webhooks. The Stripe integration has been exercised in test mode for a synthetic 30-day trial subscription, signed webhook delivery, trial-period synchronization, cancellation and entitlement revocation. The authenticated browser journey through Avenor Checkout and the Billing Portal remains untested.
 
 ### Data import
 
@@ -64,18 +64,24 @@ The following checks were run against the isolated Avenor staging project, not P
 - The authenticated role had no SELECT privilege on `public.billing_trial_claims`.
 - The public entitlement RPC cannot be executed by the `anon` role; it is granted to `authenticated` only.
 
-These checks prove the tested no-subscription path in staging. They do not prove every API, every role combination, every two-customer isolation scenario or the Production configuration.
+Additional staging-only entitlement simulations were run with all writes rolled back: an unentitled user saw zero actuals/models/scenarios/context; a trialing/active subscription exposed only its own workspace data; a `past_due` subscription and a non-member user saw zero rows. These are read-path simulations, not a full CRUD or two-customer acceptance suite.
+
+The Preview correction branch also adds an origin/Fetch Metadata check to mutating API routes (Stripe webhooks are exempt and instead verify Stripe signatures) and Postgres-backed per-user rate limits for Copilot, CSV import, Checkout, Billing Portal and CFO Brief. Migration 012 was applied to staging. The rate-limit table has RLS enabled and no privileges for `anon` or `authenticated`; a permission check confirmed the authenticated role cannot read the table or execute its RPC. The database rate-limit function was exercised in a rolled-back test: the first two calls were allowed, the third was blocked, and authenticated users were denied table read and function execution. The HTTP middleware and route-level limiter have CI coverage/build validation, but still need authenticated browser and concurrent-load acceptance. Password reset now enforces the same 12-character, mixed-case, digit and symbol policy as sign-up; this is a partial mitigation, not a substitute for Supabase leaked-password protection.
+
+A full Stripe test-mode subscription lifecycle was exercised against the isolated QA workspace. A synthetic customer and EUR 59/month, 30-day trial subscription were created in Stripe test mode. Stripe delivered a signed `customer.subscription.created` event to the Preview webhook; the event receipt and subscription were persisted in staging. This exposed an integration gap: Stripe flexible billing can provide `current_period_end` on the subscription item rather than the top-level object. The webhook now reads the top-level value or falls back to the latest item-level period end. A subsequent signed `customer.subscription.updated` event populated the expected period end; authenticated staging access then became true and the expected 66 financial actuals were visible. The test subscription was canceled in Stripe test mode; the signed deletion event changed staging status to `canceled`, `has_organization_access` became false, and financial actuals became invisible. The temporary subscription row was then removed from the synthetic demo workspace. No live charge was made. The test customer in Stripe test mode remains a non-chargeable synthetic QA record.
+
+These checks prove only the described paths in staging. They do not prove every API, write operation, role combination, every two-customer isolation scenario or the Production configuration.
 
 ## Known gaps — do not claim these are complete
 
-1. **Leaked-password protection:** Supabase Security Advisor still reports this control disabled in staging. Enable it in Supabase Auth settings (subject to plan availability) before public registration.
+1. **Leaked-password protection:** Supabase Security Advisor reports this control disabled. The connected Supabase organization is on the Free plan; Supabase lists leaked-password protection as Pro and above. It cannot be enabled on the current plan. Upgrade is a paid account decision; after upgrade, enable it in Auth → Sign In / Providers → Email and verify the advisor is clear. Until then, keep registration limited to invited test users and enforce a strong minimum password policy as a partial mitigation.
 2. **Independent security assessment:** No independent penetration test or vulnerability assessment of the Avenor application has been commissioned or completed.
 3. **Cross-customer isolation:** A complete test with two separate authenticated users in two separate organizations, including attempted cross-tenant reads and writes across every table and API, remains to be completed.
-4. **Backups and recovery:** The actual plan-level backup settings for each Avenor project, retention period, point-in-time recovery eligibility and a restore test have not been verified. Do not promise a recovery time or recovery point until measured.
-5. **Production configuration:** The Production database, deployment region, environment variables, firewall/rate limits and webhook settings must be audited separately. Staging results do not transfer automatically.
-6. **AI provider:** Successful AI Gateway inference was not evidenced in the previous seven-day usage query. Confirm provider routing, data retention, data-use terms, region and subprocessors before sending real customer data.
-7. **Legal documents:** `/privacy` and `/terms` are not live. There is no customer-ready Avenor DPA, subprocessor register or published retention/deletion policy yet.
-8. **Data lifecycle:** Customer self-service export and deletion, support-assisted erasure, retention limits for Copilot conversations and a documented backup-deletion schedule are not complete.
+4. **Backups and recovery:** The current Supabase organization is on the Free plan. Automatic backups and point-in-time recovery are not included on Free; upgrade and verify backup retention/restore eligibility before accepting customer financial data. No restore drill has been completed. Do not promise a recovery time or recovery point until measured.
+5. **Production configuration:** A read-only check on 16 November 2026 found that Production Supabase project `qeitvqzujytiiupmkmyp` is in `eu-west-1`, has zero business rows and has RLS enabled on its 10 existing tables. Its migration history stops at the recovered baseline (through migration 006); it does not yet contain migrations 007–015, including organization context, billing trial/entitlement, rate-limit and atomic model-save changes. The current Production Vercel deployment still points to `main`; only the Vercel-managed `financeosss.vercel.app` domain is attached. Production Vercel environment variables include the public Supabase URL/key but no Stripe Live or service-role secret was found. Do not deploy the correction branch to Production until the missing migrations and settings are reviewed, applied in order and smoke-tested.
+6. **AI provider:** The seven-day Vercel AI Gateway usage query for the project returned no requests as of 16 November 2026. A live Copilot inference and provider response region have not been evidenced. Confirm provider routing, data retention, data-use terms, region and subprocessors before sending real customer data.
+7. **Legal documents:** `/privacy` and `/terms` are not live. There is no customer-ready Avenor DPA, subprocessor register or published retention/deletion policy yet. The legal operator, registered address, support contact, governing law, VAT status and customer geography have not been confirmed, so these cannot responsibly be published as finalized terms.
+8. **Data lifecycle:** The correction branch now includes owner/admin workspace export and owner-only workspace erasure from the active database. Erasure requires exact workspace-name and phrase confirmation, blocks pending Checkout and cancels any linked Stripe subscription first. It does not delete the individual Supabase Auth account, provider backups or statutory Stripe billing records. Backup expiry/retention, account-level erasure and a support-assisted request process remain to be defined and verified.
 9. **Operational security:** Incident response, breach notification, access reviews, privileged-account MFA, security alert ownership, support escalation and periodic restore exercises need documented owners and rehearsals.
 
 ## How to prove data protection to a prospective customer

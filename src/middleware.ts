@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
 import { getSupabasePublicConfig } from '@/lib/supabase/config';
+import { isSameOriginMutation } from '@/lib/request-security';
 
 export async function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname;
@@ -9,6 +10,15 @@ export async function middleware(request: NextRequest) {
   const isSubscribe = pathname === '/subscribe' || pathname.startsWith('/subscribe/');
   const isProtectedPage = isAppPage || isOnboarding || isSubscribe;
   const supabaseConfig = getSupabasePublicConfig();
+
+  // Cookie-authenticated write routes must not accept cross-site browser requests.
+  // Stripe webhooks authenticate independently with their signed payload.
+  const isMutatingApi = pathname.startsWith('/api/') &&
+    !['GET', 'HEAD', 'OPTIONS'].includes(request.method.toUpperCase()) &&
+    pathname !== '/api/billing/webhook';
+  if (isMutatingApi && !isSameOriginMutation(request)) {
+    return NextResponse.json({ error: 'Cross-origin request rejected' }, { status: 403 });
+  }
 
   // The public marketing site must remain accessible even before setup.
   if (!supabaseConfig) {

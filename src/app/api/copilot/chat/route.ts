@@ -20,6 +20,7 @@ import {
 import { validateModelInputs, type HireInput, type ModelInputs } from '@/lib/finance';
 import { buildCopilotFallback } from '@/lib/copilot-fallback';
 import { CompanyContextSchema, EMPTY_COMPANY_CONTEXT, type CompanyContext } from '@/lib/company-context';
+import { enforceApiRateLimit } from '@/lib/rate-limit';
 
 export const maxDuration = 60;
 
@@ -106,6 +107,14 @@ export async function POST(request: Request) {
       .maybeSingle();
     if (!membership) {
       return NextResponse.json({ error: 'Workspace access denied' }, { status: 403 });
+    }
+
+    const rateLimit = await enforceApiRateLimit(user.id, 'copilot');
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Copilot message limit reached. Please wait before sending another message.' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } },
+      );
     }
 
     const { data: approvedModel } = await supabase
