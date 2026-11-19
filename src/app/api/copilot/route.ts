@@ -59,7 +59,7 @@ export async function POST(req: Request) {
 
     let aiStatus: 'gateway' | 'deterministic_fallback' = 'deterministic_fallback';
     let aiModel: string | null = null;
-    const gatewayToken = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
+    const gatewayToken = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN || req.headers.get('x-vercel-oidc-token');
     if (gatewayToken) {
       const model = process.env.AI_GATEWAY_MODEL || 'openai/gpt-4.1-mini';
       try {
