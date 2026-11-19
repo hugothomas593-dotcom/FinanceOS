@@ -10,6 +10,11 @@ const RequestSchema = z.object({
   hire: z.object({ headcount: z.number().int().min(1).max(500), startMonth: z.number().int().min(0).max(35), grossAnnualSalary: z.number().nonnegative(), employerCostRate: z.number().min(0).max(3), benefitsMonthlyPerPerson: z.number().nonnegative(), recruitingCostPerPerson: z.number().nonnegative(), equipmentCostPerPerson: z.number().nonnegative(), productivityRampMonths: z.number().int().min(0).max(36) }).optional()
 });
 
+type GatewayResponse = {
+  output?: Array<{ content?: Array<{ type?: string; text?: string }> }>;
+  error?: { message?: string };
+};
+
 export async function POST(req: Request) {
   try {
     const { supabase, user } = await requireUser();
@@ -19,8 +24,7 @@ export async function POST(req: Request) {
     const { data: membership } = await supabase.from('organization_members').select('role').eq('organization_id', organizationId).eq('user_id', user.id).maybeSingle();
     if (!membership) return NextResponse.json({ error: 'Organization access denied' }, { status: 403 });
 
-    // Copilot invokes a paid model provider when configured; enforce the shared
-    // Postgres-backed per-user limit before doing any forecast or AI work.
+    // Rate-limit before any forecast or paid model work; fail closed on DB errors.
     let rateLimit;
     try {
       rateLimit = await enforceApiRateLimit(user.id, 'copilot');
@@ -34,7 +38,8 @@ export async function POST(req: Request) {
       );
     }
 
-    const { data: approvedModel } = await supabase.from('model_versions').select('assumptions').eq('organization_id', organizationId).eq('status', 'approved').order('created_at', { ascending: false }).limit(1).maybeSingle();
+    const { data: approvedModel, error: modelError } = await supabase.from('model_versions').select('assumptions').eq('organization_id', organizationId).eq('status', 'approved').order('created_at', { ascending: false }).limit(1).maybeSingle();
+    if (modelError) return NextResponse.json({ error: 'Could not load the approved financial model.' }, { status: 500 });
     const modelInputs = approvedModel?.assumptions as ModelInputs | undefined;
     if (!modelInputs) return NextResponse.json({ answer: 'I need an approved financial model before I can calculate a reliable answer. Add your company assumptions and approve a model version first.', evidence: [], needsData: true });
     try { validateModelInputs(modelInputs); } catch { return NextResponse.json({ error: 'The approved financial model contains invalid assumptions. Review and approve a corrected version.' }, { status: 422 }); }
@@ -51,17 +56,46 @@ export async function POST(req: Request) {
     let explanation = `Based on the assumptions supplied, projected cash at month 18 is ${Math.round(scenarioSummary.endingCash).toLocaleString('en-GB')} EUR. The base case is ${Math.round(baseSummary.endingCash).toLocaleString('en-GB')} EUR. `;
     if (hire) explanation += `The hiring scenario adds ${hire.headcount} people from forecast month ${hire.startMonth + 1}; the model includes salary, employer-cost assumption, benefits, recruitment and equipment. It assumes no automatic revenue uplift from the hires. `;
     explanation += scenarioSummary.firstMonthBelowSixMonthsRunway ? `The modeled monthly burn implies less than six months of runway in forecast month ${scenarioSummary.firstMonthBelowSixMonthsRunway}.` : 'The model does not identify a month below six months of runway using its monthly net-burn calculation.';
-    if (process.env.OPENAI_API_KEY) {
+
+    let aiStatus: 'gateway' | 'deterministic_fallback' = 'deterministic_fallback';
+    let aiModel: string | null = null;
+    const gatewayToken = process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN;
+    if (gatewayToken) {
+      const model = process.env.AI_GATEWAY_MODEL || 'openai/gpt-4.1-mini';
       try {
-        const ai = await fetch('https://api.openai.com/v1/responses', { method: 'POST', headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ model: process.env.OPENAI_MODEL || 'gpt-4.1-mini', input: [{ role: 'system', content: 'You are Avenor, a careful startup finance analyst. Explain only the supplied deterministic results and evidence. Never invent data, tax rules or recommendations. Clearly distinguish assumptions from facts. Do not claim certainty.' }, { role: 'user', content: JSON.stringify({ question, facts, evidence }) }], max_output_tokens: 500 }), signal: AbortSignal.timeout(15000) });
-        if (ai.ok) {
-          const payload = await ai.json();
-          const output = payload.output?.flatMap((item: { content?: { type: string; text?: string }[] }) => item.content ?? []).filter((c: { type: string }) => c.type === 'output_text').map((c: { text?: string }) => c.text).join('\n');
-          if (output) explanation = output;
+        const response = await fetch('https://ai-gateway.vercel.sh/v1/responses', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${gatewayToken}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            model,
+            input: [
+              { role: 'system', content: 'You are Avenor, a careful startup finance analyst. Explain only the supplied deterministic results and evidence. Never invent data, tax rules or recommendations. Clearly distinguish assumptions from facts. Do not claim certainty. If the question cannot be answered from the supplied facts, say what additional information is needed.' },
+              { role: 'user', content: JSON.stringify({ question, facts, evidence }) },
+            ],
+            max_output_tokens: 500,
+          }),
+          signal: AbortSignal.timeout(15_000),
+        });
+        const payload = await response.json().catch(() => null) as GatewayResponse | null;
+        const output = payload?.output?.flatMap((item) => item.content ?? []).filter((part) => part.type === 'output_text' && typeof part.text === 'string').map((part) => part.text).join('\n');
+        if (response.ok && output) {
+          explanation = output;
+          aiStatus = 'gateway';
+          aiModel = model;
         }
-      } catch { /* deterministic explanation remains available if the AI provider is unavailable */ }
+      } catch {
+        // Keep the deterministic result, but expose that live AI inference was unavailable.
+      }
     }
-    return NextResponse.json({ answer: explanation, facts, evidence, disclaimer: 'Forecast only. Results depend on the supplied assumptions and are not accounting, tax, legal or investment advice.' });
+
+    return NextResponse.json({
+      answer: explanation,
+      facts,
+      evidence,
+      aiStatus,
+      aiModel,
+      disclaimer: 'Forecast only. Results depend on the supplied assumptions and are not accounting, tax, legal or investment advice.',
+    });
   } catch (e) {
     const message = e instanceof Error ? e.message : 'Unknown error';
     const unauthenticated = message === 'UNAUTHENTICATED';
