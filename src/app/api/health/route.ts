@@ -6,8 +6,11 @@ export async function GET() {
     (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
   );
 
-  // Vercel deployments can authenticate to AI Gateway with OIDC; this is not a live model test.
-  const aiGatewayIdentityAvailable = Boolean(process.env.AI_GATEWAY_API_KEY || process.env.VERCEL === '1');
+  // Vercel provides VERCEL_OIDC_TOKEN on deployments; VERCEL=1 alone does not
+  // prove that the deployment has credentials accepted by AI Gateway.
+  const aiGatewayIdentityAvailable = Boolean(
+    process.env.AI_GATEWAY_API_KEY || process.env.VERCEL_OIDC_TOKEN,
+  );
   const stripeCheckoutConfigured = Boolean(
     process.env.STRIPE_SECRET_KEY &&
     process.env.STRIPE_PRICE_ID &&
